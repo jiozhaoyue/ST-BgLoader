@@ -60,5 +60,83 @@ npm run type-check # TypeScript 严格类型检查
 
 ---
 
+## 🛠️ 开发者基建与公共 API 规范 (Developer SDK & Infrastructure API)
+
+ST-BgLoader 在全局挂载了高性能门面对象 `window.stBgLoader`（及 `window.STBgLoader.api`），专为**角色卡 (Character Cards)**、**快速回复 (Quick Replies)**、**世界书宏 (World Info)**、**自定义脚本**及**第三方扩展**打造，使其能作为多媒体基建自由驱动视觉与声效：
+
+### 1. 动态切换背景 (setBackground)
+```javascript
+// 支持视频 (MP4/WebM)、HTML5 动态沙箱、SVG 矢量动画、图像
+await window.stBgLoader.setBackground('https://example.com/cyberpunk-street.mp4', {
+    type: 'video',                          // 可选：'video' | 'audio' | 'html' | 'svg' | 'image' (默认自动嗅探)
+    filters: { blur: 2, brightness: 90 },   // 可选：覆盖视觉滤镜
+    interactive: false,                     // 可选：是否允许鼠标穿透交互
+    name: 'Cyberpunk Rain'                  // 可选：显示名称
+});
+
+// 清空当前背景
+window.stBgLoader.clearBackground();
+```
+
+### 2. 背景音乐与音效控制 (BGM & Playlist)
+```javascript
+// 播放指定音频（遵循静音就绪策略，产生用户交互后平滑渐入音量）
+await window.stBgLoader.playBGM('https://example.com/ambient-rain.mp3', {
+    title: 'Rainy Cafe Ambience',
+    volume: 0.7,
+    loop: true
+});
+
+// 平滑渐出停止音频
+window.stBgLoader.stopBGM(500); // 500ms 平滑淡出
+
+// 播放控制
+window.stBgLoader.togglePlay();
+window.stBgLoader.nextTrack();
+window.stBgLoader.prevTrack();
+window.stBgLoader.setVolume(0.8);
+window.stBgLoader.setMuted(false);
+```
+
+### 3. 视觉滤镜与预设切换 (Visual Filters & Presets)
+```javascript
+// 即时或动态微调 CSS 滤镜
+window.stBgLoader.setFilters({
+    blur: 5,         // 0 - 20px
+    brightness: 110, // 0 - 200%
+    opacity: 95,     // 0 - 100%
+    saturate: 130    // 0 - 200%
+});
+
+// 一键切换风格预设 ('default', 'cinema_dark', 'cyberpunk', 'vintage_sepia', 'dreamy_bloom', 'monochrome' 或用户自定义预设)
+window.stBgLoader.applyPreset('cyberpunk');
+
+// 切换 3D / WebGL / Canvas 背景的鼠标交互穿透状态
+window.stBgLoader.setInteractive(true);
+```
+
+### 4. 状态查询与事件监听总线 (Event Bus)
+```javascript
+// 获取当前播放状态、活跃背景与滤镜数值
+const state = window.stBgLoader.getPlaybackState();
+console.log('Current Track:', state.currentTrack?.name, 'Playing:', state.isPlaying);
+
+// 订阅事件 (返回取消订阅函数)
+const unsubscribe = window.stBgLoader.on('track-change', (track) => {
+    console.log('Track changed to:', track ? track.name : 'None');
+});
+
+window.stBgLoader.on('media-change', (media) => {
+    console.log('Background changed to:', media?.name);
+});
+
+window.stBgLoader.on('preset-change', (presetId, filters) => {
+    console.log('Filter preset applied:', presetId);
+});
+```
+
+---
+
 ## 📄 许可说明
 本项目遵循 MIT 协议开源。
+
