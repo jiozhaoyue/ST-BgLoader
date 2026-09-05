@@ -169,3 +169,38 @@ Implemented preloadMedia in PublicAPI and CacheManager for streaming background 
 ### Next Steps
 
 - Final review and project wrap-up
+
+
+## Session 5: Phase 5: Large File (105MB) Streaming & Resilience Stress Testing
+<!-- trellis-session: v=2 fp=2d7c136d7d9aac03 -->
+
+**Date**: 2026-09-05
+**Task**: Phase 5: Large File (105MB) Streaming & Resilience Stress Testing
+**Branch**: `master`
+
+### Summary
+
+Conducted large file streaming and edge case resilience stress testing against live SillyTavern. 105MB binary media stream stored in 275ms and mounted in 25ms. Rapid 10x/sec cross-media switching cleanly cancelled with zero zombie elements. Corrupted blobs and 404 URLs gracefully handled. Verified zero Blob URL leaks.
+
+### Main Changes
+
+- Hardened MediaMount with crossfadeTimer reentrancy cancellation for rapid switching
+- Implemented comprehensive tests/stress.mjs covering 105MB binary stream, rapid switching, corrupted media, and Blob URL revocation
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `4ed4712` | test: implement 105MB large stream and resilience stress suite, passing all tests |
+
+### Testing
+
+- [OK] All 4 extreme stress tests and all 14 baseline E2E tests passed 100% against live instance
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- Keep local private git repository secure and report completion to user
