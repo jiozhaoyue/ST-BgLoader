@@ -135,8 +135,26 @@ window.stBgLoader.on('preset-change', (presetId, filters) => {
 });
 ```
 
+### 5. 流式静默预加载 (preloadMedia)
+```javascript
+// 角色卡可在对话前预载多个场景资源，自动写入 CacheStorage 实现零网络延迟即时渲染
+const results = await window.stBgLoader.preloadMedia([
+    'https://example.com/scene1.mp4',
+    'https://example.com/scene2.webm',
+    'https://example.com/bgm1.mp3'
+], {
+    concurrency: 2, // 并发下载数（默认 3）
+    onProgress: (loaded, total, currentUrl) => {
+        console.log(`Preloaded ${loaded}/${total}: ${currentUrl}`);
+    }
+});
+
+console.log('Preload results:', results);
+```
+
 ---
 
 ## 📄 许可说明
 本项目遵循 MIT 协议开源。
+
 

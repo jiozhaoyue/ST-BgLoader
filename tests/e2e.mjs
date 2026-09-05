@@ -421,8 +421,53 @@ async function runE2ETests() {
         }
         console.log('✅ Test 13 Passed: Autoplay unmute and smooth volume ramp verified.');
 
+        // 14. Test preloadMedia API & Streaming CacheStorage Warming
+        console.log('🧪 Test 14: Testing preloadMedia API & CacheStorage Warming...');
+        const preloadResult = await page.evaluate(async () => {
+            const api = window.stBgLoader;
+            const testUrl = window.location.origin + '/favicon.ico';
+
+            let progressFired = false;
+            let completeFired = false;
+
+            const unsubP = api.on('preload-progress', () => { progressFired = true; });
+            const unsubC = api.on('preload-complete', () => { completeFired = true; });
+
+            // 1. First preload: should fetch and cache
+            const results1 = await api.preloadMedia([testUrl], { concurrency: 1 });
+            const firstResult = results1[0];
+
+            // 2. Second preload: should hit existing cache (cached: true)
+            const results2 = await api.preloadMedia(testUrl);
+            const secondResult = results2[0];
+
+            unsubP();
+            unsubC();
+
+            // 3. Verify media is in cache library and can be mounted instantly
+            const list = await api.getMediaList();
+            const cachedItem = list.find(i => i.url === testUrl);
+
+            return {
+                firstSuccess: firstResult?.success,
+                firstCached: firstResult?.cached,
+                secondSuccess: secondResult?.success,
+                secondCached: secondResult?.cached,
+                foundInList: !!cachedItem,
+                progressFired,
+                completeFired,
+                success: firstResult?.success && secondResult?.cached === true && !!cachedItem && progressFired && completeFired,
+            };
+        });
+        console.log('   Preload test result:', preloadResult);
+        if (!preloadResult.success) {
+            console.error('❌ Test 14 Failed: preloadMedia verification failed!');
+            process.exit(1);
+        }
+        console.log('✅ Test 14 Passed: preloadMedia API and idempotent CacheStorage warming verified.');
+
         console.log('\n==========================================');
-        console.log('🎉 ALL 13 AUTOMATED E2E TESTS PASSED! 🎉');
+        console.log('🎉 ALL 14 AUTOMATED E2E TESTS PASSED! 🎉');
         console.log('==========================================\n');
 
     } catch (err) {

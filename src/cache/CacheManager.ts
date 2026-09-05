@@ -234,6 +234,38 @@ export class CacheManager {
         });
     }
 
+    public async preloadUrl(url: string, type?: MediaType): Promise<{ item: MediaItem; isNew: boolean }> {
+        if (!this.db || !this.cache) await this.init();
+
+        const all = await this.listMedia();
+        const existing = all.find(i => i.url === url || i.cacheKey === url);
+        if (existing) {
+            await this.touchMedia(existing.id);
+            return { item: existing, isNew: false };
+        }
+
+        const filename = url.split('/').pop()?.split('?')[0] || 'preloaded_media';
+        const detectedType = type || this.detectMediaType(filename);
+
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`Failed to fetch media from ${url}: ${response.status} ${response.statusText}`);
+        }
+
+        const blob = await response.blob();
+        const item = await this.saveMedia(blob, filename, detectedType, 'url', url);
+        return { item, isNew: true };
+    }
+
+    public detectMediaType(filename: string): MediaType {
+        const ext = filename.split('.').pop()?.toLowerCase() || '';
+        if (['mp4', 'webm', 'mov', 'm4v', 'ogv'].includes(ext)) return 'video';
+        if (['mp3', 'wav', 'ogg', 'flac', 'aac', 'm4a'].includes(ext)) return 'audio';
+        if (ext === 'html' || ext === 'htm') return 'html';
+        if (ext === 'svg') return 'svg';
+        return 'image';
+    }
+
     private guessMimeType(name: string, type: MediaType): string {
         const ext = name.split('.').pop()?.toLowerCase();
         switch (ext) {

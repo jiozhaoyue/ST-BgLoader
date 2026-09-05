@@ -1,4 +1,4 @@
-import { VisualFilters, BUILTIN_PRESETS, MediaItem, MediaType, PlaybackState, BgLoaderSettings } from '../types';
+import { VisualFilters, BUILTIN_PRESETS, MediaItem, MediaType, PlaybackState, BgLoaderSettings, PreloadOptions, PreloadResult } from '../types';
 import type { STBgLoaderExtension } from '../index';
 
 export interface BackgroundOptions {
@@ -33,7 +33,7 @@ export class PublicAPI {
     public async setBackground(urlOrId: string, options?: BackgroundOptions): Promise<void> {
         // 1. Check if urlOrId matches an existing item in library
         const items = await this.ext.getCacheManager().listMedia();
-        let targetItem = items.find(i => i.id === urlOrId || i.name === urlOrId);
+        let targetItem = items.find(i => i.id === urlOrId || i.name === urlOrId || i.url === urlOrId || i.cacheKey === urlOrId);
 
         if (!targetItem) {
             // Treat as URL or path
@@ -89,7 +89,7 @@ export class PublicAPI {
         }
 
         const items = await this.ext.getCacheManager().listMedia();
-        let item = items.find(i => i.id === urlOrId || i.name === urlOrId);
+        let item = items.find(i => i.id === urlOrId || i.name === urlOrId || i.url === urlOrId || i.cacheKey === urlOrId);
 
         if (!item) {
             const title = options?.title || urlOrId.split('/').pop()?.split('?')[0] || 'BGM';
@@ -234,6 +234,52 @@ export class PublicAPI {
      */
     public async getMediaList(): Promise<MediaItem[]> {
         return this.ext.getCacheManager().listMedia();
+    }
+
+    /**
+     * Preload remote media files (video, audio, html, svg, images) into CacheStorage.
+     * Guarantees zero-network-delay instant switching when subsequently set as background or BGM.
+     */
+    public async preloadMedia(
+        urls: string | string[],
+        options?: PreloadOptions
+    ): Promise<PreloadResult[]> {
+        const list = Array.isArray(urls) ? urls : [urls];
+        const results: PreloadResult[] = [];
+        const concurrency = options?.concurrency || 3;
+        let completed = 0;
+
+        const queue = [...list];
+        const workers = Array.from({ length: Math.min(concurrency, queue.length) }, async () => {
+            while (queue.length > 0) {
+                const url = queue.shift()!;
+                try {
+                    const { item, isNew } = await this.ext.getCacheManager().preloadUrl(url);
+                    const res: PreloadResult = {
+                        url,
+                        success: true,
+                        cached: !isNew,
+                        size: item.size || 0,
+                    };
+                    results.push(res);
+                } catch (err: any) {
+                    results.push({
+                        url,
+                        success: false,
+                        cached: false,
+                        size: 0,
+                        error: err?.message || String(err),
+                    });
+                }
+                completed++;
+                options?.onProgress?.(completed, list.length, url);
+                this.emit('preload-progress', completed, list.length, url);
+            }
+        });
+
+        await Promise.all(workers);
+        this.emit('preload-complete', results);
+        return results;
     }
 
     // --- Event Bus ---

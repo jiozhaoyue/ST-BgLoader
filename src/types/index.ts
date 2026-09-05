@@ -64,6 +64,19 @@ export interface MediaItem {
     hasAudio?: boolean;
 }
 
+export interface PreloadOptions {
+    concurrency?: number;
+    onProgress?: (loadedCount: number, totalCount: number, currentUrl: string) => void;
+}
+
+export interface PreloadResult {
+    url: string;
+    success: boolean;
+    cached: boolean;
+    size: number;
+    error?: string;
+}
+
 export interface PlaybackState {
     isPlaying: boolean;
     currentTrack: MediaItem | null;
