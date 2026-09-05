@@ -133,3 +133,39 @@ Implemented public JavaScript SDK and event bus on window.stBgLoader, gesture-dr
 ### Next Steps
 
 - Provide developer guide and character card integration examples in README
+
+
+## Session 4: Phase 4: Streaming Preload Engine for Zero-Latency Asset Caching
+<!-- trellis-session: v=2 fp=c1d52f8836ddd0c4 -->
+
+**Date**: 2026-09-05
+**Task**: Phase 4: Streaming Preload Engine for Zero-Latency Asset Caching
+**Branch**: `master`
+
+### Summary
+
+Implemented preloadMedia in PublicAPI and CacheManager for streaming background preloading of remote media assets into CacheStorage, ensuring instantaneous zero-lag scene transitions for character cards and scripts. Passed all 14 automated E2E tests.
+
+### Main Changes
+
+- Implemented preloadUrl in CacheManager with idempotent CacheStorage caching and IDB cataloging
+- Added preloadMedia with concurrency control and progress callbacks to window.stBgLoader
+- Updated README.md with comprehensive preloadMedia developer guide
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `e07c0b9` | feat: implement streaming preloadMedia API and idempotent CacheStorage warming |
+
+### Testing
+
+- [OK] All 14 automated E2E tests passed against live SillyTavern instance via Puppeteer
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- Final review and project wrap-up
