@@ -1,0 +1,12 @@
+{
+    "display_name": "ST-BgLoader (Rich Media Backgrounds)",
+    "loading_order": 50,
+    "requires": [],
+    "optional": [],
+    "js": "dist/index.js",
+    "css": "dist/style.css",
+    "author": "jiozhaoyue",
+    "version": "1.0.0",
+    "homePage": "https://github.com/jiozhaoyue/ST-BgLoader",
+    "auto_update": false
+}

@@ -1,0 +1,16 @@
+{
+  "name": "st-bg-loader",
+  "version": "1.0.0",
+  "description": "Rich Media Background Plugin for SillyTavern supporting video, audio, HTML5, and SVG animations with hardware decoding and caching",
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite build --watch",
+    "type-check": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "puppeteer-core": "^25.10.0",
+    "typescript": "^5.4.0",
+    "vite": "^5.2.0"
+  }
+}
