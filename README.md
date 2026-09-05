@@ -65,6 +65,18 @@
 - **CacheStorage**：大文件流式存储与 Range 请求响应，内存零拷贝，实测 105MB 视频秒级载入。
 - **IndexedDB**：结构化元数据索引与 LRU 时间戳管理，支持磁盘配额超额自动清理。
 
+### 9. 环境白噪音发生器 (Procedural Ambient Sound Generator)
+- 原生 WebAudio 实时程序化合成雨声、壁炉木炭噼啪声与夜风，**无需额外下载音频文件**，可与 BGM 并存混合播放。
+
+### 10. 毛玻璃对话框穿透 (Frosted Glass Chat UI)
+- 开启后，SillyTavern 聊天消息框呈现通透磨砂毛玻璃质感，背景动效与微粒穿透可见，极大提升视觉沉浸度。
+
+### 11. 全景视听预设快照 (Scene Snapshots & Bookmarks)
+- 一键将当前媒体、BGM、滤镜、天气、律动、白噪音与毛玻璃打包为场景快照，支持一键切换。
+
+### 12. 视觉小说便捷快捷键 (Alt Shortcuts)
+- 支持 `Alt+B`（背景显示切换）、`Alt+P`（播放/暂停）、`Alt+M`（隔音滤波）、`Alt+W`（轮换天气）、`Alt+F`（毛玻璃开关）。
+
 ---
 
 ## 🚀 极速安装 (Installation)
@@ -85,7 +97,7 @@ git clone https://github.com/jiozhaoyue/ST-BgLoader.git
 npm install
 npm run build      # 极速打包出 dist/index.js 与 dist/style.css
 npm run type-check # TypeScript 严格类型检查
-node tests/e2e.mjs # 运行全套 20 项自动化 E2E 测试
+node tests/e2e.mjs # 运行全套 24 项自动化 E2E 测试
 ```
 
 ---

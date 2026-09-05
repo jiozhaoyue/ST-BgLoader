@@ -1,16 +1,20 @@
 import {
     BgLoaderSettings,
     BUILTIN_PRESETS,
+    BUILTIN_SCENES,
     FilterPreset,
     MediaItem,
     MediaType,
     PlaybackMode,
+    SceneSnapshot,
     TransitionType,
     TriggerRule,
     VisualizerMode,
     VisualizerOptions,
     WeatherOptions,
     WeatherType,
+    AmbientSoundOptions,
+    AmbientSoundType,
 } from '../types';
 import { CacheManager } from '../cache/CacheManager';
 
@@ -29,6 +33,9 @@ export interface SettingsDrawerCallbacks {
     onParallaxChanged?: (parallax: { enabled: boolean; intensity: number }) => void;
     onTransitionChanged?: (type: TransitionType, durationMs: number) => void;
     onMuffleChanged?: (muffled: boolean) => void;
+    onAmbientSoundChanged?: (options: AmbientSoundOptions) => void;
+    onFrostedChatChanged?: (options: { enabled: boolean; blur: number; opacity: number }) => void;
+    onSceneApplied?: (sceneId: string) => void;
 }
 
 export class SettingsDrawer {
@@ -92,6 +99,20 @@ export class SettingsDrawer {
                         <h4><i class="fa-solid fa-layer-group"></i> Media Library</h4>
                         <div class="st-bgloader-media-grid" id="st_bgloader_grid">
                             <!-- Injected dynamically -->
+                        </div>
+                    </div>
+
+                    <!-- Audiovisual Scene Presets Section -->
+                    <div class="st-bgloader-section">
+                        <h4><i class="fa-solid fa-earth-americas"></i> Audiovisual Scene Presets (全景视听预设)</h4>
+                        <div class="st-bgloader-preset-row">
+                            <label style="font-size: 0.9em; flex: 0 0 60px;">Scene:</label>
+                            <select id="st_scene_select">
+                                <!-- Populated dynamically -->
+                            </select>
+                            <button id="st_scene_apply_btn" class="menu_button" title="Apply Scene"><i class="fa-solid fa-play"></i> Apply</button>
+                            <button id="st_scene_save_btn" class="menu_button" title="Save current setup as custom scene"><i class="fa-solid fa-floppy-disk"></i></button>
+                            <button id="st_scene_del_btn" class="menu_button" title="Delete custom scene"><i class="fa-solid fa-trash"></i></button>
                         </div>
                     </div>
 
@@ -216,6 +237,49 @@ export class SettingsDrawer {
                         </div>
                     </div>
 
+                    <!-- Procedural Ambient Sound Generator Section -->
+                    <div class="st-bgloader-section">
+                        <h4><i class="fa-solid fa-fire"></i> Ambient Soundscape Generator (环境白噪音)</h4>
+                        
+                        <div class="st-bgloader-preset-row">
+                            <label style="font-size: 0.9em; flex: 0 0 90px;">Soundscape:</label>
+                            <select id="st_ambient_type">
+                                <option value="off" ${this.settings.ambientSound.type === 'off' ? 'selected' : ''}>Off (关闭白噪音)</option>
+                                <option value="rain" ${this.settings.ambientSound.type === 'rain' ? 'selected' : ''}>Gentle Rain (淅沥雨声)</option>
+                                <option value="fire" ${this.settings.ambientSound.type === 'fire' ? 'selected' : ''}>Fireplace Crackle (壁炉木炭噼啪)</option>
+                                <option value="wind" ${this.settings.ambientSound.type === 'wind' ? 'selected' : ''}>Howling Wind (空灵夜风)</option>
+                            </select>
+                        </div>
+
+                        <div class="st-bgloader-slider-row">
+                            <label>Volume</label>
+                            <input type="range" id="st_ambient_vol" min="0" max="100" step="5" value="${Math.round(this.settings.ambientSound.volume * 100)}" />
+                            <span class="st-bgloader-slider-val" id="st_ambient_vol_val">${Math.round(this.settings.ambientSound.volume * 100)}%</span>
+                        </div>
+                    </div>
+
+                    <!-- Frosted Glass Chat UI Section -->
+                    <div class="st-bgloader-section">
+                        <h4><i class="fa-solid fa-eye"></i> Frosted Glass Chat UI (毛玻璃对话框穿透)</h4>
+                        
+                        <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; margin-bottom: 8px;">
+                            <input type="checkbox" id="st_frosted_enabled" ${this.settings.frostedChat.enabled ? 'checked' : ''} />
+                            <span>Enable transparent blurred chat bubbles (穿透显示背景)</span>
+                        </label>
+
+                        <div class="st-bgloader-slider-row">
+                            <label>Blur</label>
+                            <input type="range" id="st_frosted_blur" min="0" max="25" step="1" value="${this.settings.frostedChat.blur}" />
+                            <span class="st-bgloader-slider-val" id="st_frosted_blur_val">${this.settings.frostedChat.blur}px</span>
+                        </div>
+
+                        <div class="st-bgloader-slider-row">
+                            <label>Opacity</label>
+                            <input type="range" id="st_frosted_opacity" min="20" max="100" step="5" value="${this.settings.frostedChat.opacity}" />
+                            <span class="st-bgloader-slider-val" id="st_frosted_opacity_val">${this.settings.frostedChat.opacity}%</span>
+                        </div>
+                    </div>
+
                     <!-- Scene Transitions -->
                     <div class="st-bgloader-section">
                         <h4><i class="fa-solid fa-wand-magic-sparkles"></i> Scene Transitions</h4>
@@ -271,6 +335,10 @@ export class SettingsDrawer {
                                 <span>Pause when tab inactive</span>
                             </label>
                             <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                                <input type="checkbox" id="st_shortcuts_enabled" ${this.settings.shortcutsEnabled ? 'checked' : ''} />
+                                <span>Enable Alt Shortcuts (Alt+B: 背景, Alt+P: 播放, Alt+M: 隔音, Alt+W: 天气, Alt+F: 毛玻璃)</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
                                 <input type="checkbox" id="st_mini_player_toggle" ${this.settings.showMiniPlayer ? 'checked' : ''} />
                                 <span>Show floating mini player capsule</span>
                             </label>
@@ -314,9 +382,35 @@ export class SettingsDrawer {
         this.container = drawer;
         this.bindEvents();
         this.populatePresets();
+        this.populateScenes();
         this.refreshMediaGrid();
         this.refreshTriggerList();
         this.updateCacheStats();
+    }
+
+    private populateScenes(): void {
+        const select = this.container?.querySelector('#st_scene_select') as HTMLSelectElement;
+        if (!select) return;
+
+        select.innerHTML = '';
+
+        // Add built-ins
+        Object.values(BUILTIN_SCENES).forEach((s) => {
+            const opt = document.createElement('option');
+            opt.value = s.id;
+            opt.textContent = s.name;
+            if (s.id === this.settings.activeSceneId) opt.selected = true;
+            select.appendChild(opt);
+        });
+
+        // Add user custom scenes
+        Object.entries(this.settings.scenes || {}).forEach(([id, s]) => {
+            const opt = document.createElement('option');
+            opt.value = id;
+            opt.textContent = `★ ${s.name} (Custom)`;
+            if (id === this.settings.activeSceneId) opt.selected = true;
+            select.appendChild(opt);
+        });
     }
 
     private populatePresets(): void {
@@ -394,6 +488,56 @@ export class SettingsDrawer {
             if (url) {
                 await this.handleUrlImport(url);
                 urlInput.value = '';
+            }
+        });
+
+        // Scene Controls
+        const sceneSelect = this.container.querySelector('#st_scene_select') as HTMLSelectElement;
+        this.container.querySelector('#st_scene_apply_btn')?.addEventListener('click', () => {
+            const id = sceneSelect?.value;
+            if (id) {
+                this.settings.activeSceneId = id;
+                this.callbacks.onSceneApplied?.(id);
+                this.callbacks.onSettingsChanged(this.settings);
+            }
+        });
+
+        this.container.querySelector('#st_scene_save_btn')?.addEventListener('click', () => {
+            const name = prompt('Enter a name for this custom audiovisual scene:');
+            if (name && name.trim()) {
+                const id = `scene_${Date.now()}`;
+                const newScene: SceneSnapshot = {
+                    id,
+                    name: name.trim(),
+                    mediaId: this.settings.activeMediaId || undefined,
+                    presetId: this.settings.activePresetId,
+                    filters: { ...this.settings.filters },
+                    weather: { ...this.settings.weather },
+                    visualizer: { ...this.settings.visualizer },
+                    parallax: { ...this.settings.parallax },
+                    ambientSound: { ...this.settings.ambientSound },
+                    frostedChat: this.settings.frostedChat.enabled,
+                };
+                this.settings.scenes[id] = newScene;
+                this.settings.activeSceneId = id;
+                this.populateScenes();
+                this.callbacks.onSettingsChanged(this.settings);
+            }
+        });
+
+        this.container.querySelector('#st_scene_del_btn')?.addEventListener('click', () => {
+            const current = sceneSelect?.value;
+            if (BUILTIN_SCENES[current]) {
+                alert('Cannot delete built-in scenes.');
+                return;
+            }
+            if (this.settings.scenes[current]) {
+                if (confirm(`Delete custom scene "${this.settings.scenes[current].name}"?`)) {
+                    delete this.settings.scenes[current];
+                    this.settings.activeSceneId = 'cyber_rain';
+                    this.populateScenes();
+                    this.callbacks.onSettingsChanged(this.settings);
+                }
             }
         });
 
@@ -513,6 +657,37 @@ export class SettingsDrawer {
             this.callbacks.onParallaxChanged?.(this.settings.parallax);
         });
 
+        // Ambient Sound Controls
+        const ambientSelect = this.container.querySelector('#st_ambient_type') as HTMLSelectElement;
+        ambientSelect?.addEventListener('change', () => {
+            this.settings.ambientSound.type = ambientSelect.value as AmbientSoundType;
+            this.callbacks.onAmbientSoundChanged?.(this.settings.ambientSound);
+            this.callbacks.onSettingsChanged(this.settings);
+        });
+
+        bindSlider('#st_ambient_vol', '#st_ambient_vol_val', '%', (v) => {
+            this.settings.ambientSound.volume = v / 100;
+            this.callbacks.onAmbientSoundChanged?.(this.settings.ambientSound);
+        });
+
+        // Frosted Glass Chat Controls
+        const frostedCb = this.container.querySelector('#st_frosted_enabled') as HTMLInputElement;
+        frostedCb?.addEventListener('change', () => {
+            this.settings.frostedChat.enabled = frostedCb.checked;
+            this.callbacks.onFrostedChatChanged?.(this.settings.frostedChat);
+            this.callbacks.onSettingsChanged(this.settings);
+        });
+
+        bindSlider('#st_frosted_blur', '#st_frosted_blur_val', 'px', (v) => {
+            this.settings.frostedChat.blur = v;
+            this.callbacks.onFrostedChatChanged?.(this.settings.frostedChat);
+        });
+
+        bindSlider('#st_frosted_opacity', '#st_frosted_opacity_val', '%', (v) => {
+            this.settings.frostedChat.opacity = v;
+            this.callbacks.onFrostedChatChanged?.(this.settings.frostedChat);
+        });
+
         // Transition Controls
         const transSelect = this.container.querySelector('#st_transition_effect') as HTMLSelectElement;
         transSelect?.addEventListener('change', () => {
@@ -552,6 +727,12 @@ export class SettingsDrawer {
         const blurCb = this.container.querySelector('#st_audio_blur') as HTMLInputElement;
         blurCb?.addEventListener('change', () => {
             this.settings.pauseOnBlur = blurCb.checked;
+            this.callbacks.onSettingsChanged(this.settings);
+        });
+
+        const shortcutsCb = this.container.querySelector('#st_shortcuts_enabled') as HTMLInputElement;
+        shortcutsCb?.addEventListener('change', () => {
+            this.settings.shortcutsEnabled = shortcutsCb.checked;
             this.callbacks.onSettingsChanged(this.settings);
         });
 

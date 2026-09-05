@@ -224,3 +224,23 @@ Completed atmospheric weather FX, audio visualizer, 2.5D parallax, scene transit
 ### Status
 
 [OK] **Completed**
+
+
+## Session 7: Add Ambient Sound, Frosted Glass, Scenes and Shortcuts
+<!-- trellis-session: v=2 fp=2dad727ea5ea3bd3 -->
+
+**Date**: 2026-09-06
+**Task**: Add Ambient Sound, Frosted Glass, Scenes and Shortcuts
+**Branch**: `master`
+
+### Summary
+
+Added procedural WebAudio ambient soundscape synthesizer, frosted glass transparent chat UI, scene snapshot bookmarks, visual novel shortcuts, and 24 passing E2E tests
+
+### Git Commits
+
+(No commits - planning session)
+
+### Status
+
+[OK] **Completed**

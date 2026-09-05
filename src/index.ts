@@ -11,6 +11,10 @@ import { AtmosphereFX } from './fx/AtmosphereFX';
 import { AudioVisualizer } from './visualizer/AudioVisualizer';
 import { ParallaxController } from './core/ParallaxController';
 import { TriggerManager } from './triggers/TriggerManager';
+import { AmbientSoundGenerator } from './audio/AmbientSoundGenerator';
+import { FrostedGlassController } from './ui/FrostedGlassController';
+import { SceneManager } from './core/SceneManager';
+import { ShortcutManager } from './core/ShortcutManager';
 
 const SETTINGS_KEY = 'st_bgloader_settings';
 
@@ -27,6 +31,10 @@ export class STBgLoaderExtension {
     private audioVisualizer: AudioVisualizer;
     private parallaxController: ParallaxController;
     private triggerManager: TriggerManager;
+    private ambientSoundGenerator: AmbientSoundGenerator;
+    private frostedGlassController: FrostedGlassController;
+    private sceneManager: SceneManager;
+    private shortcutManager: ShortcutManager;
     public publicApi: PublicAPI;
 
     constructor() {
@@ -37,6 +45,10 @@ export class STBgLoaderExtension {
         this.audioVisualizer = new AudioVisualizer();
         this.parallaxController = new ParallaxController();
         this.triggerManager = new TriggerManager();
+        this.ambientSoundGenerator = new AmbientSoundGenerator();
+        this.frostedGlassController = new FrostedGlassController();
+        this.sceneManager = new SceneManager();
+        this.shortcutManager = new ShortcutManager();
         this.publicApi = new PublicAPI(this);
     }
 
@@ -49,6 +61,10 @@ export class STBgLoaderExtension {
     public getAudioVisualizer(): AudioVisualizer { return this.audioVisualizer; }
     public getParallaxController(): ParallaxController { return this.parallaxController; }
     public getTriggerManager(): TriggerManager { return this.triggerManager; }
+    public getAmbientSoundGenerator(): AmbientSoundGenerator { return this.ambientSoundGenerator; }
+    public getFrostedGlassController(): FrostedGlassController { return this.frostedGlassController; }
+    public getSceneManager(): SceneManager { return this.sceneManager; }
+    public getShortcutManager(): ShortcutManager { return this.shortcutManager; }
     public getAPI(): PublicAPI { return this.publicApi; }
 
     public clearActiveBackground(): void {
@@ -93,6 +109,8 @@ export class STBgLoaderExtension {
         this.atmosphereFX.setWeather(this.settings.weather);
         this.audioVisualizer.setOptions(this.settings.visualizer);
         this.parallaxController.setOptions(this.settings.parallax);
+        this.ambientSoundGenerator.setSound(this.settings.ambientSound);
+        this.frostedGlassController.setOptions(this.settings.frostedChat);
 
         // 4. Configure AudioEngine
         this.audioEngine.setUrlResolver((item) => this.cacheManager.getMediaBlobUrl(item));
@@ -147,7 +165,66 @@ export class STBgLoaderExtension {
             }
         });
 
-        // 7. Setup Settings Drawer
+        // 7. Setup Scene Manager
+        this.sceneManager = new SceneManager(this.settings.scenes || {}, async (scene) => {
+            if (scene.mediaId) {
+                const item = await this.cacheManager.getMedia(scene.mediaId);
+                if (item) await this.applyMedia(item);
+            } else if (scene.mediaUrl) {
+                await this.publicApi.setBackground(scene.mediaUrl);
+            }
+            if (scene.bgmUrl) {
+                await this.publicApi.playBGM(scene.bgmUrl);
+            }
+            if (scene.presetId) {
+                this.publicApi.applyPreset(scene.presetId);
+            }
+            if (scene.filters) {
+                this.publicApi.setFilters(scene.filters);
+            }
+            if (scene.weather) {
+                this.publicApi.setWeather(scene.weather);
+            }
+            if (scene.visualizer) {
+                this.publicApi.setVisualizer(scene.visualizer);
+            }
+            if (scene.parallax) {
+                this.publicApi.setParallax(scene.parallax.enabled, scene.parallax.intensity);
+            }
+            if (scene.ambientSound) {
+                this.publicApi.setAmbientSound(scene.ambientSound);
+            }
+            if (typeof scene.frostedChat === 'boolean') {
+                this.publicApi.setFrostedChat(scene.frostedChat);
+            }
+        });
+
+        // 8. Setup Shortcut Manager (Alt+B, Alt+P, Alt+M, Alt+W, Alt+F)
+        this.shortcutManager = new ShortcutManager({
+            onToggleBackground: () => {
+                const cont = this.mediaMount.getContainerElement();
+                if (cont) {
+                    cont.style.display = cont.style.display === 'none' ? 'block' : 'none';
+                }
+            },
+            onTogglePlay: () => {
+                this.audioEngine.togglePlay();
+            },
+            onToggleMuffle: () => {
+                const current = this.audioEngine.getMuffled();
+                this.publicApi.setMuffled(!current);
+            },
+            onCycleWeather: () => {
+                this.publicApi.cycleWeather();
+            },
+            onToggleFrostedChat: () => {
+                const current = this.settings.frostedChat.enabled;
+                this.publicApi.setFrostedChat(!current);
+            },
+        });
+        this.shortcutManager.setEnabled(this.settings.shortcutsEnabled);
+
+        // 9. Setup Settings Drawer
         this.settingsDrawer = new SettingsDrawer(this.settings, this.cacheManager, {
             onSettingsChanged: (updated) => {
                 this.settings = updated;
@@ -155,6 +232,9 @@ export class STBgLoaderExtension {
                 this.mediaMount.applyFilters(this.settings.filters);
                 this.audioEngine.setVolume(this.settings.volume);
                 this.audioEngine.setMuted(this.settings.muted);
+                this.ambientSoundGenerator.setSound(this.settings.ambientSound);
+                this.frostedGlassController.setOptions(this.settings.frostedChat);
+                this.shortcutManager.setEnabled(this.settings.shortcutsEnabled);
             },
             onPresetChanged: (preset) => {
                 this.mediaMount.applyFilters(preset.filters);
@@ -220,7 +300,7 @@ export class STBgLoaderExtension {
         });
         this.settingsDrawer.render();
 
-        // 8. Setup Native Background Augmenter
+        // 10. Setup Native Background Augmenter
         this.nativeAugmenter = new NativeBgAugmenter(async (url, type, name) => {
             const virtualItem: MediaItem = {
                 id: 'native_' + name,
@@ -238,15 +318,15 @@ export class STBgLoaderExtension {
         });
         this.nativeAugmenter.start();
 
-        // 9. Register Global Lifecycle Hooks
+        // 11. Register Global Lifecycle Hooks
         document.addEventListener('visibilitychange', () => {
             this.audioEngine.handleVisibilityChange(document.hidden, this.settings.pauseOnBlur);
         });
 
-        // 10. Hook into SillyTavern EventSource
+        // 12. Hook into SillyTavern EventSource
         this.hookSillyTavernEvents();
 
-        // 11. Auto-restore active media if set
+        // 13. Auto-restore active media if set
         if (this.settings.activeMediaId) {
             const activeItem = await this.cacheManager.getMedia(this.settings.activeMediaId);
             if (activeItem) {
@@ -255,7 +335,7 @@ export class STBgLoaderExtension {
         }
 
         this.isInitialized = true;
-        console.log('[ST-BgLoader] Full-Power Initialization complete.');
+        console.log('[ST-BgLoader] All Modular Subsystems fully initialized.');
     }
 
     private async applyMedia(item: MediaItem): Promise<void> {

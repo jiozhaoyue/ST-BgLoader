@@ -187,7 +187,69 @@ window.stBgLoader.addTriggerRule({
 
 ---
 
-## ⚡ 7. 流式资源预热预加载 (Preload API)
+## 🌊 7. 环境白噪音发生器 (Ambient Sound APIs)
+
+### `api.setAmbientSound(typeOrOptions, volume?): void`
+播放程序化合成的逼真白噪音，不依赖外部音频文件，可与 BGM 同时并存播放。
+- **声音类型 (`type`)**：
+  - `'off'`：关闭白噪音
+  - `'rain'`：粉红噪声双带通滤波淅沥雨声
+  - `'fire'`：低频隆隆声搭配随机木炭噼啪声
+  - `'wind'`：LFO 低频正弦调制的空灵夜风
+- **音量 (`volume`)**：0.0 至 1.0
+
+```javascript
+window.stBgLoader.setAmbientSound('rain', 0.6);
+```
+
+### `api.getAmbientSound(): AmbientSoundOptions`
+获取当前环境白噪音状态。
+
+---
+
+## 🪟 8. 毛玻璃对话框穿透 (Frosted Glass Chat UI APIs)
+
+### `api.setFrostedChat(enabled: boolean, options?): void`
+开启或关闭透明毛玻璃对话气泡增强，使背景视频或粒子穿透显示在聊天消息背后。
+
+```javascript
+window.stBgLoader.setFrostedChat(true, {
+    blur: 14,      // 模糊度 (0-20px)
+    opacity: 70    // 不透明度 (20-100%)
+});
+```
+
+### `api.getFrostedChat(): { enabled: boolean; blur: number; opacity: number }`
+获取当前毛玻璃参数。
+
+---
+
+## 🗺️ 9. 全景视听预设快照 (Scene Snapshots APIs)
+
+### `api.applyScene(sceneId: string): boolean`
+一键应用完整场景包（背景 + BGM + 天气 + 滤镜 + 视差 + 白噪音 + 毛玻璃）。
+- 内置场景：`cyber_rain`, `cozy_fireplace`, `sakura_shrine`, `winter_cabin`
+- 自定义场景：用户保存的任意自定义快照 ID
+
+```javascript
+window.stBgLoader.applyScene('cyber_rain');
+```
+
+### `api.saveCurrentScene(name: string): SceneSnapshot`
+将当前所有视听状态打包保存为一个全新场景快照。
+
+### `api.getScenes(): Record<string, SceneSnapshot>`
+获取所有内置和自定义场景列表。
+
+### `api.deleteScene(id: string): boolean`
+删除自定义场景（内置场景不可删除）。
+
+### `api.cycleWeather(): WeatherType`
+按顺时针快速轮换天气模式 (`off` -> `rain` -> `snow` -> `sakura` -> `cyber_motes` -> `scanlines`)。
+
+---
+
+## ⚡ 10. 流式资源预热预加载 (Preload API)
 
 ### `api.preloadMedia(urls, options?): Promise<PreloadResult[]>`
 将高分辨率媒体批量预热至本地 `CacheStorage`，后续应用该资源时实现真正的 **0 毫秒秒切**。

@@ -659,8 +659,120 @@ async function runE2ETests() {
         }
         console.log('✅ Test 20 Passed: Smart Scene Trigger evaluation and rule management verified.');
 
+        // 21. Test Procedural Ambient Sound Generator
+        console.log('🧪 Test 21: Testing Procedural Ambient Sound Generator (rain, fire, wind, off)...');
+        const ambientResult = await page.evaluate(() => {
+            const api = window.stBgLoader;
+            api.setAmbientSound('rain', 0.6);
+            const rainOpt = api.getAmbientSound();
+
+            api.setAmbientSound('fire', 0.4);
+            const fireOpt = api.getAmbientSound();
+
+            api.setAmbientSound('off');
+            const offOpt = api.getAmbientSound();
+
+            return {
+                rain: rainOpt.type === 'rain' && rainOpt.volume === 0.6,
+                fire: fireOpt.type === 'fire' && fireOpt.volume === 0.4,
+                off: offOpt.type === 'off',
+                success: rainOpt.type === 'rain' && fireOpt.type === 'fire' && offOpt.type === 'off',
+            };
+        });
+        console.log('   Ambient sound result:', ambientResult);
+        if (!ambientResult.success) {
+            console.error('❌ Test 21 Failed: Ambient Sound Generator verification failed!');
+            process.exit(1);
+        }
+        console.log('✅ Test 21 Passed: Procedural Ambient Sound Generator (rain, fire, wind, off) verified.');
+
+        // 22. Test Frosted Glass Chat UI
+        console.log('🧪 Test 22: Testing Frosted Glass Chat UI (transparent blurred chat messages)...');
+        const frostedResult = await page.evaluate(() => {
+            const api = window.stBgLoader;
+            api.setFrostedChat(true, { blur: 14, opacity: 70 });
+            const isClassActive = document.body.classList.contains('st-bgloader-frosted-active');
+            const styleTag = document.getElementById('st-bgloader-frosted-style');
+            const state = api.getFrostedChat();
+
+            api.setFrostedChat(false);
+            const isClassRemoved = !document.body.classList.contains('st-bgloader-frosted-active');
+
+            return {
+                classActive: isClassActive,
+                classRemoved: isClassRemoved,
+                hasStyleTag: !!styleTag,
+                blur14: state.blur === 14,
+                success: isClassActive && isClassRemoved && !!styleTag && state.blur === 14,
+            };
+        });
+        console.log('   Frosted chat result:', frostedResult);
+        if (!frostedResult.success) {
+            console.error('❌ Test 22 Failed: Frosted Glass Chat UI verification failed!');
+            process.exit(1);
+        }
+        console.log('✅ Test 22 Passed: Frosted Glass Chat UI toggling and CSS custom properties verified.');
+
+        // 23. Test Audiovisual Scene Snapshots
+        console.log('🧪 Test 23: Testing Audiovisual Scene Snapshots & Bookmarks...');
+        const sceneResult = await page.evaluate(() => {
+            const api = window.stBgLoader;
+
+            // Apply built-in scene
+            const appliedBuiltin = api.applyScene('cyber_rain');
+            const weatherAfterScene = api.getWeather();
+            const allScenesBefore = api.getScenes();
+
+            // Save custom scene
+            const saved = api.saveCurrentScene('E2E Test Custom Scene');
+            const allScenesMiddle = api.getScenes();
+            const hasCustom = !!allScenesMiddle[saved.id];
+
+            // Delete custom scene
+            const deleted = api.deleteScene(saved.id);
+            const allScenesAfter = api.getScenes();
+            const removed = !allScenesAfter[saved.id];
+
+            return {
+                appliedBuiltin,
+                weatherIsRain: weatherAfterScene.type === 'rain',
+                hasBuiltins: !!allScenesBefore.cyber_rain && !!allScenesBefore.cozy_fireplace,
+                hasCustom,
+                deleted,
+                removed,
+                success: appliedBuiltin && weatherAfterScene.type === 'rain' && hasCustom && deleted && removed,
+            };
+        });
+        console.log('   Scene snapshots result:', sceneResult);
+        if (!sceneResult.success) {
+            console.error('❌ Test 23 Failed: Scene Snapshots verification failed!');
+            process.exit(1);
+        }
+        console.log('✅ Test 23 Passed: Audiovisual Scene Snapshots and custom bookmarks verified.');
+
+        // 24. Test Weather Cycling API
+        console.log('🧪 Test 24: Testing Quick Weather Cycling API (cycleWeather)...');
+        const cycleResult = await page.evaluate(() => {
+            const api = window.stBgLoader;
+            api.setWeather('off');
+            const w1 = api.cycleWeather(); // Should be 'rain'
+            const w2 = api.cycleWeather(); // Should be 'snow'
+
+            return {
+                w1,
+                w2,
+                success: w1 === 'rain' && w2 === 'snow',
+            };
+        });
+        console.log('   Weather cycle result:', cycleResult);
+        if (!cycleResult.success) {
+            console.error('❌ Test 24 Failed: cycleWeather verification failed!');
+            process.exit(1);
+        }
+        console.log('✅ Test 24 Passed: Weather cycling API verified.');
+
         console.log('\n==========================================');
-        console.log('🎉 ALL 20 AUTOMATED E2E TESTS PASSED! 🎉');
+        console.log('🎉 ALL 24 AUTOMATED E2E TESTS PASSED! 🎉');
         console.log('==========================================\n');
 
     } catch (err) {
@@ -672,4 +784,5 @@ async function runE2ETests() {
 }
 
 runE2ETests();
+
 

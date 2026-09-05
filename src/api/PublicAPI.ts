@@ -12,6 +12,9 @@ import {
     VisualizerMode,
     TransitionType,
     TriggerRule,
+    AmbientSoundOptions,
+    AmbientSoundType,
+    SceneSnapshot,
 } from '../types';
 import type { STBgLoaderExtension } from '../index';
 
@@ -306,6 +309,111 @@ export class PublicAPI {
     public getTriggerRules(): TriggerRule[] {
         return this.ext.getTriggerManager().getRules();
     }
+
+    /**
+     * Ambient sound generator (procedural rain, fire, wind)
+     */
+    public setAmbientSound(typeOrOptions: AmbientSoundType | AmbientSoundOptions, volume?: number): void {
+        let opts: AmbientSoundOptions;
+        if (typeof typeOrOptions === 'string') {
+            opts = {
+                type: typeOrOptions,
+                volume: volume !== undefined ? volume : this.ext.getSettings().ambientSound.volume,
+            };
+        } else {
+            opts = { ...typeOrOptions };
+        }
+
+        this.ext.getSettings().ambientSound = opts;
+        this.ext.getAmbientSoundGenerator().setSound(opts);
+        this.ext.saveSettings();
+        this.emit('ambient-sound-change', opts);
+    }
+
+    public getAmbientSound(): AmbientSoundOptions {
+        return { ...this.ext.getSettings().ambientSound };
+    }
+
+    /**
+     * Frosted glass transparent chat bubbles UI
+     */
+    public setFrostedChat(enabled: boolean, options?: { blur?: number; opacity?: number }): void {
+        const updated = {
+            enabled,
+            blur: options?.blur !== undefined ? options.blur : this.ext.getSettings().frostedChat.blur,
+            opacity: options?.opacity !== undefined ? options.opacity : this.ext.getSettings().frostedChat.opacity,
+        };
+        this.ext.getSettings().frostedChat = updated;
+        this.ext.getFrostedGlassController().setOptions(updated);
+        this.ext.saveSettings();
+        this.emit('frosted-chat-change', updated);
+    }
+
+    public getFrostedChat(): { enabled: boolean; blur: number; opacity: number } {
+        return { ...this.ext.getSettings().frostedChat };
+    }
+
+    /**
+     * Audiovisual Scene Snapshots
+     */
+    public applyScene(id: string): boolean {
+        const success = this.ext.getSceneManager().applyScene(id);
+        if (success) {
+            this.ext.getSettings().activeSceneId = id;
+            this.ext.saveSettings();
+            this.emit('scene-change', id);
+        }
+        return success;
+    }
+
+    public saveCurrentScene(name: string): SceneSnapshot {
+        const settings = this.ext.getSettings();
+        const snapshot: SceneSnapshot = {
+            id: `scene_${Date.now()}`,
+            name,
+            mediaId: settings.activeMediaId || undefined,
+            presetId: settings.activePresetId,
+            filters: { ...settings.filters },
+            weather: { ...settings.weather },
+            visualizer: { ...settings.visualizer },
+            parallax: { ...settings.parallax },
+            ambientSound: { ...settings.ambientSound },
+            frostedChat: settings.frostedChat.enabled,
+        };
+
+        this.ext.getSceneManager().saveScene(snapshot);
+        this.ext.getSettings().scenes = this.ext.getSceneManager().getUserScenes();
+        this.ext.saveSettings();
+        this.emit('scenes-change', this.ext.getSceneManager().getAllScenes());
+        return snapshot;
+    }
+
+    public getScenes(): Record<string, SceneSnapshot> {
+        return this.ext.getSceneManager().getAllScenes();
+    }
+
+    public deleteScene(id: string): boolean {
+        const deleted = this.ext.getSceneManager().deleteScene(id);
+        if (deleted) {
+            this.ext.getSettings().scenes = this.ext.getSceneManager().getUserScenes();
+            this.ext.saveSettings();
+            this.emit('scenes-change', this.ext.getSceneManager().getAllScenes());
+        }
+        return deleted;
+    }
+
+    /**
+     * Quick cycle through weather types
+     */
+    public cycleWeather(): WeatherType {
+        const types: WeatherType[] = ['off', 'rain', 'snow', 'sakura', 'cyber_motes', 'scanlines'];
+        const current = this.ext.getSettings().weather.type;
+        const nextIdx = (types.indexOf(current) + 1) % types.length;
+        const nextType = types[nextIdx];
+        this.setWeather(nextType);
+        return nextType;
+    }
+
 
     public getPlaybackState(): PlaybackState {
         const settings = this.ext.getSettings();
