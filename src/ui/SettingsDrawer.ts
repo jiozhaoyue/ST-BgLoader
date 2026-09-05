@@ -1,4 +1,17 @@
-import { BgLoaderSettings, BUILTIN_PRESETS, FilterPreset, MediaItem, MediaType, PlaybackMode } from '../types';
+import {
+    BgLoaderSettings,
+    BUILTIN_PRESETS,
+    FilterPreset,
+    MediaItem,
+    MediaType,
+    PlaybackMode,
+    TransitionType,
+    TriggerRule,
+    VisualizerMode,
+    VisualizerOptions,
+    WeatherOptions,
+    WeatherType,
+} from '../types';
 import { CacheManager } from '../cache/CacheManager';
 
 export interface SettingsDrawerCallbacks {
@@ -11,6 +24,11 @@ export interface SettingsDrawerCallbacks {
     onMiniPlayerToggle: (visible: boolean) => void;
     onCapsuleOnPlayToggle?: (enabled: boolean) => void;
     onPlaybackModeChanged: (mode: PlaybackMode) => void;
+    onWeatherChanged?: (weather: WeatherOptions) => void;
+    onVisualizerChanged?: (visualizer: VisualizerOptions) => void;
+    onParallaxChanged?: (parallax: { enabled: boolean; intensity: number }) => void;
+    onTransitionChanged?: (type: TransitionType, durationMs: number) => void;
+    onMuffleChanged?: (muffled: boolean) => void;
 }
 
 export class SettingsDrawer {
@@ -50,7 +68,7 @@ export class SettingsDrawer {
         drawer.innerHTML = `
             <div class="inline-drawer">
                 <div class="inline-drawer-toggle inline-drawer-header">
-                    <b><i class="fa-solid fa-photo-film"></i> ST-BgLoader (Rich Media Backgrounds)</b>
+                    <b><i class="fa-solid fa-photo-film"></i> ST-BgLoader (Rich Media Backgrounds & FX)</b>
                     <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
                 </div>
                 <div class="inline-drawer-content" style="display: flex; flex-direction: column; gap: 12px; padding-top: 10px;">
@@ -127,6 +145,99 @@ export class SettingsDrawer {
                         </div>
                     </div>
 
+                    <!-- Atmospheric Weather & Particles Section -->
+                    <div class="st-bgloader-section">
+                        <h4><i class="fa-solid fa-cloud-sun-rain"></i> Atmospheric Weather & Particles</h4>
+                        
+                        <div class="st-bgloader-preset-row">
+                            <label style="font-size: 0.9em; flex: 0 0 80px;">Weather:</label>
+                            <select id="st_weather_type">
+                                <option value="off" ${this.settings.weather.type === 'off' ? 'selected' : ''}>Off (关闭天气)</option>
+                                <option value="rain" ${this.settings.weather.type === 'rain' ? 'selected' : ''}>Rain (细雨微涟)</option>
+                                <option value="snow" ${this.settings.weather.type === 'snow' ? 'selected' : ''}>Snow (冬日飘雪)</option>
+                                <option value="sakura" ${this.settings.weather.type === 'sakura' ? 'selected' : ''}>Sakura (落樱缤纷)</option>
+                                <option value="cyber_motes" ${this.settings.weather.type === 'cyber_motes' ? 'selected' : ''}>Cyber Motes (赛博霓虹微粒)</option>
+                                <option value="scanlines" ${this.settings.weather.type === 'scanlines' ? 'selected' : ''}>Scanlines (复古CRT扫描线)</option>
+                            </select>
+                        </div>
+
+                        <div class="st-bgloader-preset-row">
+                            <label style="font-size: 0.9em; flex: 0 0 80px;">Density:</label>
+                            <select id="st_weather_density">
+                                <option value="low" ${this.settings.weather.density === 'low' ? 'selected' : ''}>Low (稀疏)</option>
+                                <option value="medium" ${this.settings.weather.density === 'medium' ? 'selected' : ''}>Medium (适中)</option>
+                                <option value="high" ${this.settings.weather.density === 'high' ? 'selected' : ''}>High (密集)</option>
+                            </select>
+                        </div>
+
+                        <div class="st-bgloader-slider-row">
+                            <label>Speed</label>
+                            <input type="range" id="st_weather_speed" min="5" max="25" step="1" value="${Math.round(this.settings.weather.speed * 10)}" />
+                            <span class="st-bgloader-slider-val" id="st_weather_speed_val">${this.settings.weather.speed}x</span>
+                        </div>
+
+                        <div class="st-bgloader-slider-row">
+                            <label>Opacity</label>
+                            <input type="range" id="st_weather_opacity" min="10" max="100" step="5" value="${Math.round(this.settings.weather.opacity * 100)}" />
+                            <span class="st-bgloader-slider-val" id="st_weather_opacity_val">${Math.round(this.settings.weather.opacity * 100)}%</span>
+                        </div>
+                    </div>
+
+                    <!-- Audio Visualizer & Motion Reactive Section -->
+                    <div class="st-bgloader-section">
+                        <h4><i class="fa-solid fa-chart-simple"></i> Audio Visualizer & Parallax</h4>
+                        
+                        <div class="st-bgloader-preset-row">
+                            <label style="font-size: 0.9em; flex: 0 0 90px;">Visualizer:</label>
+                            <select id="st_visualizer_mode">
+                                <option value="off" ${this.settings.visualizer.mode === 'off' ? 'selected' : ''}>Off (关闭律动)</option>
+                                <option value="pulse" ${this.settings.visualizer.mode === 'pulse' ? 'selected' : ''}>Pulse (低音呼吸律动)</option>
+                                <option value="spectrum" ${this.settings.visualizer.mode === 'spectrum' ? 'selected' : ''}>Spectrum (底部音频频谱)</option>
+                            </select>
+                        </div>
+
+                        <div class="st-bgloader-slider-row">
+                            <label>Sensitivity</label>
+                            <input type="range" id="st_visualizer_sens" min="5" max="25" step="1" value="${Math.round(this.settings.visualizer.sensitivity * 10)}" />
+                            <span class="st-bgloader-slider-val" id="st_visualizer_sens_val">${this.settings.visualizer.sensitivity}x</span>
+                        </div>
+
+                        <div style="margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 8px;">
+                            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                                <input type="checkbox" id="st_parallax_enabled" ${this.settings.parallax.enabled ? 'checked' : ''} />
+                                <span>Enable 2.5D Mouse Gyro Parallax (景深视差)</span>
+                            </label>
+                        </div>
+
+                        <div class="st-bgloader-slider-row" style="margin-top: 8px;">
+                            <label>Depth Intensity</label>
+                            <input type="range" id="st_parallax_intensity" min="1" max="10" step="1" value="${Math.round(this.settings.parallax.intensity * 10)}" />
+                            <span class="st-bgloader-slider-val" id="st_parallax_intensity_val">${this.settings.parallax.intensity}</span>
+                        </div>
+                    </div>
+
+                    <!-- Scene Transitions -->
+                    <div class="st-bgloader-section">
+                        <h4><i class="fa-solid fa-wand-magic-sparkles"></i> Scene Transitions</h4>
+                        
+                        <div class="st-bgloader-preset-row">
+                            <label style="font-size: 0.9em; flex: 0 0 90px;">Effect:</label>
+                            <select id="st_transition_effect">
+                                <option value="fade" ${this.settings.transitionEffect === 'fade' ? 'selected' : ''}>Fade (平滑淡入淡出)</option>
+                                <option value="zoom_fade" ${this.settings.transitionEffect === 'zoom_fade' ? 'selected' : ''}>Zoom Fade (缩放推进淡入)</option>
+                                <option value="blur_fade" ${this.settings.transitionEffect === 'blur_fade' ? 'selected' : ''}>Blur Fade (虚化柔焦渐变)</option>
+                                <option value="slide_left" ${this.settings.transitionEffect === 'slide_left' ? 'selected' : ''}>Slide Left (向左推移)</option>
+                                <option value="slide_right" ${this.settings.transitionEffect === 'slide_right' ? 'selected' : ''}>Slide Right (向右推移)</option>
+                            </select>
+                        </div>
+
+                        <div class="st-bgloader-slider-row">
+                            <label>Duration</label>
+                            <input type="range" id="st_transition_dur" min="200" max="1500" step="50" value="${this.settings.transitionDurationMs}" />
+                            <span class="st-bgloader-slider-val" id="st_transition_dur_val">${this.settings.transitionDurationMs}ms</span>
+                        </div>
+                    </div>
+
                     <!-- Audio Engine & Playlist Controls -->
                     <div class="st-bgloader-section">
                         <h4><i class="fa-solid fa-volume-high"></i> Audio & BGM Playlist</h4>
@@ -152,6 +263,10 @@ export class SettingsDrawer {
                                 <span>Mute Audio</span>
                             </label>
                             <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                                <input type="checkbox" id="st_audio_muffle" ${this.settings.muffleBGM ? 'checked' : ''} />
+                                <span>Lo-Fi Acoustic Muffle (隔壁房间低通滤波沉浸感)</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
                                 <input type="checkbox" id="st_audio_blur" ${this.settings.pauseOnBlur ? 'checked' : ''} />
                                 <span>Pause when tab inactive</span>
                             </label>
@@ -166,12 +281,28 @@ export class SettingsDrawer {
                         </div>
                     </div>
 
-                    <!-- Cache & Performance -->
+                    <!-- Smart Scene Triggers -->
                     <div class="st-bgloader-section">
-                        <h4><i class="fa-solid fa-database"></i> Cache Management</h4>
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <h4><i class="fa-solid fa-bolt"></i> Smart Scene Triggers</h4>
+                        <div class="st-bgloader-trigger-list" id="st_trigger_list">
+                            <!-- Populated dynamically -->
+                        </div>
+                        <button id="st_trigger_add_btn" class="menu_button" style="width: 100%;">
+                            <i class="fa-solid fa-plus"></i> Add Scene Trigger Rule
+                        </button>
+                    </div>
+
+                    <!-- Backup & Cache -->
+                    <div class="st-bgloader-section">
+                        <h4><i class="fa-solid fa-file-export"></i> Backup & Cache</h4>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                             <div>Used: <strong id="st_cache_used">Calculating...</strong> (<span id="st_cache_count">0</span> items)</div>
                             <button id="st_cache_clear_btn" class="menu_button menu_button_danger">Clear Cache</button>
+                        </div>
+                        <div class="st-bgloader-btn-row">
+                            <button id="st_backup_export_btn" class="menu_button"><i class="fa-solid fa-download"></i> Export Settings JSON</button>
+                            <button id="st_backup_import_btn" class="menu_button"><i class="fa-solid fa-upload"></i> Import Settings JSON</button>
+                            <input type="file" id="st_backup_import_file" style="display: none;" accept=".json" />
                         </div>
                     </div>
 
@@ -184,6 +315,7 @@ export class SettingsDrawer {
         this.bindEvents();
         this.populatePresets();
         this.refreshMediaGrid();
+        this.refreshTriggerList();
         this.updateCacheStats();
     }
 
@@ -313,7 +445,7 @@ export class SettingsDrawer {
             }
         });
 
-        // Sliders
+        // Visual Filter Sliders
         const bindSlider = (id: string, valId: string, unit: string, onChange: (val: number) => void) => {
             const slider = this.container!.querySelector(id) as HTMLInputElement;
             const label = this.container!.querySelector(valId);
@@ -330,13 +462,96 @@ export class SettingsDrawer {
         bindSlider('#st_filter_opacity', '#st_filter_opacity_val', '%', (v) => this.settings.filters.opacity = v);
         bindSlider('#st_filter_saturate', '#st_filter_saturate_val', '%', (v) => this.settings.filters.saturate = v);
 
+        // Weather Controls
+        const weatherTypeSelect = this.container.querySelector('#st_weather_type') as HTMLSelectElement;
+        weatherTypeSelect?.addEventListener('change', () => {
+            this.settings.weather.type = weatherTypeSelect.value as WeatherType;
+            this.callbacks.onWeatherChanged?.(this.settings.weather);
+            this.callbacks.onSettingsChanged(this.settings);
+        });
+
+        const weatherDensitySelect = this.container.querySelector('#st_weather_density') as HTMLSelectElement;
+        weatherDensitySelect?.addEventListener('change', () => {
+            this.settings.weather.density = weatherDensitySelect.value as any;
+            this.callbacks.onWeatherChanged?.(this.settings.weather);
+            this.callbacks.onSettingsChanged(this.settings);
+        });
+
+        bindSlider('#st_weather_speed', '#st_weather_speed_val', 'x', (v) => {
+            this.settings.weather.speed = v / 10;
+            this.callbacks.onWeatherChanged?.(this.settings.weather);
+        });
+
+        bindSlider('#st_weather_opacity', '#st_weather_opacity_val', '%', (v) => {
+            this.settings.weather.opacity = v / 100;
+            this.callbacks.onWeatherChanged?.(this.settings.weather);
+        });
+
+        // Visualizer Controls
+        const visModeSelect = this.container.querySelector('#st_visualizer_mode') as HTMLSelectElement;
+        visModeSelect?.addEventListener('change', () => {
+            this.settings.visualizer.mode = visModeSelect.value as VisualizerMode;
+            this.callbacks.onVisualizerChanged?.(this.settings.visualizer);
+            this.callbacks.onSettingsChanged(this.settings);
+        });
+
+        bindSlider('#st_visualizer_sens', '#st_visualizer_sens_val', 'x', (v) => {
+            this.settings.visualizer.sensitivity = v / 10;
+            this.callbacks.onVisualizerChanged?.(this.settings.visualizer);
+        });
+
+        // Parallax Controls
+        const parallaxCb = this.container.querySelector('#st_parallax_enabled') as HTMLInputElement;
+        parallaxCb?.addEventListener('change', () => {
+            this.settings.parallax.enabled = parallaxCb.checked;
+            this.callbacks.onParallaxChanged?.(this.settings.parallax);
+            this.callbacks.onSettingsChanged(this.settings);
+        });
+
+        bindSlider('#st_parallax_intensity', '#st_parallax_intensity_val', '', (v) => {
+            this.settings.parallax.intensity = v / 10;
+            this.callbacks.onParallaxChanged?.(this.settings.parallax);
+        });
+
+        // Transition Controls
+        const transSelect = this.container.querySelector('#st_transition_effect') as HTMLSelectElement;
+        transSelect?.addEventListener('change', () => {
+            this.settings.transitionEffect = transSelect.value as TransitionType;
+            this.callbacks.onTransitionChanged?.(this.settings.transitionEffect, this.settings.transitionDurationMs);
+            this.callbacks.onSettingsChanged(this.settings);
+        });
+
+        bindSlider('#st_transition_dur', '#st_transition_dur_val', 'ms', (v) => {
+            this.settings.transitionDurationMs = v;
+            this.callbacks.onTransitionChanged?.(this.settings.transitionEffect, this.settings.transitionDurationMs);
+        });
+
+        // Audio controls
         bindSlider('#st_audio_volume', '#st_audio_volume_val', '%', (v) => this.settings.volume = v / 100);
 
-        // Playback mode
         const modeSelect = this.container.querySelector('#st_playback_mode') as HTMLSelectElement;
         modeSelect?.addEventListener('change', () => {
             this.settings.playbackMode = modeSelect.value as PlaybackMode;
             this.callbacks.onPlaybackModeChanged(this.settings.playbackMode);
+            this.callbacks.onSettingsChanged(this.settings);
+        });
+
+        const muteCb = this.container.querySelector('#st_audio_mute') as HTMLInputElement;
+        muteCb?.addEventListener('change', () => {
+            this.settings.muted = muteCb.checked;
+            this.callbacks.onSettingsChanged(this.settings);
+        });
+
+        const muffleCb = this.container.querySelector('#st_audio_muffle') as HTMLInputElement;
+        muffleCb?.addEventListener('change', () => {
+            this.settings.muffleBGM = muffleCb.checked;
+            this.callbacks.onMuffleChanged?.(muffleCb.checked);
+            this.callbacks.onSettingsChanged(this.settings);
+        });
+
+        const blurCb = this.container.querySelector('#st_audio_blur') as HTMLInputElement;
+        blurCb?.addEventListener('change', () => {
+            this.settings.pauseOnBlur = blurCb.checked;
             this.callbacks.onSettingsChanged(this.settings);
         });
 
@@ -363,17 +578,9 @@ export class SettingsDrawer {
             this.callbacks.onSettingsChanged(this.settings);
         });
 
-        // Checkboxes
-        const muteCb = this.container.querySelector('#st_audio_mute') as HTMLInputElement;
-        muteCb?.addEventListener('change', () => {
-            this.settings.muted = muteCb.checked;
-            this.callbacks.onSettingsChanged(this.settings);
-        });
-
-        const blurCb = this.container.querySelector('#st_audio_blur') as HTMLInputElement;
-        blurCb?.addEventListener('change', () => {
-            this.settings.pauseOnBlur = blurCb.checked;
-            this.callbacks.onSettingsChanged(this.settings);
+        // Smart Trigger Rule Add Button
+        this.container.querySelector('#st_trigger_add_btn')?.addEventListener('click', () => {
+            this.promptAddTriggerRule();
         });
 
         // Clear Cache
@@ -384,6 +591,108 @@ export class SettingsDrawer {
                 await this.refreshMediaGrid();
                 await this.updateCacheStats();
             }
+        });
+
+        // Backup Export / Import
+        this.container.querySelector('#st_backup_export_btn')?.addEventListener('click', () => {
+            const jsonStr = JSON.stringify(this.settings, null, 2);
+            const blob = new Blob([jsonStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `st-bgloader-settings-${Date.now()}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        });
+
+        const importFile = this.container.querySelector('#st_backup_import_file') as HTMLInputElement;
+        this.container.querySelector('#st_backup_import_btn')?.addEventListener('click', () => {
+            importFile?.click();
+        });
+
+        importFile?.addEventListener('change', async () => {
+            if (importFile.files && importFile.files[0]) {
+                try {
+                    const text = await importFile.files[0].text();
+                    const imported = JSON.parse(text);
+                    if (imported && typeof imported === 'object') {
+                        this.settings = { ...this.settings, ...imported };
+                        this.callbacks.onSettingsChanged(this.settings);
+                        this.render();
+                        alert('Settings successfully imported!');
+                    }
+                } catch (err) {
+                    alert(`Failed to import settings JSON: ${err}`);
+                }
+                importFile.value = '';
+            }
+        });
+    }
+
+    private promptAddTriggerRule(): void {
+        const name = prompt('Enter rule name:');
+        if (!name) return;
+        const typeInput = prompt('Trigger type (character / chat / regex):', 'character')?.toLowerCase().trim();
+        const type = (typeInput === 'chat' || typeInput === 'regex') ? typeInput : 'character';
+        const pattern = prompt(`Enter ${type} matching pattern (e.g. Character name, Chat ID, or Regex text):`);
+        if (!pattern) return;
+
+        const newRule: TriggerRule = {
+            id: `rule_${Date.now()}`,
+            name,
+            enabled: true,
+            type,
+            pattern,
+            action: {
+                preset: this.settings.activePresetId,
+                weather: this.settings.weather.type,
+            },
+        };
+
+        this.settings.triggerRules.push(newRule);
+        this.callbacks.onSettingsChanged(this.settings);
+        this.refreshTriggerList();
+    }
+
+    public refreshTriggerList(): void {
+        const list = this.container?.querySelector('#st_trigger_list');
+        if (!list) return;
+
+        list.innerHTML = '';
+        if (this.settings.triggerRules.length === 0) {
+            list.innerHTML = `<div style="text-align: center; opacity: 0.6; padding: 8px;">No trigger rules configured yet.</div>`;
+            return;
+        }
+
+        this.settings.triggerRules.forEach((rule, idx) => {
+            const item = document.createElement('div');
+            item.className = 'st-bgloader-trigger-item';
+
+            item.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 6px;">
+                    <input type="checkbox" class="st-rule-toggle" ${rule.enabled ? 'checked' : ''} />
+                    <div>
+                        <span class="st-bgloader-trigger-badge">${rule.type}</span>
+                        <strong>${rule.name}</strong>: <code>${rule.pattern}</code>
+                    </div>
+                </div>
+                <button class="menu_button menu_button_danger st-rule-del" title="Delete"><i class="fa-solid fa-trash"></i></button>
+            `;
+
+            const toggle = item.querySelector('.st-rule-toggle') as HTMLInputElement;
+            toggle.addEventListener('change', () => {
+                rule.enabled = toggle.checked;
+                this.callbacks.onSettingsChanged(this.settings);
+            });
+
+            const del = item.querySelector('.st-rule-del');
+            del?.addEventListener('click', () => {
+                this.settings.triggerRules.splice(idx, 1);
+                this.callbacks.onSettingsChanged(this.settings);
+                this.refreshTriggerList();
+            });
+
+            list.appendChild(item);
         });
     }
 

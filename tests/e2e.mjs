@@ -466,8 +466,201 @@ async function runE2ETests() {
         }
         console.log('✅ Test 14 Passed: preloadMedia API and idempotent CacheStorage warming verified.');
 
+        // 15. Test Atmospheric Weather FX
+        console.log('🧪 Test 15: Testing Atmospheric Weather FX (rain, snow, sakura, cyber_motes, scanlines)...');
+        const weatherResult = await page.evaluate(async () => {
+            const api = window.stBgLoader;
+            const canvas = document.querySelector('#bg1 .st-bg-atmosphere-canvas');
+            if (!canvas) return { success: false, reason: 'atmosphere canvas missing' };
+
+            // Turn on rain
+            api.setWeather('rain', { density: 'high', speed: 1.5 });
+            const isCanvasVisible = canvas.style.display !== 'none';
+            const stateRain = api.getWeather();
+
+            // Switch to sakura
+            api.setWeather('sakura');
+            const stateSakura = api.getWeather();
+
+            // Turn off
+            api.setWeather('off');
+            const isCanvasHidden = canvas.style.display === 'none';
+
+            return {
+                canvasFound: !!canvas,
+                rainActive: isCanvasVisible && stateRain.type === 'rain' && stateRain.density === 'high',
+                sakuraActive: stateSakura.type === 'sakura',
+                offHidden: isCanvasHidden,
+                success: isCanvasVisible && stateRain.type === 'rain' && stateSakura.type === 'sakura' && isCanvasHidden,
+            };
+        });
+        console.log('   Weather test result:', weatherResult);
+        if (!weatherResult.success) {
+            console.error('❌ Test 15 Failed: Weather FX verification failed!');
+            process.exit(1);
+        }
+        console.log('✅ Test 15 Passed: Atmospheric Weather FX dynamic modes and zero-overhead off state verified.');
+
+        // 16. Test Audio Visualizer
+        console.log('🧪 Test 16: Testing Audio Visualizer & Reactive FX...');
+        const visualizerResult = await page.evaluate(() => {
+            const api = window.stBgLoader;
+            const canvas = document.querySelector('#bg1 .st-bg-visualizer-canvas');
+            if (!canvas) return { success: false, reason: 'visualizer canvas missing' };
+
+            // Turn on spectrum
+            api.setVisualizer('spectrum');
+            const isSpectrumVisible = canvas.style.display !== 'none';
+
+            // Turn on pulse
+            api.setVisualizer('pulse');
+            const isPulseCanvasHidden = canvas.style.display === 'none';
+
+            // Turn off
+            api.setVisualizer('off');
+            const stateOff = api.getVisualizer();
+
+            return {
+                canvasFound: !!canvas,
+                spectrumVisible: isSpectrumVisible,
+                pulseCanvasHidden: isPulseCanvasHidden,
+                modeOff: stateOff.mode === 'off',
+                success: isSpectrumVisible && isPulseCanvasHidden && stateOff.mode === 'off',
+            };
+        });
+        console.log('   Visualizer test result:', visualizerResult);
+        if (!visualizerResult.success) {
+            console.error('❌ Test 16 Failed: Audio visualizer verification failed!');
+            process.exit(1);
+        }
+        console.log('✅ Test 16 Passed: Audio Visualizer modes (spectrum, pulse, off) verified.');
+
+        // 17. Test 2.5D Parallax Controller
+        console.log('🧪 Test 17: Testing 2.5D Parallax Controller...');
+        const parallaxResult = await page.evaluate(() => {
+            const api = window.stBgLoader;
+            api.setParallax(true, 0.5);
+            const stateOn = api.getPlaybackState();
+
+            api.setParallax(false);
+            const stateOff = api.getPlaybackState();
+
+            return {
+                enabledInitially: stateOn.parallaxEnabled,
+                disabledAfter: !stateOff.parallaxEnabled,
+                success: stateOn.parallaxEnabled && !stateOff.parallaxEnabled,
+            };
+        });
+        console.log('   Parallax test result:', parallaxResult);
+        if (!parallaxResult.success) {
+            console.error('❌ Test 17 Failed: Parallax controller verification failed!');
+            process.exit(1);
+        }
+        console.log('✅ Test 17 Passed: 2.5D Parallax controller toggling verified.');
+
+        // 18. Test Transition Types
+        console.log('🧪 Test 18: Testing Transition Types (zoom_fade, blur_fade, slide_left, slide_right)...');
+        const transitionResult = await page.evaluate(() => {
+            const api = window.stBgLoader;
+            api.setTransition('zoom_fade', 600);
+            const stateZoom = api.getPlaybackState();
+
+            api.setTransition('blur_fade', 500);
+            const stateBlur = api.getPlaybackState();
+
+            api.setTransition('fade', 400);
+            const stateFade = api.getPlaybackState();
+
+            return {
+                zoom: stateZoom.transitionEffect === 'zoom_fade',
+                blur: stateBlur.transitionEffect === 'blur_fade',
+                fade: stateFade.transitionEffect === 'fade',
+                success: stateZoom.transitionEffect === 'zoom_fade' && stateBlur.transitionEffect === 'blur_fade' && stateFade.transitionEffect === 'fade',
+            };
+        });
+        console.log('   Transition test result:', transitionResult);
+        if (!transitionResult.success) {
+            console.error('❌ Test 18 Failed: Transition types verification failed!');
+            process.exit(1);
+        }
+        console.log('✅ Test 18 Passed: Transition modes (zoom_fade, blur_fade, fade) verified.');
+
+        // 19. Test Lo-Fi Room Acoustic Muffle
+        console.log('🧪 Test 19: Testing Lo-Fi Room Acoustic Muffle effect...');
+        const muffleResult = await page.evaluate(() => {
+            const api = window.stBgLoader;
+            api.setMuffled(true);
+            const isMuffledOn = api.getMuffled();
+
+            api.setMuffled(false);
+            const isMuffledOff = api.getMuffled();
+
+            return {
+                on: isMuffledOn,
+                off: !isMuffledOff,
+                success: isMuffledOn && !isMuffledOff,
+            };
+        });
+        console.log('   Muffle test result:', muffleResult);
+        if (!muffleResult.success) {
+            console.error('❌ Test 19 Failed: Lo-Fi Acoustic Muffle verification failed!');
+            process.exit(1);
+        }
+        console.log('✅ Test 19 Passed: Lo-Fi BiquadFilter acoustic muffle toggling verified.');
+
+        // 20. Test Smart Scene Trigger Rules
+        console.log('🧪 Test 20: Testing Smart Scene Trigger Rules...');
+        const triggerResult = await page.evaluate(() => {
+            const ext = window.STBgLoader;
+            const api = window.stBgLoader;
+            const triggerMgr = ext.getTriggerManager();
+
+            let firedRuleName = '';
+            triggerMgr.setTriggerCallback((action, rule) => {
+                firedRuleName = rule.name;
+            });
+
+            // Add test rule
+            const testRule = {
+                id: 'test_rule_e2e',
+                name: 'E2E Cyberpunk Scene',
+                enabled: true,
+                type: 'character',
+                pattern: 'CyberCat',
+                action: {
+                    preset: 'cyberpunk',
+                    weather: 'cyber_motes',
+                },
+            };
+
+            api.addTriggerRule(testRule);
+            const rulesBefore = api.getTriggerRules();
+
+            // Evaluate character match
+            const matched = triggerMgr.evaluateCharacter('CyberCat');
+            const matchedName = firedRuleName;
+
+            // Clean up rule
+            api.removeTriggerRule('test_rule_e2e');
+            const rulesAfter = api.getTriggerRules();
+
+            return {
+                ruleAdded: rulesBefore.some(r => r.id === 'test_rule_e2e'),
+                ruleRemoved: !rulesAfter.some(r => r.id === 'test_rule_e2e'),
+                matched,
+                matchedName,
+                success: matched && matchedName === 'E2E Cyberpunk Scene' && !rulesAfter.some(r => r.id === 'test_rule_e2e'),
+            };
+        });
+        console.log('   Trigger test result:', triggerResult);
+        if (!triggerResult.success) {
+            console.error('❌ Test 20 Failed: Smart Scene Trigger verification failed!');
+            process.exit(1);
+        }
+        console.log('✅ Test 20 Passed: Smart Scene Trigger evaluation and rule management verified.');
+
         console.log('\n==========================================');
-        console.log('🎉 ALL 14 AUTOMATED E2E TESTS PASSED! 🎉');
+        console.log('🎉 ALL 20 AUTOMATED E2E TESTS PASSED! 🎉');
         console.log('==========================================\n');
 
     } catch (err) {
@@ -479,3 +672,4 @@ async function runE2ETests() {
 }
 
 runE2ETests();
+

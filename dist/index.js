@@ -1,4 +1,4 @@
-const f = {
+const M = {
   default: {
     id: "default",
     name: "Default (原色)",
@@ -29,7 +29,7 @@ const f = {
     name: "Monochrome (黑白极简)",
     filters: { blur: 0, brightness: 100, opacity: 100, saturate: 0 }
   }
-}, E = {
+}, L = {
   enabled: !0,
   activeMediaId: null,
   volume: 0.8,
@@ -50,63 +50,85 @@ const f = {
   playlist: [],
   cacheQuotaMB: 1024,
   lruAutoClean: !0,
-  chatBindings: {}
-}, I = "st_bg_loader_db", R = 1, m = "media_items", M = "st-bg-cache-v1";
+  chatBindings: {},
+  // New Subsystem Defaults
+  weather: {
+    type: "off",
+    density: "medium",
+    speed: 1,
+    opacity: 0.75,
+    wind: 0.5
+  },
+  visualizer: {
+    mode: "off",
+    color: "#4fa3d1",
+    sensitivity: 1
+  },
+  parallax: {
+    enabled: !1,
+    intensity: 0.3
+  },
+  transitionEffect: "fade",
+  transitionDurationMs: 400,
+  muffleBGM: !1,
+  muffleOnDrawer: !1,
+  triggerRules: []
+}, q = "st_bg_loader_db", D = 1, m = "media_items", P = "st-bg-cache-v1";
 class V {
   db = null;
   cache = null;
   objectUrls = /* @__PURE__ */ new Map();
   async init() {
-    "caches" in window && (this.cache = await caches.open(M)), this.db = await new Promise((e, t) => {
-      const i = indexedDB.open(I, R);
-      i.onupgradeneeded = (s) => {
-        const a = s.target.result;
-        if (!a.objectStoreNames.contains(m)) {
-          const n = a.createObjectStore(m, { keyPath: "id" });
-          n.createIndex("type", "type", { unique: !1 }), n.createIndex("lastUsedTimestamp", "lastUsedTimestamp", { unique: !1 });
+    "caches" in window && (this.cache = await caches.open(P)), this.db = await new Promise((e, t) => {
+      const i = indexedDB.open(q, D);
+      i.onupgradeneeded = (a) => {
+        const s = a.target.result;
+        if (!s.objectStoreNames.contains(m)) {
+          const r = s.createObjectStore(m, { keyPath: "id" });
+          r.createIndex("type", "type", { unique: !1 }), r.createIndex("lastUsedTimestamp", "lastUsedTimestamp", { unique: !1 });
         }
       }, i.onsuccess = () => e(i.result), i.onerror = () => t(i.error);
     });
   }
   async listMedia() {
     return this.db || await this.init(), new Promise((e, t) => {
-      const a = this.db.transaction(m, "readonly").objectStore(m).getAll();
-      a.onsuccess = () => e(a.result || []), a.onerror = () => t(a.error);
+      const s = this.db.transaction(m, "readonly").objectStore(m).getAll();
+      s.onsuccess = () => e(s.result || []), s.onerror = () => t(s.error);
     });
   }
   async getMedia(e) {
     return this.db || await this.init(), new Promise((t, i) => {
-      const n = this.db.transaction(m, "readonly").objectStore(m).get(e);
-      n.onsuccess = () => t(n.result || null), n.onerror = () => i(n.error);
+      const r = this.db.transaction(m, "readonly").objectStore(m).get(e);
+      r.onsuccess = () => t(r.result || null), r.onerror = () => i(r.error);
     });
   }
-  async saveMedia(e, t, i, s, a) {
+  async saveMedia(e, t, i, a, s) {
     (!this.db || !this.cache) && await this.init();
-    const n = "bg_" + Date.now() + "_" + Math.random().toString(36).substring(2, 9), r = `/st-bg-cache/${n}/${encodeURIComponent(t)}`;
-    let o, d = "", c = 0;
-    typeof e == "string" ? (d = i === "svg" ? "image/svg+xml" : "text/html", o = new Blob([e], { type: d }), c = o.size) : (o = e, d = e.type || this.guessMimeType(t, i), c = e.size);
+    const r = "bg_" + Date.now() + "_" + Math.random().toString(36).substring(2, 9), n = `/st-bg-cache/${r}/${encodeURIComponent(t)}`;
+    let l, c = "", h = 0;
+    typeof e == "string" ? (c = i === "svg" ? "image/svg+xml" : "text/html", l = new Blob([e], { type: c }), h = l.size) : (l = e, c = e.type || this.guessMimeType(t, i), h = e.size);
     const u = new Headers({
-      "Content-Type": d,
-      "Content-Length": c.toString()
-    }), g = new Response(o, { headers: u });
-    await this.cache.put(r, g);
-    const y = {
-      id: n,
+      "Content-Type": c,
+      "Content-Length": h.toString()
+    }), g = new Response(l, { headers: u });
+    await this.cache.put(n, g);
+    const f = {
+      id: r,
       name: t,
       type: i,
-      source: s,
-      url: a || r,
-      cacheKey: r,
-      size: c,
-      mimeType: d,
+      source: a,
+      url: s || n,
+      cacheKey: n,
+      size: h,
+      mimeType: c,
       addedTimestamp: Date.now(),
       lastUsedTimestamp: Date.now(),
       hasAudio: i === "video" || i === "audio"
     };
-    return await new Promise((b, v) => {
-      const h = this.db.transaction(m, "readwrite").objectStore(m).put(y);
-      h.onsuccess = () => b(), h.onerror = () => v(h.error);
-    }), y;
+    return await new Promise((v, y) => {
+      const b = this.db.transaction(m, "readwrite").objectStore(m).put(f);
+      b.onsuccess = () => v(), b.onerror = () => y(b.error);
+    }), f;
   }
   async getMediaBlobUrl(e) {
     if (this.objectUrls.has(e.id))
@@ -117,15 +139,15 @@ class V {
       try {
         const i = await fetch(e.url);
         if (i.ok) {
-          const s = i.clone();
-          await this.cache.put(e.cacheKey, s), t = i;
+          const a = i.clone();
+          await this.cache.put(e.cacheKey, a), t = i;
         }
       } catch (i) {
         console.warn("[ST-BgLoader] Failed to fetch and cache remote URL:", e.url, i);
       }
     if (t) {
-      const i = await t.blob(), s = URL.createObjectURL(i);
-      return this.objectUrls.set(e.id, s), this.touchMedia(e.id), s;
+      const i = await t.blob(), a = URL.createObjectURL(i);
+      return this.objectUrls.set(e.id, a), this.touchMedia(e.id), a;
     }
     return e.url;
   }
@@ -137,9 +159,9 @@ class V {
   async deleteMedia(e) {
     (!this.db || !this.cache) && await this.init();
     const t = await this.getMedia(e);
-    t && (await this.cache.delete(t.cacheKey), this.objectUrls.has(e) && (URL.revokeObjectURL(this.objectUrls.get(e)), this.objectUrls.delete(e)), await new Promise((i, s) => {
-      const r = this.db.transaction(m, "readwrite").objectStore(m).delete(e);
-      r.onsuccess = () => i(), r.onerror = () => s(r.error);
+    t && (await this.cache.delete(t.cacheKey), this.objectUrls.has(e) && (URL.revokeObjectURL(this.objectUrls.get(e)), this.objectUrls.delete(e)), await new Promise((i, a) => {
+      const n = this.db.transaction(m, "readwrite").objectStore(m).delete(e);
+      n.onsuccess = () => i(), n.onerror = () => a(n.error);
     }));
   }
   async getCacheUsage() {
@@ -151,12 +173,12 @@ class V {
   }
   async cleanLRU(e) {
     const t = await this.listMedia();
-    let i = t.reduce((s, a) => s + (a.size || 0), 0);
+    let i = t.reduce((a, s) => a + (s.size || 0), 0);
     if (!(i <= e)) {
-      t.sort((s, a) => s.lastUsedTimestamp - a.lastUsedTimestamp);
-      for (const s of t) {
+      t.sort((a, s) => a.lastUsedTimestamp - s.lastUsedTimestamp);
+      for (const a of t) {
         if (i <= e) break;
-        console.log("[ST-BgLoader] LRU evicting:", s.name, s.size), i -= s.size || 0, await this.deleteMedia(s.id);
+        console.log("[ST-BgLoader] LRU evicting:", a.name, a.size), i -= a.size || 0, await this.deleteMedia(a.id);
       }
     }
   }
@@ -164,21 +186,21 @@ class V {
     (!this.db || !this.cache) && await this.init();
     for (const e of this.objectUrls.values())
       URL.revokeObjectURL(e);
-    this.objectUrls.clear(), "caches" in window && (await caches.delete(M), this.cache = await caches.open(M)), await new Promise((e, t) => {
-      const a = this.db.transaction(m, "readwrite").objectStore(m).clear();
-      a.onsuccess = () => e(), a.onerror = () => t(a.error);
+    this.objectUrls.clear(), "caches" in window && (await caches.delete(P), this.cache = await caches.open(P)), await new Promise((e, t) => {
+      const s = this.db.transaction(m, "readwrite").objectStore(m).clear();
+      s.onsuccess = () => e(), s.onerror = () => t(s.error);
     });
   }
   async preloadUrl(e, t) {
     (!this.db || !this.cache) && await this.init();
-    const s = (await this.listMedia()).find((c) => c.url === e || c.cacheKey === e);
-    if (s)
-      return await this.touchMedia(s.id), { item: s, isNew: !1 };
-    const a = e.split("/").pop()?.split("?")[0] || "preloaded_media", n = t || this.detectMediaType(a), r = await fetch(e);
-    if (!r.ok)
-      throw new Error(`Failed to fetch media from ${e}: ${r.status} ${r.statusText}`);
-    const o = await r.blob();
-    return { item: await this.saveMedia(o, a, n, "url", e), isNew: !0 };
+    const a = (await this.listMedia()).find((h) => h.url === e || h.cacheKey === e);
+    if (a)
+      return await this.touchMedia(a.id), { item: a, isNew: !1 };
+    const s = e.split("/").pop()?.split("?")[0] || "preloaded_media", r = t || this.detectMediaType(s), n = await fetch(e);
+    if (!n.ok)
+      throw new Error(`Failed to fetch media from ${e}: ${n.status} ${n.statusText}`);
+    const l = await n.blob();
+    return { item: await this.saveMedia(l, s, r, "url", e), isNew: !0 };
   }
   detectMediaType(e) {
     const t = e.split(".").pop()?.toLowerCase() || "";
@@ -229,8 +251,15 @@ class U {
   urlResolver;
   userHasInteracted = !1;
   isWaitingForInteractionUnmute = !1;
+  // WebAudio Graph for Lo-Fi muffle and Visualizer
+  audioContext = null;
+  sourceNode = null;
+  biquadFilter = null;
+  analyserNode = null;
+  isMuffled = !1;
   onTrackChange;
   onPlayStateChange;
+  onAnalyserReady;
   setUrlResolver(e) {
     this.urlResolver = e;
   }
@@ -238,13 +267,39 @@ class U {
     return this.isWaitingForInteractionUnmute;
   }
   notifyUserInteraction() {
-    this.userHasInteracted = !0, this.isWaitingForInteractionUnmute && (this.isWaitingForInteractionUnmute = !1, this.fadeInVolume(this.volume, 400));
+    this.userHasInteracted = !0, this.resumeAudioContext(), this.initWebAudio(), this.isWaitingForInteractionUnmute && (this.isWaitingForInteractionUnmute = !1, this.fadeInVolume(this.volume, 400));
+  }
+  resumeAudioContext() {
+    this.audioContext && this.audioContext.state === "suspended" && this.audioContext.resume().catch(() => {
+    });
+  }
+  initWebAudio() {
+    if (!(this.audioContext || !this.audioElement))
+      try {
+        const e = window.AudioContext || window.webkitAudioContext;
+        if (!e) return;
+        this.audioContext = new e(), this.audioElement.crossOrigin = "anonymous", this.sourceNode = this.audioContext.createMediaElementSource(this.audioElement), this.biquadFilter = this.audioContext.createBiquadFilter(), this.biquadFilter.type = "lowpass", this.biquadFilter.frequency.value = this.isMuffled ? 800 : 2e4, this.biquadFilter.Q.value = 1, this.analyserNode = this.audioContext.createAnalyser(), this.analyserNode.fftSize = 256, this.sourceNode.connect(this.biquadFilter), this.biquadFilter.connect(this.analyserNode), this.analyserNode.connect(this.audioContext.destination), this.onAnalyserReady && this.onAnalyserReady(this.analyserNode);
+      } catch (e) {
+        console.warn("[ST-BgLoader AudioEngine] WebAudio graph init note (falling back to direct output):", e);
+      }
+  }
+  getAnalyserNode() {
+    return this.analyserNode;
+  }
+  setMuffled(e) {
+    if (this.isMuffled = e, this.biquadFilter && this.audioContext) {
+      const t = e ? 800 : 2e4, i = this.audioContext.currentTime;
+      this.biquadFilter.frequency.cancelScheduledValues(i), this.biquadFilter.frequency.setTargetAtTime(t, i, 0.08);
+    }
+  }
+  getMuffled() {
+    return this.isMuffled;
   }
   async playMediaItem(e, t) {
-    const i = this.playlist.findIndex((a) => a.id === e.id);
+    const i = this.playlist.findIndex((s) => s.id === e.id);
     i !== -1 ? this.currentIndex = i : (this.playlist.push(e), this.currentIndex = this.playlist.length - 1);
-    const s = t || (this.urlResolver ? await this.urlResolver(e) : e.url);
-    await this.playTrack(s, this.playbackMode === "single"), this.onTrackChange?.(e);
+    const a = t || (this.urlResolver ? await this.urlResolver(e) : e.url);
+    await this.playTrack(a, this.playbackMode === "single"), this.onTrackChange?.(e);
   }
   async playCurrentTrack() {
     const e = this.getCurrentTrack();
@@ -253,7 +308,7 @@ class U {
     const t = this.urlResolver ? await this.urlResolver(e) : e.url;
     this.audioElement.src = t, this.audioElement.loop = this.playbackMode === "single", !this.userHasInteracted && !this.muted ? (this.isWaitingForInteractionUnmute = !0, this.audioElement.muted = !0) : this.applyVolume();
     try {
-      await this.audioElement.play(), this.onTrackChange?.(e);
+      this.initWebAudio(), this.resumeAudioContext(), await this.audioElement.play(), this.onTrackChange?.(e);
     } catch (i) {
       console.warn("[ST-BgLoader AudioEngine] Autoplay was prevented by browser policy:", i);
     }
@@ -317,8 +372,8 @@ class U {
     this.playlist.length !== 0 && (this.currentIndex = (this.currentIndex - 1 + this.playlist.length) % this.playlist.length, await this.playCurrentTrack());
   }
   async togglePlay() {
-    this.audioElement && (this.audioElement.paused ? !this.audioElement.src && this.playlist.length > 0 ? (this.currentIndex === -1 && (this.currentIndex = 0), await this.playCurrentTrack()) : await this.audioElement.play().catch(() => {
-    }) : this.audioElement.pause());
+    this.audioElement && (this.audioElement.paused ? (this.initWebAudio(), this.resumeAudioContext(), !this.audioElement.src && this.playlist.length > 0 ? (this.currentIndex === -1 && (this.currentIndex = 0), await this.playCurrentTrack()) : await this.audioElement.play().catch(() => {
+    })) : this.audioElement.pause());
   }
   handleTrackEnded() {
     this.playbackMode !== "single" && this.playlist.length > 1 && this.playNext().catch((e) => console.error(e));
@@ -330,7 +385,7 @@ class U {
     if (this.audioElement) {
       this.clearFade(), this.audioElement.src = e, this.audioElement.loop = t, !this.userHasInteracted && !this.muted ? (this.isWaitingForInteractionUnmute = !0, this.audioElement.muted = !0) : this.applyVolume();
       try {
-        await this.audioElement.play();
+        this.initWebAudio(), this.resumeAudioContext(), await this.audioElement.play();
       } catch (i) {
         console.warn("[ST-BgLoader AudioEngine] Autoplay was prevented by browser policy:", i);
       }
@@ -338,13 +393,13 @@ class U {
   }
   fadeInVolume(e, t = 400) {
     this.clearFade();
-    const i = performance.now(), s = Math.max(0, Math.min(1, e));
+    const i = performance.now(), a = Math.max(0, Math.min(1, e));
     this.audioElement && (this.audioElement.muted = !1, this.audioElement.volume = 0), this.attachedVideo && (this.attachedVideo.muted = !1, this.attachedVideo.volume = 0);
-    const a = () => {
-      const n = performance.now() - i, r = Math.min(1, n / t), o = s * r;
-      this.audioElement && (this.audioElement.volume = o), this.attachedVideo && (this.attachedVideo.volume = o), r < 1 ? this.fadeTimer = requestAnimationFrame(a) : this.applyVolume();
+    const s = () => {
+      const r = performance.now() - i, n = Math.min(1, r / t), l = a * n;
+      this.audioElement && (this.audioElement.volume = l), this.attachedVideo && (this.attachedVideo.volume = l), n < 1 ? this.fadeTimer = requestAnimationFrame(s) : this.applyVolume();
     };
-    this.fadeTimer = requestAnimationFrame(a);
+    this.fadeTimer = requestAnimationFrame(s);
   }
   stopTrack(e = 300) {
     if (!this.audioElement || this.audioElement.paused) return;
@@ -352,11 +407,11 @@ class U {
       this.audioElement.pause(), this.audioElement.currentTime = 0;
       return;
     }
-    const t = this.audioElement.volume, i = performance.now(), s = () => {
-      const a = performance.now() - i, n = Math.min(1, a / e);
-      this.audioElement && (this.audioElement.volume = t * (1 - n)), n < 1 ? this.fadeTimer = requestAnimationFrame(s) : this.audioElement && (this.audioElement.pause(), this.audioElement.currentTime = 0, this.applyVolume());
+    const t = this.audioElement.volume, i = performance.now(), a = () => {
+      const s = performance.now() - i, r = Math.min(1, s / e);
+      this.audioElement && (this.audioElement.volume = t * (1 - r)), r < 1 ? this.fadeTimer = requestAnimationFrame(a) : this.audioElement && (this.audioElement.pause(), this.audioElement.currentTime = 0, this.applyVolume());
     };
-    this.clearFade(), this.fadeTimer = requestAnimationFrame(s);
+    this.clearFade(), this.fadeTimer = requestAnimationFrame(a);
   }
   handleVisibilityChange(e, t) {
     t && (e ? (this.audioElement && !this.audioElement.paused && (this.audioElement.pause(), this.isPausedForBlur = !0), this.attachedVideo && !this.attachedVideo.paused && this.attachedVideo.pause()) : (this.isPausedForBlur && this.audioElement && (this.audioElement.play().catch(() => {
@@ -371,10 +426,11 @@ class U {
     this.fadeTimer !== null && (cancelAnimationFrame(this.fadeTimer), this.fadeTimer = null);
   }
   destroy() {
-    this.clearFade(), this.audioElement && (this.audioElement.pause(), this.audioElement.src = "", this.audioElement = null), this.attachedVideo = null, this.playlist = [];
+    this.clearFade(), this.audioElement && (this.audioElement.pause(), this.audioElement.src = "", this.audioElement = null), this.audioContext && (this.audioContext.close().catch(() => {
+    }), this.audioContext = null), this.attachedVideo = null, this.playlist = [];
   }
 }
-class x {
+class F {
   videoElement = null;
   container;
   audioEngine;
@@ -384,18 +440,18 @@ class x {
   async render(e, t = "cover") {
     this.destroy();
     const i = document.createElement("video");
-    return i.className = "st-bg-video-element", i.src = e, i.loop = !0, i.playsInline = !0, i.autoplay = !0, this.applyFitting(i, t), i.style.position = "absolute", i.style.top = "0", i.style.left = "0", i.style.width = "100%", i.style.height = "100%", i.style.pointerEvents = "none", i.style.transform = "translateZ(0)", i.style.willChange = "transform", i.style.opacity = "0", i.style.transition = "opacity 400ms ease-in-out", this.container.appendChild(i), this.videoElement = i, this.audioEngine.attachVideo(i), new Promise((s) => {
-      const a = async () => {
-        i.removeEventListener("canplay", a);
+    return i.className = "st-bg-video-element", i.src = e, i.loop = !0, i.playsInline = !0, i.autoplay = !0, this.applyFitting(i, t), i.style.position = "absolute", i.style.top = "0", i.style.left = "0", i.style.width = "100%", i.style.height = "100%", i.style.pointerEvents = "none", i.style.transform = "translateZ(0)", i.style.willChange = "transform", i.style.opacity = "0", i.style.transition = "opacity 400ms ease-in-out", this.container.appendChild(i), this.videoElement = i, this.audioEngine.attachVideo(i), new Promise((a) => {
+      const s = async () => {
+        i.removeEventListener("canplay", s);
         try {
           await i.play();
-        } catch (n) {
-          console.warn("[ST-BgLoader] Video autoplay failed, trying muted:", n), i.muted = !0, i.play().catch((r) => console.error("[ST-BgLoader] Video playback error:", r));
+        } catch (r) {
+          console.warn("[ST-BgLoader] Video autoplay failed, trying muted:", r), i.muted = !0, i.play().catch((n) => console.error("[ST-BgLoader] Video playback error:", n));
         }
-        i.style.opacity = "1", s(i);
+        i.style.opacity = "1", a(i);
       };
-      i.addEventListener("canplay", a), i.addEventListener("error", (n) => {
-        console.error("[ST-BgLoader] Error loading video:", n), s(i);
+      i.addEventListener("canplay", s), i.addEventListener("error", (r) => {
+        console.error("[ST-BgLoader] Error loading video:", r), a(i);
       });
     });
   }
@@ -420,7 +476,7 @@ class x {
     this.videoElement && (this.audioEngine.attachVideo(null), this.videoElement.pause(), this.videoElement.removeAttribute("src"), this.videoElement.load(), this.videoElement.remove(), this.videoElement = null);
   }
 }
-class T {
+class z {
   iframeElement = null;
   container;
   constructor(e) {
@@ -429,9 +485,9 @@ class T {
   async render(e, t = !1) {
     this.destroy();
     const i = document.createElement("iframe");
-    return i.className = "st-bg-iframe-element", i.setAttribute("sandbox", "allow-scripts allow-same-origin"), i.style.position = "absolute", i.style.top = "0", i.style.left = "0", i.style.width = "100%", i.style.height = "100%", i.style.border = "none", i.style.opacity = "0", i.style.pointerEvents = "auto", i.style.transition = "opacity 400ms ease-in-out", this.container.appendChild(i), this.iframeElement = i, new Promise((s) => {
+    return i.className = "st-bg-iframe-element", i.setAttribute("sandbox", "allow-scripts allow-same-origin"), i.style.position = "absolute", i.style.top = "0", i.style.left = "0", i.style.width = "100%", i.style.height = "100%", i.style.border = "none", i.style.opacity = "0", i.style.pointerEvents = "auto", i.style.transition = "opacity 400ms ease-in-out", this.container.appendChild(i), this.iframeElement = i, new Promise((a) => {
       i.onload = () => {
-        i.style.opacity = "1", s(i);
+        i.style.opacity = "1", a(i);
       }, t ? i.src = e : i.srcdoc = e;
     });
   }
@@ -442,7 +498,7 @@ class T {
     this.iframeElement && (this.iframeElement.srcdoc = "", this.iframeElement.src = "about:blank", this.iframeElement.remove(), this.iframeElement = null);
   }
 }
-class L {
+class $ {
   imageElement = null;
   container;
   constructor(e) {
@@ -451,11 +507,11 @@ class L {
   async render(e, t = "cover") {
     this.destroy();
     const i = document.createElement("img");
-    return i.className = "st-bg-image-element", i.src = e, this.applyFitting(i, t), i.style.position = "absolute", i.style.top = "0", i.style.left = "0", i.style.width = "100%", i.style.height = "100%", i.style.pointerEvents = "none", i.style.opacity = "0", i.style.transition = "opacity 400ms ease-in-out", this.container.appendChild(i), this.imageElement = i, new Promise((s) => {
+    return i.className = "st-bg-image-element", i.src = e, this.applyFitting(i, t), i.style.position = "absolute", i.style.top = "0", i.style.left = "0", i.style.width = "100%", i.style.height = "100%", i.style.pointerEvents = "none", i.style.opacity = "0", i.style.transition = "opacity 400ms ease-in-out", this.container.appendChild(i), this.imageElement = i, new Promise((a) => {
       i.onload = () => {
-        i.style.opacity = "1", s(i);
+        i.style.opacity = "1", a(i);
       }, i.onerror = () => {
-        console.error("[ST-BgLoader] Failed to load background image:", e), s(i);
+        console.error("[ST-BgLoader] Failed to load background image:", e), a(i);
       };
     });
   }
@@ -480,7 +536,7 @@ class L {
     this.imageElement && (this.imageElement.remove(), this.imageElement = null);
   }
 }
-class q {
+class N {
   hostEl = null;
   containerEl = null;
   layerA = null;
@@ -495,8 +551,19 @@ class q {
   audioEngine;
   observer = null;
   crossfadeTimer = null;
+  transitionType = "fade";
+  transitionDurationMs = 400;
   constructor(e) {
     this.audioEngine = e;
+  }
+  setTransition(e, t = 400) {
+    this.transitionType = e, this.transitionDurationMs = Math.max(100, Math.min(2e3, t));
+  }
+  getContainerElement() {
+    return this.containerEl;
+  }
+  getHostElement() {
+    return this.hostEl;
   }
   init() {
     if (this.hostEl = document.querySelector("#bg1"), !this.hostEl) {
@@ -513,10 +580,10 @@ class q {
     if (!this.hostEl) return;
     window.getComputedStyle(this.hostEl).position === "static" && (this.hostEl.style.position = "relative");
     let t = this.hostEl.querySelector(".st-bg-media-container");
-    t ? (this.layerA = t.querySelector(".st-bg-layer-a"), this.layerB = t.querySelector(".st-bg-layer-b")) : (t = document.createElement("div"), t.className = "st-bg-media-container", t.style.position = "absolute", t.style.top = "0", t.style.left = "0", t.style.width = "100%", t.style.height = "100%", t.style.overflow = "hidden", t.style.zIndex = "0", t.style.pointerEvents = "none", this.layerA = document.createElement("div"), this.layerA.className = "st-bg-layer st-bg-layer-a", this.setupLayerStyle(this.layerA), this.layerB = document.createElement("div"), this.layerB.className = "st-bg-layer st-bg-layer-b", this.setupLayerStyle(this.layerB), t.appendChild(this.layerA), t.appendChild(this.layerB), this.hostEl.appendChild(t)), this.containerEl = t, this.videoRendererA = new x(this.layerA, this.audioEngine), this.videoRendererB = new x(this.layerB, this.audioEngine), this.iframeRendererA = new T(this.layerA), this.iframeRendererB = new T(this.layerB), this.imageRendererA = new L(this.layerA), this.imageRendererB = new L(this.layerB), this.observer = new MutationObserver(() => this.syncFitting()), this.observer.observe(this.hostEl, { attributes: !0, attributeFilter: ["class"] }), this.syncFitting();
+    t ? (this.layerA = t.querySelector(".st-bg-layer-a"), this.layerB = t.querySelector(".st-bg-layer-b")) : (t = document.createElement("div"), t.className = "st-bg-media-container", t.style.position = "absolute", t.style.top = "0", t.style.left = "0", t.style.width = "100%", t.style.height = "100%", t.style.overflow = "hidden", t.style.zIndex = "0", t.style.pointerEvents = "none", this.layerA = document.createElement("div"), this.layerA.className = "st-bg-layer st-bg-layer-a", this.setupLayerStyle(this.layerA), this.layerB = document.createElement("div"), this.layerB.className = "st-bg-layer st-bg-layer-b", this.setupLayerStyle(this.layerB), t.appendChild(this.layerA), t.appendChild(this.layerB), this.hostEl.appendChild(t)), this.containerEl = t, this.videoRendererA = new F(this.layerA, this.audioEngine), this.videoRendererB = new F(this.layerB, this.audioEngine), this.iframeRendererA = new z(this.layerA), this.iframeRendererB = new z(this.layerB), this.imageRendererA = new $(this.layerA), this.imageRendererB = new $(this.layerB), this.observer = new MutationObserver(() => this.syncFitting()), this.observer.observe(this.hostEl, { attributes: !0, attributeFilter: ["class"] }), this.syncFitting();
   }
   setupLayerStyle(e) {
-    e.style.position = "absolute", e.style.top = "0", e.style.left = "0", e.style.width = "100%", e.style.height = "100%", e.style.opacity = "0", e.style.transition = "opacity 400ms ease-in-out", e.style.pointerEvents = "none";
+    e.style.position = "absolute", e.style.top = "0", e.style.left = "0", e.style.width = "100%", e.style.height = "100%", e.style.opacity = "0", e.style.transition = `all ${this.transitionDurationMs}ms cubic-bezier(0.4, 0, 0.2, 1)`, e.style.pointerEvents = "none";
   }
   applyFilters(e) {
     if (!this.containerEl) return;
@@ -536,40 +603,43 @@ class q {
     if (!this.containerEl || !this.layerA || !this.layerB) return;
     if (this.crossfadeTimer !== null) {
       clearTimeout(this.crossfadeTimer), this.crossfadeTimer = null;
-      const c = this.activeLayer === "A" ? this.videoRendererB : this.videoRendererA, u = this.activeLayer === "A" ? this.iframeRendererB : this.iframeRendererA, g = this.activeLayer === "A" ? this.imageRendererB : this.imageRendererA;
-      c.destroy(), u.destroy(), g.destroy();
+      const g = this.activeLayer === "A" ? this.videoRendererB : this.videoRendererA, f = this.activeLayer === "A" ? this.iframeRendererB : this.iframeRendererA, v = this.activeLayer === "A" ? this.imageRendererB : this.imageRendererA;
+      g.destroy(), f.destroy(), v.destroy();
       const y = this.activeLayer === "A" ? this.layerB : this.layerA;
-      y && (y.style.opacity = "0");
+      y && (y.style.opacity = "0", y.style.transform = "none", y.style.filter = "none");
     }
-    const i = this.activeLayer === "A" ? "B" : "A", s = i === "B" ? this.layerB : this.layerA, a = this.activeLayer === "A" ? this.layerA : this.layerB, n = i === "B" ? this.videoRendererB : this.videoRendererA, r = i === "B" ? this.iframeRendererB : this.iframeRendererA, o = i === "B" ? this.imageRendererB : this.imageRendererA;
-    n.destroy(), r.destroy(), o.destroy();
-    const d = this.getFitting();
+    const i = this.activeLayer === "A" ? "B" : "A", a = i === "B" ? this.layerB : this.layerA, s = this.activeLayer === "A" ? this.layerA : this.layerB, r = i === "B" ? this.videoRendererB : this.videoRendererA, n = i === "B" ? this.iframeRendererB : this.iframeRendererA, l = i === "B" ? this.imageRendererB : this.imageRendererA;
+    r.destroy(), n.destroy(), l.destroy();
+    const c = this.getFitting();
     switch (e.type) {
       case "video":
-        await n.render(t, d);
+        await r.render(t, c);
         break;
       case "html":
       case "svg":
-        await r.render(t, !0);
+        await n.render(t, !0);
         break;
       case "image":
-        await o.render(t, d);
+        await l.render(t, c);
         break;
       case "audio":
         await this.audioEngine.playMediaItem(e, t);
         break;
     }
-    s.style.opacity = "1", a.style.opacity = "0", this.activeLayer = i, this.crossfadeTimer = window.setTimeout(() => {
+    const h = this.transitionDurationMs;
+    a.style.transition = `all ${h}ms cubic-bezier(0.4, 0, 0.2, 1)`, s.style.transition = `all ${h}ms cubic-bezier(0.4, 0, 0.2, 1)`;
+    const u = this.transitionType;
+    u === "zoom_fade" ? (a.style.transform = "scale(1.06)", a.style.opacity = "0", a.offsetHeight, a.style.transform = "scale(1)", a.style.opacity = "1", s.style.transform = "scale(0.96)", s.style.opacity = "0") : u === "blur_fade" ? (a.style.filter = "blur(10px)", a.style.opacity = "0", a.offsetHeight, a.style.filter = "blur(0px)", a.style.opacity = "1", s.style.filter = "blur(10px)", s.style.opacity = "0") : u === "slide_left" ? (a.style.transform = "translate3d(100%, 0, 0)", a.style.opacity = "1", a.offsetHeight, a.style.transform = "translate3d(0, 0, 0)", s.style.transform = "translate3d(-100%, 0, 0)", s.style.opacity = "0") : u === "slide_right" ? (a.style.transform = "translate3d(-100%, 0, 0)", a.style.opacity = "1", a.offsetHeight, a.style.transform = "translate3d(0, 0, 0)", s.style.transform = "translate3d(100%, 0, 0)", s.style.opacity = "0") : (a.style.transform = "none", a.style.filter = "none", a.style.opacity = "1", s.style.transform = "none", s.style.filter = "none", s.style.opacity = "0"), this.activeLayer = i, this.crossfadeTimer = window.setTimeout(() => {
       this.crossfadeTimer = null;
-      const c = this.activeLayer === "A" ? this.videoRendererB : this.videoRendererA, u = this.activeLayer === "A" ? this.iframeRendererB : this.iframeRendererA, g = this.activeLayer === "A" ? this.imageRendererB : this.imageRendererA;
-      c.destroy(), u.destroy(), g.destroy();
-    }, 450);
+      const g = this.activeLayer === "A" ? this.videoRendererB : this.videoRendererA, f = this.activeLayer === "A" ? this.iframeRendererB : this.iframeRendererA, v = this.activeLayer === "A" ? this.imageRendererB : this.imageRendererA;
+      g.destroy(), f.destroy(), v.destroy(), s.style.transform = "none", s.style.filter = "none";
+    }, h + 50);
   }
   clear() {
-    this.crossfadeTimer !== null && (clearTimeout(this.crossfadeTimer), this.crossfadeTimer = null), this.layerA && (this.layerA.style.opacity = "0"), this.layerB && (this.layerB.style.opacity = "0"), this.videoRendererA?.destroy(), this.videoRendererB?.destroy(), this.iframeRendererA?.destroy(), this.iframeRendererB?.destroy(), this.imageRendererA?.destroy(), this.imageRendererB?.destroy();
+    this.crossfadeTimer !== null && (clearTimeout(this.crossfadeTimer), this.crossfadeTimer = null), this.layerA && (this.layerA.style.opacity = "0", this.layerA.style.transform = "none", this.layerA.style.filter = "none"), this.layerB && (this.layerB.style.opacity = "0", this.layerB.style.transform = "none", this.layerB.style.filter = "none"), this.videoRendererA?.destroy(), this.videoRendererB?.destroy(), this.iframeRendererA?.destroy(), this.iframeRendererB?.destroy(), this.imageRendererA?.destroy(), this.imageRendererB?.destroy();
   }
 }
-class F {
+class H {
   container = null;
   settings;
   cacheManager;
@@ -581,10 +651,10 @@ class F {
     const e = document.querySelector("#extensions_settings");
     if (!e) {
       console.warn("[ST-BgLoader] #extensions_settings not found yet, waiting for DOM insertion...");
-      const s = new MutationObserver(() => {
-        document.querySelector("#extensions_settings") && (s.disconnect(), this.render());
+      const a = new MutationObserver(() => {
+        document.querySelector("#extensions_settings") && (a.disconnect(), this.render());
       });
-      s.observe(document.body, { childList: !0, subtree: !0 });
+      a.observe(document.body, { childList: !0, subtree: !0 });
       return;
     }
     const t = document.querySelector("#st_bgloader_settings");
@@ -593,7 +663,7 @@ class F {
     i.id = "st_bgloader_settings", i.className = "st-bgloader-panel", i.innerHTML = `
             <div class="inline-drawer">
                 <div class="inline-drawer-toggle inline-drawer-header">
-                    <b><i class="fa-solid fa-photo-film"></i> ST-BgLoader (Rich Media Backgrounds)</b>
+                    <b><i class="fa-solid fa-photo-film"></i> ST-BgLoader (Rich Media Backgrounds & FX)</b>
                     <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
                 </div>
                 <div class="inline-drawer-content" style="display: flex; flex-direction: column; gap: 12px; padding-top: 10px;">
@@ -670,6 +740,99 @@ class F {
                         </div>
                     </div>
 
+                    <!-- Atmospheric Weather & Particles Section -->
+                    <div class="st-bgloader-section">
+                        <h4><i class="fa-solid fa-cloud-sun-rain"></i> Atmospheric Weather & Particles</h4>
+                        
+                        <div class="st-bgloader-preset-row">
+                            <label style="font-size: 0.9em; flex: 0 0 80px;">Weather:</label>
+                            <select id="st_weather_type">
+                                <option value="off" ${this.settings.weather.type === "off" ? "selected" : ""}>Off (关闭天气)</option>
+                                <option value="rain" ${this.settings.weather.type === "rain" ? "selected" : ""}>Rain (细雨微涟)</option>
+                                <option value="snow" ${this.settings.weather.type === "snow" ? "selected" : ""}>Snow (冬日飘雪)</option>
+                                <option value="sakura" ${this.settings.weather.type === "sakura" ? "selected" : ""}>Sakura (落樱缤纷)</option>
+                                <option value="cyber_motes" ${this.settings.weather.type === "cyber_motes" ? "selected" : ""}>Cyber Motes (赛博霓虹微粒)</option>
+                                <option value="scanlines" ${this.settings.weather.type === "scanlines" ? "selected" : ""}>Scanlines (复古CRT扫描线)</option>
+                            </select>
+                        </div>
+
+                        <div class="st-bgloader-preset-row">
+                            <label style="font-size: 0.9em; flex: 0 0 80px;">Density:</label>
+                            <select id="st_weather_density">
+                                <option value="low" ${this.settings.weather.density === "low" ? "selected" : ""}>Low (稀疏)</option>
+                                <option value="medium" ${this.settings.weather.density === "medium" ? "selected" : ""}>Medium (适中)</option>
+                                <option value="high" ${this.settings.weather.density === "high" ? "selected" : ""}>High (密集)</option>
+                            </select>
+                        </div>
+
+                        <div class="st-bgloader-slider-row">
+                            <label>Speed</label>
+                            <input type="range" id="st_weather_speed" min="5" max="25" step="1" value="${Math.round(this.settings.weather.speed * 10)}" />
+                            <span class="st-bgloader-slider-val" id="st_weather_speed_val">${this.settings.weather.speed}x</span>
+                        </div>
+
+                        <div class="st-bgloader-slider-row">
+                            <label>Opacity</label>
+                            <input type="range" id="st_weather_opacity" min="10" max="100" step="5" value="${Math.round(this.settings.weather.opacity * 100)}" />
+                            <span class="st-bgloader-slider-val" id="st_weather_opacity_val">${Math.round(this.settings.weather.opacity * 100)}%</span>
+                        </div>
+                    </div>
+
+                    <!-- Audio Visualizer & Motion Reactive Section -->
+                    <div class="st-bgloader-section">
+                        <h4><i class="fa-solid fa-chart-simple"></i> Audio Visualizer & Parallax</h4>
+                        
+                        <div class="st-bgloader-preset-row">
+                            <label style="font-size: 0.9em; flex: 0 0 90px;">Visualizer:</label>
+                            <select id="st_visualizer_mode">
+                                <option value="off" ${this.settings.visualizer.mode === "off" ? "selected" : ""}>Off (关闭律动)</option>
+                                <option value="pulse" ${this.settings.visualizer.mode === "pulse" ? "selected" : ""}>Pulse (低音呼吸律动)</option>
+                                <option value="spectrum" ${this.settings.visualizer.mode === "spectrum" ? "selected" : ""}>Spectrum (底部音频频谱)</option>
+                            </select>
+                        </div>
+
+                        <div class="st-bgloader-slider-row">
+                            <label>Sensitivity</label>
+                            <input type="range" id="st_visualizer_sens" min="5" max="25" step="1" value="${Math.round(this.settings.visualizer.sensitivity * 10)}" />
+                            <span class="st-bgloader-slider-val" id="st_visualizer_sens_val">${this.settings.visualizer.sensitivity}x</span>
+                        </div>
+
+                        <div style="margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 8px;">
+                            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                                <input type="checkbox" id="st_parallax_enabled" ${this.settings.parallax.enabled ? "checked" : ""} />
+                                <span>Enable 2.5D Mouse Gyro Parallax (景深视差)</span>
+                            </label>
+                        </div>
+
+                        <div class="st-bgloader-slider-row" style="margin-top: 8px;">
+                            <label>Depth Intensity</label>
+                            <input type="range" id="st_parallax_intensity" min="1" max="10" step="1" value="${Math.round(this.settings.parallax.intensity * 10)}" />
+                            <span class="st-bgloader-slider-val" id="st_parallax_intensity_val">${this.settings.parallax.intensity}</span>
+                        </div>
+                    </div>
+
+                    <!-- Scene Transitions -->
+                    <div class="st-bgloader-section">
+                        <h4><i class="fa-solid fa-wand-magic-sparkles"></i> Scene Transitions</h4>
+                        
+                        <div class="st-bgloader-preset-row">
+                            <label style="font-size: 0.9em; flex: 0 0 90px;">Effect:</label>
+                            <select id="st_transition_effect">
+                                <option value="fade" ${this.settings.transitionEffect === "fade" ? "selected" : ""}>Fade (平滑淡入淡出)</option>
+                                <option value="zoom_fade" ${this.settings.transitionEffect === "zoom_fade" ? "selected" : ""}>Zoom Fade (缩放推进淡入)</option>
+                                <option value="blur_fade" ${this.settings.transitionEffect === "blur_fade" ? "selected" : ""}>Blur Fade (虚化柔焦渐变)</option>
+                                <option value="slide_left" ${this.settings.transitionEffect === "slide_left" ? "selected" : ""}>Slide Left (向左推移)</option>
+                                <option value="slide_right" ${this.settings.transitionEffect === "slide_right" ? "selected" : ""}>Slide Right (向右推移)</option>
+                            </select>
+                        </div>
+
+                        <div class="st-bgloader-slider-row">
+                            <label>Duration</label>
+                            <input type="range" id="st_transition_dur" min="200" max="1500" step="50" value="${this.settings.transitionDurationMs}" />
+                            <span class="st-bgloader-slider-val" id="st_transition_dur_val">${this.settings.transitionDurationMs}ms</span>
+                        </div>
+                    </div>
+
                     <!-- Audio Engine & Playlist Controls -->
                     <div class="st-bgloader-section">
                         <h4><i class="fa-solid fa-volume-high"></i> Audio & BGM Playlist</h4>
@@ -695,6 +858,10 @@ class F {
                                 <span>Mute Audio</span>
                             </label>
                             <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                                <input type="checkbox" id="st_audio_muffle" ${this.settings.muffleBGM ? "checked" : ""} />
+                                <span>Lo-Fi Acoustic Muffle (隔壁房间低通滤波沉浸感)</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
                                 <input type="checkbox" id="st_audio_blur" ${this.settings.pauseOnBlur ? "checked" : ""} />
                                 <span>Pause when tab inactive</span>
                             </label>
@@ -709,112 +876,227 @@ class F {
                         </div>
                     </div>
 
-                    <!-- Cache & Performance -->
+                    <!-- Smart Scene Triggers -->
                     <div class="st-bgloader-section">
-                        <h4><i class="fa-solid fa-database"></i> Cache Management</h4>
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <h4><i class="fa-solid fa-bolt"></i> Smart Scene Triggers</h4>
+                        <div class="st-bgloader-trigger-list" id="st_trigger_list">
+                            <!-- Populated dynamically -->
+                        </div>
+                        <button id="st_trigger_add_btn" class="menu_button" style="width: 100%;">
+                            <i class="fa-solid fa-plus"></i> Add Scene Trigger Rule
+                        </button>
+                    </div>
+
+                    <!-- Backup & Cache -->
+                    <div class="st-bgloader-section">
+                        <h4><i class="fa-solid fa-file-export"></i> Backup & Cache</h4>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                             <div>Used: <strong id="st_cache_used">Calculating...</strong> (<span id="st_cache_count">0</span> items)</div>
                             <button id="st_cache_clear_btn" class="menu_button menu_button_danger">Clear Cache</button>
+                        </div>
+                        <div class="st-bgloader-btn-row">
+                            <button id="st_backup_export_btn" class="menu_button"><i class="fa-solid fa-download"></i> Export Settings JSON</button>
+                            <button id="st_backup_import_btn" class="menu_button"><i class="fa-solid fa-upload"></i> Import Settings JSON</button>
+                            <input type="file" id="st_backup_import_file" style="display: none;" accept=".json" />
                         </div>
                     </div>
 
                 </div>
             </div>
-        `, e.appendChild(i), this.container = i, this.bindEvents(), this.populatePresets(), this.refreshMediaGrid(), this.updateCacheStats();
+        `, e.appendChild(i), this.container = i, this.bindEvents(), this.populatePresets(), this.refreshMediaGrid(), this.refreshTriggerList(), this.updateCacheStats();
   }
   populatePresets() {
     const e = this.container?.querySelector("#st_preset_select");
-    e && (e.innerHTML = "", Object.values(f).forEach((t) => {
+    e && (e.innerHTML = "", Object.values(M).forEach((t) => {
       const i = document.createElement("option");
       i.value = t.id, i.textContent = t.name, t.id === this.settings.activePresetId && (i.selected = !0), e.appendChild(i);
     }), Object.entries(this.settings.userPresets || {}).forEach(([t, i]) => {
-      const s = document.createElement("option");
-      s.value = t, s.textContent = `★ ${t} (Custom)`, t === this.settings.activePresetId && (s.selected = !0), e.appendChild(s);
+      const a = document.createElement("option");
+      a.value = t, a.textContent = `★ ${t} (Custom)`, t === this.settings.activePresetId && (a.selected = !0), e.appendChild(a);
     }));
   }
   bindEvents() {
     if (!this.container) return;
     const e = this.container.querySelector(".inline-drawer-toggle"), t = this.container.querySelector(".inline-drawer-content"), i = this.container.querySelector(".inline-drawer-icon");
     e?.addEventListener("click", () => {
-      const l = t.style.display === "none";
-      t.style.display = l ? "flex" : "none", i && (i.classList.toggle("down", l), i.classList.toggle("up", !l));
+      const o = t.style.display === "none";
+      t.style.display = o ? "flex" : "none", i && (i.classList.toggle("down", o), i.classList.toggle("up", !o));
     });
-    const s = this.container.querySelector("#st_bgloader_dropzone"), a = this.container.querySelector("#st_bgloader_file_input");
-    s?.addEventListener("click", () => a?.click()), a?.addEventListener("change", async () => {
-      a.files && a.files.length > 0 && (await this.handleFileUpload(a.files[0]), a.value = "");
-    }), s?.addEventListener("dragover", (l) => {
-      l.preventDefault(), s.classList.add("dragover");
-    }), s?.addEventListener("dragleave", () => s.classList.remove("dragover")), s?.addEventListener("drop", async (l) => {
-      const h = l;
-      h.preventDefault(), s.classList.remove("dragover"), h.dataTransfer?.files && h.dataTransfer.files.length > 0 && await this.handleFileUpload(h.dataTransfer.files[0]);
+    const a = this.container.querySelector("#st_bgloader_dropzone"), s = this.container.querySelector("#st_bgloader_file_input");
+    a?.addEventListener("click", () => s?.click()), s?.addEventListener("change", async () => {
+      s.files && s.files.length > 0 && (await this.handleFileUpload(s.files[0]), s.value = "");
+    }), a?.addEventListener("dragover", (o) => {
+      o.preventDefault(), a.classList.add("dragover");
+    }), a?.addEventListener("dragleave", () => a.classList.remove("dragover")), a?.addEventListener("drop", async (o) => {
+      const d = o;
+      d.preventDefault(), a.classList.remove("dragover"), d.dataTransfer?.files && d.dataTransfer.files.length > 0 && await this.handleFileUpload(d.dataTransfer.files[0]);
     });
-    const n = this.container.querySelector("#st_bgloader_url_input");
+    const r = this.container.querySelector("#st_bgloader_url_input");
     this.container.querySelector("#st_bgloader_url_btn")?.addEventListener("click", async () => {
-      const l = n.value.trim();
-      l && (await this.handleUrlImport(l), n.value = "");
+      const o = r.value.trim();
+      o && (await this.handleUrlImport(o), r.value = "");
     });
-    const o = this.container.querySelector("#st_preset_select");
-    o?.addEventListener("change", () => {
-      const l = o.value;
-      this.settings.activePresetId = l;
-      let h = f[l]?.filters;
-      !h && this.settings.userPresets[l] && (h = this.settings.userPresets[l]), h && (this.settings.filters = { ...h }, this.updateSliders(h), this.callbacks.onPresetChanged({ id: l, name: l, filters: h }), this.callbacks.onSettingsChanged(this.settings));
+    const l = this.container.querySelector("#st_preset_select");
+    l?.addEventListener("change", () => {
+      const o = l.value;
+      this.settings.activePresetId = o;
+      let d = M[o]?.filters;
+      !d && this.settings.userPresets[o] && (d = this.settings.userPresets[o]), d && (this.settings.filters = { ...d }, this.updateSliders(d), this.callbacks.onPresetChanged({ id: o, name: o, filters: d }), this.callbacks.onSettingsChanged(this.settings));
     }), this.container.querySelector("#st_preset_save_btn")?.addEventListener("click", () => {
-      const l = prompt("Enter a name for this custom preset:");
-      if (l && l.trim()) {
-        const h = l.trim();
-        this.settings.userPresets[h] = { ...this.settings.filters }, this.settings.activePresetId = h, this.populatePresets(), this.callbacks.onSettingsChanged(this.settings);
+      const o = prompt("Enter a name for this custom preset:");
+      if (o && o.trim()) {
+        const d = o.trim();
+        this.settings.userPresets[d] = { ...this.settings.filters }, this.settings.activePresetId = d, this.populatePresets(), this.callbacks.onSettingsChanged(this.settings);
       }
     }), this.container.querySelector("#st_preset_del_btn")?.addEventListener("click", () => {
-      const l = o.value;
-      if (this.settings.userPresets[l]) {
-        if (confirm(`Delete custom preset "${l}"?`)) {
-          delete this.settings.userPresets[l], this.settings.activePresetId = "default", this.populatePresets();
-          const h = f.default.filters;
-          this.settings.filters = { ...h }, this.updateSliders(h), this.callbacks.onPresetChanged(f.default), this.callbacks.onSettingsChanged(this.settings);
+      const o = l.value;
+      if (this.settings.userPresets[o]) {
+        if (confirm(`Delete custom preset "${o}"?`)) {
+          delete this.settings.userPresets[o], this.settings.activePresetId = "default", this.populatePresets();
+          const d = M.default.filters;
+          this.settings.filters = { ...d }, this.updateSliders(d), this.callbacks.onPresetChanged(M.default), this.callbacks.onSettingsChanged(this.settings);
         }
       } else
         alert("Cannot delete built-in presets.");
     });
-    const d = (l, h, A, B) => {
-      const _ = this.container.querySelector(l), S = this.container.querySelector(h);
-      _?.addEventListener("input", () => {
-        const k = Number(_.value);
-        S && (S.textContent = `${k}${A}`), B(k), this.callbacks.onSettingsChanged(this.settings);
+    const c = (o, d, x, E) => {
+      const R = this.container.querySelector(o), I = this.container.querySelector(d);
+      R?.addEventListener("input", () => {
+        const B = Number(R.value);
+        I && (I.textContent = `${B}${x}`), E(B), this.callbacks.onSettingsChanged(this.settings);
       });
     };
-    d("#st_filter_blur", "#st_filter_blur_val", "px", (l) => this.settings.filters.blur = l), d("#st_filter_brightness", "#st_filter_brightness_val", "%", (l) => this.settings.filters.brightness = l), d("#st_filter_opacity", "#st_filter_opacity_val", "%", (l) => this.settings.filters.opacity = l), d("#st_filter_saturate", "#st_filter_saturate_val", "%", (l) => this.settings.filters.saturate = l), d("#st_audio_volume", "#st_audio_volume_val", "%", (l) => this.settings.volume = l / 100);
-    const c = this.container.querySelector("#st_playback_mode");
-    c?.addEventListener("change", () => {
-      this.settings.playbackMode = c.value, this.callbacks.onPlaybackModeChanged(this.settings.playbackMode), this.callbacks.onSettingsChanged(this.settings);
+    c("#st_filter_blur", "#st_filter_blur_val", "px", (o) => this.settings.filters.blur = o), c("#st_filter_brightness", "#st_filter_brightness_val", "%", (o) => this.settings.filters.brightness = o), c("#st_filter_opacity", "#st_filter_opacity_val", "%", (o) => this.settings.filters.opacity = o), c("#st_filter_saturate", "#st_filter_saturate_val", "%", (o) => this.settings.filters.saturate = o);
+    const h = this.container.querySelector("#st_weather_type");
+    h?.addEventListener("change", () => {
+      this.settings.weather.type = h.value, this.callbacks.onWeatherChanged?.(this.settings.weather), this.callbacks.onSettingsChanged(this.settings);
     });
-    const u = this.container.querySelector("#st_bg_interactive");
+    const u = this.container.querySelector("#st_weather_density");
     u?.addEventListener("change", () => {
-      this.settings.interactiveBackground = u.checked, this.callbacks.onInteractiveChanged(u.checked), this.callbacks.onSettingsChanged(this.settings);
+      this.settings.weather.density = u.value, this.callbacks.onWeatherChanged?.(this.settings.weather), this.callbacks.onSettingsChanged(this.settings);
+    }), c("#st_weather_speed", "#st_weather_speed_val", "x", (o) => {
+      this.settings.weather.speed = o / 10, this.callbacks.onWeatherChanged?.(this.settings.weather);
+    }), c("#st_weather_opacity", "#st_weather_opacity_val", "%", (o) => {
+      this.settings.weather.opacity = o / 100, this.callbacks.onWeatherChanged?.(this.settings.weather);
     });
-    const g = this.container.querySelector("#st_mini_player_toggle");
+    const g = this.container.querySelector("#st_visualizer_mode");
     g?.addEventListener("change", () => {
-      this.settings.showMiniPlayer = g.checked, this.callbacks.onMiniPlayerToggle(g.checked), this.callbacks.onSettingsChanged(this.settings);
+      this.settings.visualizer.mode = g.value, this.callbacks.onVisualizerChanged?.(this.settings.visualizer), this.callbacks.onSettingsChanged(this.settings);
+    }), c("#st_visualizer_sens", "#st_visualizer_sens_val", "x", (o) => {
+      this.settings.visualizer.sensitivity = o / 10, this.callbacks.onVisualizerChanged?.(this.settings.visualizer);
     });
-    const y = this.container.querySelector("#st_capsule_on_play");
-    y?.addEventListener("change", () => {
-      this.settings.capsuleOnPlayOnly = y.checked, this.callbacks.onCapsuleOnPlayToggle?.(y.checked), this.callbacks.onSettingsChanged(this.settings);
+    const f = this.container.querySelector("#st_parallax_enabled");
+    f?.addEventListener("change", () => {
+      this.settings.parallax.enabled = f.checked, this.callbacks.onParallaxChanged?.(this.settings.parallax), this.callbacks.onSettingsChanged(this.settings);
+    }), c("#st_parallax_intensity", "#st_parallax_intensity_val", "", (o) => {
+      this.settings.parallax.intensity = o / 10, this.callbacks.onParallaxChanged?.(this.settings.parallax);
     });
-    const b = this.container.querySelector("#st_audio_mute");
-    b?.addEventListener("change", () => {
-      this.settings.muted = b.checked, this.callbacks.onSettingsChanged(this.settings);
-    });
-    const v = this.container.querySelector("#st_audio_blur");
+    const v = this.container.querySelector("#st_transition_effect");
     v?.addEventListener("change", () => {
-      this.settings.pauseOnBlur = v.checked, this.callbacks.onSettingsChanged(this.settings);
+      this.settings.transitionEffect = v.value, this.callbacks.onTransitionChanged?.(this.settings.transitionEffect, this.settings.transitionDurationMs), this.callbacks.onSettingsChanged(this.settings);
+    }), c("#st_transition_dur", "#st_transition_dur_val", "ms", (o) => {
+      this.settings.transitionDurationMs = o, this.callbacks.onTransitionChanged?.(this.settings.transitionEffect, this.settings.transitionDurationMs);
+    }), c("#st_audio_volume", "#st_audio_volume_val", "%", (o) => this.settings.volume = o / 100);
+    const y = this.container.querySelector("#st_playback_mode");
+    y?.addEventListener("change", () => {
+      this.settings.playbackMode = y.value, this.callbacks.onPlaybackModeChanged(this.settings.playbackMode), this.callbacks.onSettingsChanged(this.settings);
+    });
+    const C = this.container.querySelector("#st_audio_mute");
+    C?.addEventListener("change", () => {
+      this.settings.muted = C.checked, this.callbacks.onSettingsChanged(this.settings);
+    });
+    const _ = this.container.querySelector("#st_audio_muffle");
+    _?.addEventListener("change", () => {
+      this.settings.muffleBGM = _.checked, this.callbacks.onMuffleChanged?.(_.checked), this.callbacks.onSettingsChanged(this.settings);
+    });
+    const b = this.container.querySelector("#st_audio_blur");
+    b?.addEventListener("change", () => {
+      this.settings.pauseOnBlur = b.checked, this.callbacks.onSettingsChanged(this.settings);
+    });
+    const k = this.container.querySelector("#st_bg_interactive");
+    k?.addEventListener("change", () => {
+      this.settings.interactiveBackground = k.checked, this.callbacks.onInteractiveChanged(k.checked), this.callbacks.onSettingsChanged(this.settings);
+    });
+    const T = this.container.querySelector("#st_mini_player_toggle");
+    T?.addEventListener("change", () => {
+      this.settings.showMiniPlayer = T.checked, this.callbacks.onMiniPlayerToggle(T.checked), this.callbacks.onSettingsChanged(this.settings);
+    });
+    const A = this.container.querySelector("#st_capsule_on_play");
+    A?.addEventListener("change", () => {
+      this.settings.capsuleOnPlayOnly = A.checked, this.callbacks.onCapsuleOnPlayToggle?.(A.checked), this.callbacks.onSettingsChanged(this.settings);
+    }), this.container.querySelector("#st_trigger_add_btn")?.addEventListener("click", () => {
+      this.promptAddTriggerRule();
     }), this.container.querySelector("#st_cache_clear_btn")?.addEventListener("click", async () => {
       confirm("Are you sure you want to clear all cached media files?") && (await this.cacheManager.clearAll(), await this.refreshMediaGrid(), await this.updateCacheStats());
+    }), this.container.querySelector("#st_backup_export_btn")?.addEventListener("click", () => {
+      const o = JSON.stringify(this.settings, null, 2), d = new Blob([o], { type: "application/json" }), x = URL.createObjectURL(d), E = document.createElement("a");
+      E.href = x, E.download = `st-bgloader-settings-${Date.now()}.json`, E.click(), URL.revokeObjectURL(x);
+    });
+    const w = this.container.querySelector("#st_backup_import_file");
+    this.container.querySelector("#st_backup_import_btn")?.addEventListener("click", () => {
+      w?.click();
+    }), w?.addEventListener("change", async () => {
+      if (w.files && w.files[0]) {
+        try {
+          const o = await w.files[0].text(), d = JSON.parse(o);
+          d && typeof d == "object" && (this.settings = { ...this.settings, ...d }, this.callbacks.onSettingsChanged(this.settings), this.render(), alert("Settings successfully imported!"));
+        } catch (o) {
+          alert(`Failed to import settings JSON: ${o}`);
+        }
+        w.value = "";
+      }
     });
   }
+  promptAddTriggerRule() {
+    const e = prompt("Enter rule name:");
+    if (!e) return;
+    const t = prompt("Trigger type (character / chat / regex):", "character")?.toLowerCase().trim(), i = t === "chat" || t === "regex" ? t : "character", a = prompt(`Enter ${i} matching pattern (e.g. Character name, Chat ID, or Regex text):`);
+    if (!a) return;
+    const s = {
+      id: `rule_${Date.now()}`,
+      name: e,
+      enabled: !0,
+      type: i,
+      pattern: a,
+      action: {
+        preset: this.settings.activePresetId,
+        weather: this.settings.weather.type
+      }
+    };
+    this.settings.triggerRules.push(s), this.callbacks.onSettingsChanged(this.settings), this.refreshTriggerList();
+  }
+  refreshTriggerList() {
+    const e = this.container?.querySelector("#st_trigger_list");
+    if (e) {
+      if (e.innerHTML = "", this.settings.triggerRules.length === 0) {
+        e.innerHTML = '<div style="text-align: center; opacity: 0.6; padding: 8px;">No trigger rules configured yet.</div>';
+        return;
+      }
+      this.settings.triggerRules.forEach((t, i) => {
+        const a = document.createElement("div");
+        a.className = "st-bgloader-trigger-item", a.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 6px;">
+                    <input type="checkbox" class="st-rule-toggle" ${t.enabled ? "checked" : ""} />
+                    <div>
+                        <span class="st-bgloader-trigger-badge">${t.type}</span>
+                        <strong>${t.name}</strong>: <code>${t.pattern}</code>
+                    </div>
+                </div>
+                <button class="menu_button menu_button_danger st-rule-del" title="Delete"><i class="fa-solid fa-trash"></i></button>
+            `;
+        const s = a.querySelector(".st-rule-toggle");
+        s.addEventListener("change", () => {
+          t.enabled = s.checked, this.callbacks.onSettingsChanged(this.settings);
+        }), a.querySelector(".st-rule-del")?.addEventListener("click", () => {
+          this.settings.triggerRules.splice(i, 1), this.callbacks.onSettingsChanged(this.settings), this.refreshTriggerList();
+        }), e.appendChild(a);
+      });
+    }
+  }
   updateSliders(e) {
-    const t = (i, s, a, n) => {
-      const r = this.container?.querySelector(i), o = this.container?.querySelector(s);
-      r && (r.value = a.toString()), o && (o.textContent = `${a}${n}`);
+    const t = (i, a, s, r) => {
+      const n = this.container?.querySelector(i), l = this.container?.querySelector(a);
+      n && (n.value = s.toString()), l && (l.textContent = `${s}${r}`);
     };
     t("#st_filter_blur", "#st_filter_blur_val", e.blur, "px"), t("#st_filter_brightness", "#st_filter_brightness_val", e.brightness, "%"), t("#st_filter_opacity", "#st_filter_opacity_val", e.opacity, "%"), t("#st_filter_saturate", "#st_filter_saturate_val", e.saturate, "%");
   }
@@ -827,38 +1109,38 @@ class F {
       return;
     }
     t.forEach((i) => {
-      const s = document.createElement("div");
-      s.className = "st-bgloader-media-card", this.settings.activeMediaId === i.id && s.classList.add("active"), s.innerHTML = `
+      const a = document.createElement("div");
+      a.className = "st-bgloader-media-card", this.settings.activeMediaId === i.id && a.classList.add("active"), a.innerHTML = `
                 <div class="st-bgloader-media-badge ${i.type}">${i.type}</div>
                 <button class="st-bgloader-media-delete" title="Delete"><i class="fa-solid fa-trash"></i></button>
                 <div class="st-bgloader-media-card-title" title="${i.name}">${i.name}</div>
-            `, s.addEventListener("click", (n) => {
-        n.target.closest(".st-bgloader-media-delete") || (this.settings.activeMediaId = i.id, this.container?.querySelectorAll(".st-bgloader-media-card").forEach((o) => o.classList.remove("active")), s.classList.add("active"), this.callbacks.onMediaSelected(i), this.callbacks.onSettingsChanged(this.settings));
-      }), s.querySelector(".st-bgloader-media-delete")?.addEventListener("click", async (n) => {
-        n.stopPropagation(), confirm(`Delete media "${i.name}"?`) && (await this.cacheManager.deleteMedia(i.id), this.settings.activeMediaId === i.id && (this.settings.activeMediaId = null, this.callbacks.onSettingsChanged(this.settings)), this.callbacks.onMediaDeleted(i.id), await this.refreshMediaGrid(), await this.updateCacheStats());
-      }), e.appendChild(s);
+            `, a.addEventListener("click", (r) => {
+        r.target.closest(".st-bgloader-media-delete") || (this.settings.activeMediaId = i.id, this.container?.querySelectorAll(".st-bgloader-media-card").forEach((l) => l.classList.remove("active")), a.classList.add("active"), this.callbacks.onMediaSelected(i), this.callbacks.onSettingsChanged(this.settings));
+      }), a.querySelector(".st-bgloader-media-delete")?.addEventListener("click", async (r) => {
+        r.stopPropagation(), confirm(`Delete media "${i.name}"?`) && (await this.cacheManager.deleteMedia(i.id), this.settings.activeMediaId === i.id && (this.settings.activeMediaId = null, this.callbacks.onSettingsChanged(this.settings)), this.callbacks.onMediaDeleted(i.id), await this.refreshMediaGrid(), await this.updateCacheStats());
+      }), e.appendChild(a);
     });
   }
   async updateCacheStats() {
     const e = this.container?.querySelector("#st_cache_used"), t = this.container?.querySelector("#st_cache_count");
     if (!e || !t) return;
-    const { usedBytes: i, itemCount: s } = await this.cacheManager.getCacheUsage(), a = (i / (1024 * 1024)).toFixed(2);
-    e.textContent = `${a} MB`, t.textContent = s.toString();
+    const { usedBytes: i, itemCount: a } = await this.cacheManager.getCacheUsage(), s = (i / (1024 * 1024)).toFixed(2);
+    e.textContent = `${s} MB`, t.textContent = a.toString();
   }
   async handleFileUpload(e) {
     const t = this.detectMediaType(e.name, e.type), i = await this.cacheManager.saveMedia(e, e.name, t, "local");
     await this.refreshMediaGrid(), await this.updateCacheStats(), this.callbacks.onMediaUploaded(i);
   }
   async handleUrlImport(e) {
-    const t = e.split("/").pop()?.split("?")[0] || "remote_media", i = this.detectMediaType(t), s = await this.cacheManager.saveMedia(new Blob([]), t, i, "url", e);
-    await this.refreshMediaGrid(), await this.updateCacheStats(), this.callbacks.onMediaUploaded(s);
+    const t = e.split("/").pop()?.split("?")[0] || "remote_media", i = this.detectMediaType(t), a = await this.cacheManager.saveMedia(new Blob([]), t, i, "url", e);
+    await this.refreshMediaGrid(), await this.updateCacheStats(), this.callbacks.onMediaUploaded(a);
   }
   detectMediaType(e, t = "") {
     const i = e.split(".").pop()?.toLowerCase() || "";
     return ["mp4", "webm", "mov", "m4v", "ogv"].includes(i) || t.startsWith("video/") ? "video" : ["mp3", "wav", "ogg", "flac", "aac", "m4a"].includes(i) || t.startsWith("audio/") ? "audio" : i === "html" || i === "htm" ? "html" : i === "svg" ? "svg" : "image";
   }
 }
-class $ {
+class j {
   observer = null;
   onNativeMediaSelect;
   constructor(e) {
@@ -878,12 +1160,12 @@ class $ {
   augmentThumbnails(e) {
     e.querySelectorAll(".bg_example[bgfile]:not([data-st-bg-augmented])").forEach((i) => {
       i.setAttribute("data-st-bg-augmented", "true");
-      const s = i.getAttribute("bgfile") || "", a = this.detectType(s);
-      if (a !== "image") {
-        const n = document.createElement("span");
-        n.className = `st-bg-native-badge ${a}`, n.textContent = a.toUpperCase(), i.appendChild(n), i.addEventListener("click", () => {
-          const r = i.dataset.url || `/backgrounds/${s}`;
-          this.onNativeMediaSelect(r, a, s);
+      const a = i.getAttribute("bgfile") || "", s = this.detectType(a);
+      if (s !== "image") {
+        const r = document.createElement("span");
+        r.className = `st-bg-native-badge ${s}`, r.textContent = s.toUpperCase(), i.appendChild(r), i.addEventListener("click", () => {
+          const n = i.dataset.url || `/backgrounds/${a}`;
+          this.onNativeMediaSelect(n, s, a);
         });
       }
     });
@@ -896,7 +1178,7 @@ class $ {
     this.observer && (this.observer.disconnect(), this.observer = null);
   }
 }
-class D {
+class W {
   container = null;
   audioEngine;
   isVisible = !0;
@@ -909,34 +1191,34 @@ class D {
     this.isVisible = e, this.capsuleOnPlayOnly = t;
     const i = document.querySelector("#st_bg_mini_player");
     i && i.remove();
-    const s = document.createElement("div");
-    s.id = "st_bg_mini_player", s.className = "st-bg-mini-player";
-    const a = this.audioEngine.getCurrentTrack(), n = a ? a.name : "No Audio Selected", r = this.audioEngine.isPlaying(), o = this.audioEngine.getPlaybackMode(), d = this.isVisible && (!this.capsuleOnPlayOnly || r);
-    s.classList.add(d ? "visible" : "hidden"), s.innerHTML = `
+    const a = document.createElement("div");
+    a.id = "st_bg_mini_player", a.className = "st-bg-mini-player";
+    const s = this.audioEngine.getCurrentTrack(), r = s ? s.name : "No Audio Selected", n = this.audioEngine.isPlaying(), l = this.audioEngine.getPlaybackMode(), c = this.isVisible && (!this.capsuleOnPlayOnly || n);
+    a.classList.add(c ? "visible" : "hidden"), a.innerHTML = `
             <div class="st-bg-mini-capsule">
                 <button class="st-bg-mini-btn" id="st_mini_prev" title="Previous Track">
                     <i class="fa-solid fa-backward-step"></i>
                 </button>
                 <button class="st-bg-mini-btn st-bg-mini-play" id="st_mini_play" title="Play/Pause">
-                    <i class="fa-solid ${r ? "fa-pause" : "fa-play"}"></i>
+                    <i class="fa-solid ${n ? "fa-pause" : "fa-play"}"></i>
                 </button>
                 <button class="st-bg-mini-btn" id="st_mini_next" title="Next Track">
                     <i class="fa-solid fa-forward-step"></i>
                 </button>
-                <div class="st-bg-mini-track" id="st_mini_title" title="${n}">${n}</div>
-                <button class="st-bg-mini-btn st-bg-mini-mode" id="st_mini_mode" title="Mode: ${o}">
-                    <i class="fa-solid ${this.getModeIcon(o)}"></i>
+                <div class="st-bg-mini-track" id="st_mini_title" title="${r}">${r}</div>
+                <button class="st-bg-mini-btn st-bg-mini-mode" id="st_mini_mode" title="Mode: ${l}">
+                    <i class="fa-solid ${this.getModeIcon(l)}"></i>
                 </button>
             </div>
-        `, document.body.appendChild(s), this.container = s, this.bindEvents(), this.audioEngine.onTrackChange = (c) => {
+        `, document.body.appendChild(a), this.container = a, this.bindEvents(), this.audioEngine.onTrackChange = (h) => {
       const u = this.container?.querySelector("#st_mini_title");
       if (u) {
-        const g = c ? c.name : "No Audio";
+        const g = h ? h.name : "No Audio";
         u.textContent = g, u.setAttribute("title", g);
       }
-    }, this.audioEngine.onPlayStateChange = (c) => {
+    }, this.audioEngine.onPlayStateChange = (h) => {
       const u = this.container?.querySelector("#st_mini_play i");
-      u && (u.className = `fa-solid ${c ? "fa-pause" : "fa-play"}`), this.capsuleOnPlayOnly && this.isVisible && (c ? (this.hideTimer !== null && (clearTimeout(this.hideTimer), this.hideTimer = null), this.show()) : (this.hideTimer !== null && clearTimeout(this.hideTimer), this.hideTimer = window.setTimeout(() => {
+      u && (u.className = `fa-solid ${h ? "fa-pause" : "fa-play"}`), this.capsuleOnPlayOnly && this.isVisible && (h ? (this.hideTimer !== null && (clearTimeout(this.hideTimer), this.hideTimer = null), this.show()) : (this.hideTimer !== null && clearTimeout(this.hideTimer), this.hideTimer = window.setTimeout(() => {
         this.hide();
       }, 1200)));
     };
@@ -954,8 +1236,8 @@ class D {
       const i = this.container?.querySelector("#st_mini_mode");
       if (i) {
         i.setAttribute("title", `Mode: ${t}`);
-        const s = i.querySelector("i");
-        s && (s.className = `fa-solid ${this.getModeIcon(t)}`);
+        const a = i.querySelector("i");
+        a && (a.className = `fa-solid ${this.getModeIcon(t)}`);
       }
     }));
   }
@@ -986,7 +1268,7 @@ class D {
     this.hideTimer !== null && (clearTimeout(this.hideTimer), this.hideTimer = null), this.container && (this.container.remove(), this.container = null);
   }
 }
-class N {
+class G {
   ext;
   eventListeners = /* @__PURE__ */ new Map();
   constructor(e) {
@@ -997,13 +1279,13 @@ class N {
    * Supports MP4/WebM video, HTML/Canvas sandboxed pages, SVG animations, and images.
    */
   async setBackground(e, t) {
-    let s = (await this.ext.getCacheManager().listMedia()).find((a) => a.id === e || a.name === e || a.url === e || a.cacheKey === e);
-    if (!s) {
-      const a = t?.name || e.split("/").pop()?.split("?")[0] || "remote_background", n = t?.type || this.detectType(e);
-      t?.saveToLibrary ? s = await this.ext.getCacheManager().saveMedia(new Blob([]), a, n, "url", e) : s = {
+    let a = (await this.ext.getCacheManager().listMedia()).find((s) => s.id === e || s.name === e || s.url === e || s.cacheKey === e);
+    if (!a) {
+      const s = t?.name || e.split("/").pop()?.split("?")[0] || "remote_background", r = t?.type || this.detectType(e);
+      t?.saveToLibrary ? a = await this.ext.getCacheManager().saveMedia(new Blob([]), s, r, "url", e) : a = {
         id: "custom_" + Date.now(),
-        name: a,
-        type: n,
+        name: s,
+        type: r,
         source: "url",
         url: e,
         cacheKey: e,
@@ -1013,7 +1295,7 @@ class N {
         lastUsedTimestamp: Date.now()
       };
     }
-    t?.filters && this.setFilters(t.filters), typeof t?.interactive == "boolean" && this.setInteractive(t.interactive), await this.ext.applyMediaItem(s), this.emit("media-change", s);
+    t?.filters && this.setFilters(t.filters), typeof t?.interactive == "boolean" && this.setInteractive(t.interactive), await this.ext.applyMediaItem(a), this.emit("media-change", a);
   }
   /**
    * Clear the current background
@@ -1026,12 +1308,12 @@ class N {
    */
   async playBGM(e, t) {
     typeof t?.volume == "number" && this.setVolume(t.volume);
-    let s = (await this.ext.getCacheManager().listMedia()).find((n) => n.id === e || n.name === e || n.url === e || n.cacheKey === e);
-    if (!s) {
-      const n = t?.title || e.split("/").pop()?.split("?")[0] || "BGM";
-      s = {
+    let a = (await this.ext.getCacheManager().listMedia()).find((r) => r.id === e || r.name === e || r.url === e || r.cacheKey === e);
+    if (!a) {
+      const r = t?.title || e.split("/").pop()?.split("?")[0] || "BGM";
+      a = {
         id: "bgm_" + Date.now(),
-        name: n,
+        name: r,
         type: "audio",
         source: "url",
         url: e,
@@ -1042,7 +1324,7 @@ class N {
         lastUsedTimestamp: Date.now()
       };
     }
-    await this.ext.getAudioEngine().playMediaItem(s), this.emit("track-change", s);
+    await this.ext.getAudioEngine().playMediaItem(a), this.emit("track-change", a);
   }
   /**
    * Stop background music with optional fade-out
@@ -1050,40 +1332,31 @@ class N {
   stopBGM(e = 300) {
     this.ext.getAudioEngine().stopTrack(e), this.emit("track-change", null);
   }
-  /**
-   * Toggle play/pause for background audio
-   */
   togglePlay() {
     this.ext.getAudioEngine().togglePlay();
   }
-  /**
-   * Play next track in playlist
-   */
   nextTrack() {
     this.ext.getAudioEngine().playNext();
   }
-  /**
-   * Play previous track in playlist
-   */
   prevTrack() {
     this.ext.getAudioEngine().playPrev();
   }
-  /**
-   * Set master volume (0.0 to 1.0)
-   */
   setVolume(e) {
     const t = Math.max(0, Math.min(1, e));
     this.ext.getSettings().volume = t, this.ext.getAudioEngine().setVolume(t), this.ext.saveSettings(), this.emit("volume-change", t);
   }
-  /**
-   * Mute or unmute audio
-   */
   setMuted(e) {
     this.ext.getSettings().muted = e, this.ext.getAudioEngine().setMuted(e), this.ext.saveSettings(), this.emit("mute-change", e);
   }
   /**
-   * Dynamically adjust CSS visual filters
+   * Toggle or set Lo-Fi acoustic muffle effect (800Hz lowpass filter)
    */
+  setMuffled(e) {
+    this.ext.getSettings().muffleBGM = e, this.ext.getAudioEngine().setMuffled(e), this.ext.saveSettings(), this.emit("muffle-change", e);
+  }
+  getMuffled() {
+    return this.ext.getAudioEngine().getMuffled();
+  }
   setFilters(e) {
     const t = this.ext.getSettings().filters, i = {
       blur: e.blur !== void 0 ? e.blur : t.blur,
@@ -1093,23 +1366,69 @@ class N {
     };
     this.ext.getSettings().filters = i, this.ext.getMediaMount().applyFilters(i), this.ext.saveSettings(), this.emit("filters-change", i);
   }
-  /**
-   * Apply built-in or custom filter preset
-   */
   applyPreset(e) {
     const t = this.ext.getSettings();
-    let i = f[e]?.filters;
+    let i = M[e]?.filters;
     !i && t.userPresets[e] && (i = t.userPresets[e]), i ? (t.activePresetId = e, t.filters = { ...i }, this.ext.getMediaMount().applyFilters(i), this.ext.saveSettings(), this.emit("preset-change", e, i)) : console.warn(`[ST-BgLoader PublicAPI] Preset "${e}" not found.`);
   }
-  /**
-   * Set mouse interaction passthrough for HTML/Canvas/WebGL backgrounds
-   */
   setInteractive(e) {
     this.ext.getSettings().interactiveBackground = e, this.ext.getMediaMount().setInteractive(e), this.ext.saveSettings(), this.emit("interactive-change", e);
   }
   /**
-   * Return current playback, filter, and media status
+   * Atmospheric weather & particle FX
    */
+  setWeather(e, t) {
+    let i;
+    typeof e == "string" ? i = {
+      ...this.ext.getSettings().weather,
+      type: e,
+      ...t || {}
+    } : i = { ...e }, this.ext.getSettings().weather = i, this.ext.getAtmosphereFX().setWeather(i), this.ext.saveSettings(), this.emit("weather-change", i);
+  }
+  getWeather() {
+    return { ...this.ext.getSettings().weather };
+  }
+  /**
+   * Audio visualizer options
+   */
+  setVisualizer(e) {
+    let t;
+    typeof e == "string" ? t = {
+      ...this.ext.getSettings().visualizer,
+      mode: e
+    } : t = { ...e }, this.ext.getSettings().visualizer = t, this.ext.getAudioVisualizer().setOptions(t), this.ext.saveSettings(), this.emit("visualizer-change", t);
+  }
+  getVisualizer() {
+    return { ...this.ext.getSettings().visualizer };
+  }
+  /**
+   * 2.5D Parallax controls
+   */
+  setParallax(e, t) {
+    const i = {
+      enabled: e,
+      intensity: t !== void 0 ? t : this.ext.getSettings().parallax.intensity
+    };
+    this.ext.getSettings().parallax = i, this.ext.getParallaxController().setOptions(i), this.ext.saveSettings(), this.emit("parallax-change", i);
+  }
+  /**
+   * Transition effect and duration
+   */
+  setTransition(e, t) {
+    this.ext.getSettings().transitionEffect = e, t !== void 0 && (this.ext.getSettings().transitionDurationMs = t), this.ext.getMediaMount().setTransition(e, this.ext.getSettings().transitionDurationMs), this.ext.saveSettings(), this.emit("transition-change", e, this.ext.getSettings().transitionDurationMs);
+  }
+  /**
+   * Trigger rule management
+   */
+  addTriggerRule(e) {
+    this.ext.getTriggerManager().addRule(e), this.ext.getSettings().triggerRules = this.ext.getTriggerManager().getRules(), this.ext.saveSettings(), this.emit("trigger-rules-change", this.ext.getSettings().triggerRules);
+  }
+  removeTriggerRule(e) {
+    this.ext.getTriggerManager().removeRule(e), this.ext.getSettings().triggerRules = this.ext.getTriggerManager().getRules(), this.ext.saveSettings(), this.emit("trigger-rules-change", this.ext.getSettings().triggerRules);
+  }
+  getTriggerRules() {
+    return this.ext.getTriggerManager().getRules();
+  }
   getPlaybackState() {
     const e = this.ext.getSettings(), t = this.ext.getAudioEngine();
     return {
@@ -1121,52 +1440,46 @@ class N {
       activeMediaId: e.activeMediaId,
       activePresetId: e.activePresetId,
       filters: { ...e.filters },
-      isInteractive: e.interactiveBackground
+      isInteractive: e.interactiveBackground,
+      weather: e.weather.type,
+      visualizerMode: e.visualizer.mode,
+      parallaxEnabled: e.parallax.enabled,
+      transitionEffect: e.transitionEffect,
+      isMuffled: t.getMuffled()
     };
   }
-  /**
-   * Get list of all media items in cache library
-   */
   async getMediaList() {
     return this.ext.getCacheManager().listMedia();
   }
-  /**
-   * Preload remote media files (video, audio, html, svg, images) into CacheStorage.
-   * Guarantees zero-network-delay instant switching when subsequently set as background or BGM.
-   */
   async preloadMedia(e, t) {
-    const i = Array.isArray(e) ? e : [e], s = [], a = t?.concurrency || 3;
-    let n = 0;
-    const r = [...i], o = Array.from({ length: Math.min(a, r.length) }, async () => {
-      for (; r.length > 0; ) {
-        const d = r.shift();
+    const i = Array.isArray(e) ? e : [e], a = [], s = t?.concurrency || 3;
+    let r = 0;
+    const n = [...i], l = Array.from({ length: Math.min(s, n.length) }, async () => {
+      for (; n.length > 0; ) {
+        const c = n.shift();
         try {
-          const { item: c, isNew: u } = await this.ext.getCacheManager().preloadUrl(d), g = {
-            url: d,
+          const { item: h, isNew: u } = await this.ext.getCacheManager().preloadUrl(c), g = {
+            url: c,
             success: !0,
             cached: !u,
-            size: c.size || 0
+            size: h.size || 0
           };
-          s.push(g);
-        } catch (c) {
-          s.push({
-            url: d,
+          a.push(g);
+        } catch (h) {
+          a.push({
+            url: c,
             success: !1,
             cached: !1,
             size: 0,
-            error: c?.message || String(c)
+            error: h?.message || String(h)
           });
         }
-        n++, t?.onProgress?.(n, i.length, d), this.emit("preload-progress", n, i.length, d);
+        r++, t?.onProgress?.(r, i.length, c), this.emit("preload-progress", r, i.length, c);
       }
     });
-    return await Promise.all(o), this.emit("preload-complete", s), s;
+    return await Promise.all(l), this.emit("preload-complete", a), a;
   }
   // --- Event Bus ---
-  /**
-   * Subscribe to ST-BgLoader events. Returns unsubscribe function.
-   * Events: 'media-change', 'track-change', 'play-state-change', 'volume-change', 'mute-change', 'filters-change', 'preset-change', 'interactive-change'
-   */
   on(e, t) {
     return this.eventListeners.has(e) || this.eventListeners.set(e, /* @__PURE__ */ new Set()), this.eventListeners.get(e).add(t), () => this.off(e, t);
   }
@@ -1177,8 +1490,8 @@ class N {
     this.eventListeners.get(e)?.forEach((i) => {
       try {
         i(...t);
-      } catch (s) {
-        console.error(`[ST-BgLoader PublicAPI] Error in listener for "${e}":`, s);
+      } catch (a) {
+        console.error(`[ST-BgLoader PublicAPI] Error in listener for "${e}":`, a);
       }
     });
   }
@@ -1187,19 +1500,423 @@ class N {
     return ["mp4", "webm", "mov", "m4v", "ogv"].includes(t) ? "video" : ["mp3", "wav", "ogg", "flac", "aac", "m4a"].includes(t) ? "audio" : t === "html" || t === "htm" ? "html" : t === "svg" ? "svg" : "image";
   }
 }
-const P = "st_bgloader_settings";
-class j {
+class X {
+  canvas;
+  ctx = null;
+  parentEl = null;
+  animFrameId = null;
+  resizeObserver = null;
+  currentOptions = {
+    type: "off",
+    density: "medium",
+    speed: 1,
+    opacity: 0.75,
+    wind: 0.5
+  };
+  particles = [];
+  ripples = [];
+  scanlineOffset = 0;
+  width = 0;
+  height = 0;
+  dpr = 1;
+  constructor() {
+    this.canvas = document.createElement("canvas"), this.canvas.className = "st-bg-atmosphere-canvas", this.canvas.style.position = "absolute", this.canvas.style.top = "0", this.canvas.style.left = "0", this.canvas.style.width = "100%", this.canvas.style.height = "100%", this.canvas.style.pointerEvents = "none", this.canvas.style.zIndex = "2", this.canvas.style.display = "none", this.ctx = this.canvas.getContext("2d");
+  }
+  mount(e) {
+    this.parentEl = e, this.canvas.parentElement || e.appendChild(this.canvas), this.updateDimensions(), window.ResizeObserver && (this.resizeObserver = new ResizeObserver(() => {
+      this.updateDimensions();
+    }), this.resizeObserver.observe(e)), window.addEventListener("resize", this.onWindowResize);
+  }
+  onWindowResize = () => {
+    this.updateDimensions();
+  };
+  updateDimensions() {
+    if (!this.parentEl) return;
+    const e = this.parentEl.getBoundingClientRect();
+    this.width = e.width || window.innerWidth, this.height = e.height || window.innerHeight, this.dpr = Math.min(window.devicePixelRatio || 1, 2), this.canvas.width = Math.floor(this.width * this.dpr), this.canvas.height = Math.floor(this.height * this.dpr), this.ctx && this.ctx.scale(this.dpr, this.dpr), this.currentOptions.type !== "off" && this.initParticles();
+  }
+  setWeather(e) {
+    this.currentOptions = { ...e }, this.currentOptions.type === "off" ? (this.stop(), this.canvas.style.display = "none", this.particles = [], this.ripples = [], this.ctx && this.ctx.clearRect(0, 0, this.width, this.height)) : (this.canvas.style.display = "block", this.initParticles(), this.start());
+  }
+  getParticleCount() {
+    const e = Math.min(this.width, 1920) / 10;
+    switch (this.currentOptions.density) {
+      case "low":
+        return Math.floor(e * 0.5);
+      case "high":
+        return Math.floor(e * 2);
+      case "medium":
+      default:
+        return Math.floor(e);
+    }
+  }
+  initParticles() {
+    this.particles = [], this.ripples = [];
+    const e = this.getParticleCount(), t = this.currentOptions.type;
+    for (let i = 0; i < e; i++)
+      this.particles.push(this.createParticle(t, !0));
+  }
+  createParticle(e, t = !1) {
+    const i = t ? Math.random() * this.height : -20, a = Math.random() * (this.width + 400) - 200, s = this.currentOptions.speed, r = this.currentOptions.wind;
+    switch (e) {
+      case "rain":
+        return {
+          x: a,
+          y: i,
+          vx: r * 3,
+          vy: (12 + Math.random() * 8) * s,
+          size: 10 + Math.random() * 15,
+          alpha: (0.3 + Math.random() * 0.4) * this.currentOptions.opacity
+        };
+      case "snow":
+        return {
+          x: a,
+          y: i,
+          vx: r * 0.8 + (Math.random() - 0.5) * 0.5,
+          vy: (1 + Math.random() * 2) * s,
+          size: 2 + Math.random() * 3.5,
+          alpha: (0.4 + Math.random() * 0.5) * this.currentOptions.opacity,
+          oscillationOffset: Math.random() * Math.PI * 2
+        };
+      case "sakura":
+        return {
+          x: a,
+          y: i,
+          vx: r * 1.2 + (Math.random() - 0.5) * 0.8,
+          vy: (1.2 + Math.random() * 2.2) * s,
+          size: 8 + Math.random() * 6,
+          alpha: (0.6 + Math.random() * 0.3) * this.currentOptions.opacity,
+          rotation: Math.random() * Math.PI * 2,
+          vRotation: (Math.random() - 0.5) * 0.04 * s,
+          oscillationOffset: Math.random() * Math.PI * 2
+        };
+      case "cyber_motes": {
+        const n = ["#00f0ff", "#ff007f", "#7928ca", "#00ff88"];
+        return {
+          x: Math.random() * this.width,
+          y: t ? Math.random() * this.height : this.height + 20,
+          vx: (Math.random() - 0.5) * 1.5 + r * 0.5,
+          vy: -(1.5 + Math.random() * 3) * s,
+          size: 2 + Math.random() * 3.5,
+          alpha: (0.5 + Math.random() * 0.5) * this.currentOptions.opacity,
+          color: n[Math.floor(Math.random() * n.length)],
+          life: 0,
+          maxLife: 150 + Math.random() * 200
+        };
+      }
+      default:
+        return { x: 0, y: 0, vx: 0, vy: 0, size: 0, alpha: 0 };
+    }
+  }
+  start() {
+    if (this.animFrameId !== null) return;
+    const e = () => {
+      this.render(), this.currentOptions.type !== "off" && (this.animFrameId = requestAnimationFrame(e));
+    };
+    this.animFrameId = requestAnimationFrame(e);
+  }
+  stop() {
+    this.animFrameId !== null && (cancelAnimationFrame(this.animFrameId), this.animFrameId = null);
+  }
+  render() {
+    if (!this.ctx || this.width === 0 || this.height === 0) return;
+    const e = this.ctx;
+    e.clearRect(0, 0, this.width, this.height);
+    const t = this.currentOptions.type;
+    if (t === "scanlines") {
+      this.renderScanlines(e);
+      return;
+    }
+    const i = this.particles.length;
+    for (let a = 0; a < i; a++) {
+      const s = this.particles[a];
+      if (t === "rain")
+        e.beginPath(), e.strokeStyle = `rgba(180, 215, 255, ${s.alpha})`, e.lineWidth = 1.2, e.moveTo(s.x, s.y), e.lineTo(s.x + s.vx * 1.2, s.y + s.size), e.stroke(), s.x += s.vx, s.y += s.vy, s.y > this.height - 20 && Math.random() < 0.15 && this.ripples.push({
+          x: s.x,
+          y: this.height - 5 + Math.random() * 5,
+          vx: 0,
+          vy: 0,
+          size: 1,
+          alpha: s.alpha * 0.8
+        }), (s.y > this.height || s.x < -100 || s.x > this.width + 100) && (this.particles[a] = this.createParticle(t, !1));
+      else if (t === "snow") {
+        s.oscillationOffset = (s.oscillationOffset || 0) + 0.02;
+        const r = Math.sin(s.oscillationOffset) * 0.8;
+        s.x += s.vx + r, s.y += s.vy, e.beginPath(), e.arc(s.x, s.y, s.size, 0, Math.PI * 2), e.fillStyle = `rgba(255, 255, 255, ${s.alpha})`, e.fill(), (s.y > this.height || s.x < -50 || s.x > this.width + 50) && (this.particles[a] = this.createParticle(t, !1));
+      } else if (t === "sakura") {
+        s.oscillationOffset = (s.oscillationOffset || 0) + 0.03, s.rotation = (s.rotation || 0) + (s.vRotation || 0.02);
+        const r = Math.sin(s.oscillationOffset) * 1.5;
+        s.x += s.vx + r, s.y += s.vy, e.save(), e.translate(s.x, s.y), e.rotate(s.rotation), e.beginPath(), e.ellipse(0, 0, s.size, s.size * 0.55, 0, 0, Math.PI * 2), e.fillStyle = `rgba(255, 183, 197, ${s.alpha})`, e.fill(), e.restore(), (s.y > this.height || s.x < -50 || s.x > this.width + 50) && (this.particles[a] = this.createParticle(t, !1));
+      } else if (t === "cyber_motes") {
+        s.life = (s.life || 0) + 1, s.x += s.vx, s.y += s.vy;
+        const r = s.life / (s.maxLife || 200), n = s.alpha * Math.sin(r * Math.PI);
+        e.save(), e.shadowBlur = 8, e.shadowColor = s.color || "#00f0ff", e.beginPath(), e.arc(s.x, s.y, s.size, 0, Math.PI * 2), e.fillStyle = s.color || "#00f0ff", e.globalAlpha = Math.max(0, n), e.fill(), e.restore(), (s.y < -20 || s.life && s.life > (s.maxLife || 200)) && (this.particles[a] = this.createParticle(t, !1));
+      }
+    }
+    for (let a = this.ripples.length - 1; a >= 0; a--) {
+      const s = this.ripples[a];
+      if (s.size += 0.8, s.alpha -= 0.03, s.alpha <= 0 || s.size > 14) {
+        this.ripples.splice(a, 1);
+        continue;
+      }
+      e.beginPath(), e.ellipse(s.x, s.y, s.size * 1.5, s.size * 0.6, 0, 0, Math.PI * 2), e.strokeStyle = `rgba(180, 215, 255, ${s.alpha})`, e.lineWidth = 1, e.stroke();
+    }
+  }
+  renderScanlines(e) {
+    const i = 0.12 * this.currentOptions.opacity;
+    e.fillStyle = `rgba(0, 0, 0, ${i})`;
+    for (let s = 0; s < this.height; s += 4)
+      e.fillRect(0, s, this.width, 1.5);
+    this.scanlineOffset = (this.scanlineOffset + 2 * this.currentOptions.speed) % this.height;
+    const a = e.createLinearGradient(0, this.scanlineOffset - 30, 0, this.scanlineOffset + 30);
+    a.addColorStop(0, "rgba(255, 255, 255, 0)"), a.addColorStop(0.5, `rgba(255, 255, 255, ${0.08 * this.currentOptions.opacity})`), a.addColorStop(1, "rgba(255, 255, 255, 0)"), e.fillStyle = a, e.fillRect(0, this.scanlineOffset - 30, this.width, 60), Math.random() < 0.05 && (e.fillStyle = `rgba(255, 255, 255, ${0.02 * this.currentOptions.opacity})`, e.fillRect(0, 0, this.width, this.height));
+  }
+  destroy() {
+    this.stop(), window.removeEventListener("resize", this.onWindowResize), this.resizeObserver && (this.resizeObserver.disconnect(), this.resizeObserver = null), this.canvas.parentElement && this.canvas.parentElement.removeChild(this.canvas), this.particles = [], this.ripples = [];
+  }
+}
+class Y {
+  canvas;
+  ctx = null;
+  parentEl = null;
+  mediaContainerEl = null;
+  analyser = null;
+  animFrameId = null;
+  dataArray = null;
+  currentOptions = {
+    mode: "off",
+    color: "#4fa3d1",
+    sensitivity: 1
+  };
+  width = 0;
+  height = 0;
+  dpr = 1;
+  constructor() {
+    this.canvas = document.createElement("canvas"), this.canvas.className = "st-bg-visualizer-canvas", this.canvas.style.position = "absolute", this.canvas.style.left = "0", this.canvas.style.bottom = "0", this.canvas.style.width = "100%", this.canvas.style.height = "140px", this.canvas.style.pointerEvents = "none", this.canvas.style.zIndex = "3", this.canvas.style.display = "none", this.ctx = this.canvas.getContext("2d");
+  }
+  mount(e, t) {
+    this.parentEl = e, this.mediaContainerEl = t || null, this.canvas.parentElement || e.appendChild(this.canvas), this.updateDimensions(), window.addEventListener("resize", this.onResize);
+  }
+  onResize = () => {
+    this.updateDimensions();
+  };
+  updateDimensions() {
+    this.parentEl && (this.width = this.parentEl.clientWidth || window.innerWidth, this.height = 140, this.dpr = Math.min(window.devicePixelRatio || 1, 2), this.canvas.width = Math.floor(this.width * this.dpr), this.canvas.height = Math.floor(this.height * this.dpr), this.ctx && this.ctx.scale(this.dpr, this.dpr));
+  }
+  setAnalyser(e) {
+    if (this.analyser = e, this.analyser) {
+      this.analyser.fftSize = 256;
+      const t = this.analyser.frequencyBinCount;
+      this.dataArray = new Uint8Array(new ArrayBuffer(t));
+    } else
+      this.dataArray = null;
+  }
+  setOptions(e) {
+    this.currentOptions = { ...e }, this.currentOptions.mode === "off" ? (this.stop(), this.canvas.style.display = "none", this.ctx && this.ctx.clearRect(0, 0, this.width, this.height), this.mediaContainerEl && (this.mediaContainerEl.style.filter = "")) : (this.currentOptions.mode === "spectrum" ? this.canvas.style.display = "block" : this.canvas.style.display = "none", this.start());
+  }
+  start() {
+    if (this.animFrameId !== null) return;
+    const e = () => {
+      this.render(), this.currentOptions.mode !== "off" && (this.animFrameId = requestAnimationFrame(e));
+    };
+    this.animFrameId = requestAnimationFrame(e);
+  }
+  stop() {
+    this.animFrameId !== null && (cancelAnimationFrame(this.animFrameId), this.animFrameId = null);
+  }
+  render() {
+    if (!this.analyser || !this.dataArray)
+      return;
+    this.analyser.getByteFrequencyData(this.dataArray);
+    const e = this.currentOptions.mode, t = this.currentOptions.sensitivity;
+    if (e === "pulse") {
+      let i = 0;
+      const a = Math.min(12, this.dataArray.length);
+      for (let n = 0; n < a; n++)
+        i += this.dataArray[n];
+      const s = i / a / 255, r = Math.pow(s, 2) * 0.35 * t;
+      if (this.mediaContainerEl) {
+        const n = 1 + r * 0.015;
+        this.mediaContainerEl.style.transform = `scale(${n})`, this.mediaContainerEl.style.transition = "transform 0.06s ease-out";
+      }
+    } else if (e === "spectrum") {
+      if (!this.ctx) return;
+      const i = this.ctx;
+      i.clearRect(0, 0, this.width, this.height);
+      const a = this.dataArray.length, s = Math.max(3, this.width / a * 1.6);
+      let r = 0;
+      const n = this.currentOptions.color || "#4fa3d1";
+      for (let l = 0; l < a; l++) {
+        const c = this.dataArray[l] / 255 * t, h = Math.min(this.height, c * (this.height - 10));
+        if (h > 1) {
+          const u = i.createLinearGradient(0, this.height, 0, this.height - h);
+          u.addColorStop(0, `${n}22`), u.addColorStop(0.7, `${n}aa`), u.addColorStop(1, `${n}ff`), i.fillStyle = u;
+          const g = this.height - h;
+          i.beginPath();
+          const f = Math.min(s / 2, 3);
+          i.roundRect(r, g, s - 1.5, h, [f, f, 0, 0]), i.fill();
+        }
+        if (r += s, r > this.width) break;
+      }
+    }
+  }
+  destroy() {
+    this.stop(), window.removeEventListener("resize", this.onResize), this.canvas.parentElement && this.canvas.parentElement.removeChild(this.canvas), this.mediaContainerEl && (this.mediaContainerEl.style.transform = "", this.mediaContainerEl.style.transition = "");
+  }
+}
+class K {
+  targetEl = null;
+  options = {
+    enabled: !1,
+    intensity: 0.3
+  };
+  targetX = 0;
+  targetY = 0;
+  currentX = 0;
+  currentY = 0;
+  animFrameId = null;
+  isRunning = !1;
+  constructor() {
+  }
+  attach(e) {
+    this.targetEl = e, this.options.enabled && this.enable();
+  }
+  setOptions(e) {
+    const t = this.options.enabled;
+    this.options = { ...this.options, ...e }, this.options.enabled && !t ? this.enable() : !this.options.enabled && t && this.disable();
+  }
+  onMouseMove = (e) => {
+    if (!this.options.enabled) return;
+    const t = window.innerWidth / 2, i = window.innerHeight / 2, a = 30 * this.options.intensity, s = (e.clientX - t) / t, r = (e.clientY - i) / i;
+    this.targetX = s * a, this.targetY = r * a, this.isRunning || this.startLoop();
+  };
+  enable() {
+    window.addEventListener("mousemove", this.onMouseMove, { passive: !0 }), this.targetEl && (this.targetEl.style.willChange = "transform"), this.startLoop();
+  }
+  disable() {
+    window.removeEventListener("mousemove", this.onMouseMove), this.animFrameId !== null && (cancelAnimationFrame(this.animFrameId), this.animFrameId = null), this.isRunning = !1, this.targetX = 0, this.targetY = 0, this.currentX = 0, this.currentY = 0, this.targetEl && (this.targetEl.style.transform = "", this.targetEl.style.willChange = "");
+  }
+  startLoop() {
+    if (this.isRunning) return;
+    this.isRunning = !0;
+    const e = () => {
+      if (!this.options.enabled) {
+        this.isRunning = !1;
+        return;
+      }
+      const t = 0.08;
+      if (this.currentX += (this.targetX - this.currentX) * t, this.currentY += (this.targetY - this.currentY) * t, this.targetEl) {
+        const a = 1 + 0.05 * this.options.intensity;
+        this.targetEl.style.transform = `translate3d(${this.currentX.toFixed(2)}px, ${this.currentY.toFixed(2)}px, 0) scale(${a.toFixed(3)})`;
+      }
+      Math.abs(this.targetX - this.currentX) + Math.abs(this.targetY - this.currentY) > 0.01 ? this.animFrameId = requestAnimationFrame(e) : (this.isRunning = !1, this.animFrameId = null);
+    };
+    this.animFrameId = requestAnimationFrame(e);
+  }
+  destroy() {
+    this.disable(), this.targetEl = null;
+  }
+}
+class J {
+  rules = [];
+  onTriggerCallback;
+  eventSourceUnlisteners = [];
+  lastTriggeredId = null;
+  lastTriggerTime = 0;
+  constructor(e = [], t) {
+    this.rules = [...e], this.onTriggerCallback = t;
+  }
+  setTriggerCallback(e) {
+    this.onTriggerCallback = e;
+  }
+  setRules(e) {
+    this.rules = [...e];
+  }
+  getRules() {
+    return this.rules;
+  }
+  addRule(e) {
+    this.rules.push(e);
+  }
+  removeRule(e) {
+    this.rules = this.rules.filter((t) => t.id !== e);
+  }
+  evaluateCharacter(e) {
+    if (!e) return !1;
+    for (const t of this.rules)
+      if (!(!t.enabled || t.type !== "character") && t.pattern.toLowerCase().trim() === e.toLowerCase().trim())
+        return this.fireRule(t), !0;
+    return !1;
+  }
+  evaluateChat(e) {
+    if (!e) return !1;
+    for (const t of this.rules)
+      if (!(!t.enabled || t.type !== "chat") && t.pattern.trim() === e.trim())
+        return this.fireRule(t), !0;
+    return !1;
+  }
+  evaluateMessage(e) {
+    if (!e) return !1;
+    for (const t of this.rules)
+      if (!(!t.enabled || t.type !== "regex"))
+        try {
+          if (new RegExp(t.pattern, "i").test(e))
+            return this.fireRule(t), !0;
+        } catch (i) {
+          console.warn(`[ST-BgLoader TriggerManager] Invalid regex pattern "${t.pattern}":`, i);
+        }
+    return !1;
+  }
+  fireRule(e) {
+    const t = Date.now();
+    this.lastTriggeredId === e.id && t - this.lastTriggerTime < 500 || (this.lastTriggeredId = e.id, this.lastTriggerTime = t, console.log(`[ST-BgLoader TriggerManager] Fired rule: "${e.name}" (${e.type})`), this.onTriggerCallback?.(e.action, e));
+  }
+  bindSillyTavernEvents(e, t) {
+    if (this.unbindEvents(), !e || typeof e.on != "function") return;
+    const i = (n) => {
+      typeof n == "string" ? this.evaluateMessage(n) : n && typeof n.mes == "string" && this.evaluateMessage(n.mes);
+    }, a = (n) => {
+      const l = typeof n == "string" ? n : n?.chatId || n?.id;
+      l && this.evaluateChat(String(l));
+    }, s = (n) => {
+      const l = typeof n == "string" ? n : n?.name || n?.avatar;
+      l && this.evaluateCharacter(String(l));
+    }, r = (n, l) => {
+      e.on(n, l), this.eventSourceUnlisteners.push(() => {
+        typeof e.removeListener == "function" ? e.removeListener(n, l) : typeof e.off == "function" && e.off(n, l);
+      });
+    };
+    t ? (t.MESSAGE_RECEIVED && r(t.MESSAGE_RECEIVED, i), t.CHARACTER_MESSAGE_RENDERED && r(t.CHARACTER_MESSAGE_RENDERED, i), t.CHAT_CHANGED && r(t.CHAT_CHANGED, a), t.CHARACTER_PAGE_LOADED && r(t.CHARACTER_PAGE_LOADED, s)) : (r("message_received", i), r("character_message_rendered", i), r("chat_changed", a));
+  }
+  unbindEvents() {
+    for (const e of this.eventSourceUnlisteners)
+      try {
+        e();
+      } catch {
+      }
+    this.eventSourceUnlisteners = [];
+  }
+  destroy() {
+    this.unbindEvents(), this.rules = [], this.onTriggerCallback = void 0;
+  }
+}
+const O = "st_bgloader_settings";
+class Q {
   isInitialized = !1;
-  settings = { ...E };
+  settings = { ...L };
   cacheManager;
   audioEngine;
   mediaMount;
   settingsDrawer = null;
   nativeAugmenter = null;
   miniPlayer = null;
+  atmosphereFX;
+  audioVisualizer;
+  parallaxController;
+  triggerManager;
   publicApi;
   constructor() {
-    this.cacheManager = new V(), this.audioEngine = new U(), this.mediaMount = new q(this.audioEngine), this.publicApi = new N(this);
+    this.cacheManager = new V(), this.audioEngine = new U(), this.mediaMount = new N(this.audioEngine), this.atmosphereFX = new X(), this.audioVisualizer = new Y(), this.parallaxController = new K(), this.triggerManager = new J(), this.publicApi = new G(this);
   }
   getCacheManager() {
     return this.cacheManager;
@@ -1216,6 +1933,18 @@ class j {
   getMiniPlayer() {
     return this.miniPlayer;
   }
+  getAtmosphereFX() {
+    return this.atmosphereFX;
+  }
+  getAudioVisualizer() {
+    return this.audioVisualizer;
+  }
+  getParallaxController() {
+    return this.parallaxController;
+  }
+  getTriggerManager() {
+    return this.triggerManager;
+  }
   getAPI() {
     return this.publicApi;
   }
@@ -1226,75 +1955,96 @@ class j {
     await this.applyMedia(e);
   }
   async init() {
-    console.log("[ST-BgLoader] Initializing Rich Media Background Plugin..."), this.loadSettings(), await this.cacheManager.init(), this.mediaMount.init(), this.mediaMount.applyFilters(this.settings.filters), this.mediaMount.setInteractive(this.settings.interactiveBackground), this.audioEngine.setUrlResolver((a) => this.cacheManager.getMediaBlobUrl(a)), this.audioEngine.setVolume(this.settings.volume), this.audioEngine.setMuted(this.settings.muted), this.audioEngine.setPlaybackMode(this.settings.playbackMode);
-    const t = (await this.cacheManager.listMedia()).filter((a) => a.type === "audio");
-    this.audioEngine.setPlaylist(t), this.miniPlayer = new D(this.audioEngine), this.miniPlayer.render(this.settings.showMiniPlayer, this.settings.capsuleOnPlayOnly);
-    const i = this.audioEngine.onTrackChange;
-    this.audioEngine.onTrackChange = (a) => {
-      i?.(a), this.publicApi.emit("track-change", a);
+    console.log("[ST-BgLoader] Initializing Rich Media Background Plugin..."), this.loadSettings(), await this.cacheManager.init(), this.mediaMount.init(), this.mediaMount.applyFilters(this.settings.filters), this.mediaMount.setInteractive(this.settings.interactiveBackground), this.mediaMount.setTransition(this.settings.transitionEffect, this.settings.transitionDurationMs);
+    const e = this.mediaMount.getHostElement() || document.querySelector("#bg1"), t = this.mediaMount.getContainerElement();
+    e && (this.atmosphereFX.mount(e), this.audioVisualizer.mount(e, t || void 0)), t && this.parallaxController.attach(t), this.atmosphereFX.setWeather(this.settings.weather), this.audioVisualizer.setOptions(this.settings.visualizer), this.parallaxController.setOptions(this.settings.parallax), this.audioEngine.setUrlResolver((n) => this.cacheManager.getMediaBlobUrl(n)), this.audioEngine.setVolume(this.settings.volume), this.audioEngine.setMuted(this.settings.muted), this.audioEngine.setMuffled(this.settings.muffleBGM), this.audioEngine.setPlaybackMode(this.settings.playbackMode), this.audioEngine.onAnalyserReady = (n) => {
+      this.audioVisualizer.setAnalyser(n);
     };
-    const s = this.audioEngine.onPlayStateChange;
-    if (this.audioEngine.onPlayStateChange = (a) => {
-      s?.(a), this.publicApi.emit("play-state-change", a);
-    }, this.settingsDrawer = new F(this.settings, this.cacheManager, {
-      onSettingsChanged: (a) => {
-        this.settings = a, this.saveSettings(), this.mediaMount.applyFilters(this.settings.filters), this.audioEngine.setVolume(this.settings.volume), this.audioEngine.setMuted(this.settings.muted);
+    const a = (await this.cacheManager.listMedia()).filter((n) => n.type === "audio");
+    this.audioEngine.setPlaylist(a), this.miniPlayer = new W(this.audioEngine), this.miniPlayer.render(this.settings.showMiniPlayer, this.settings.capsuleOnPlayOnly);
+    const s = this.audioEngine.onTrackChange;
+    this.audioEngine.onTrackChange = (n) => {
+      s?.(n), this.publicApi.emit("track-change", n);
+    };
+    const r = this.audioEngine.onPlayStateChange;
+    if (this.audioEngine.onPlayStateChange = (n) => {
+      r?.(n), this.publicApi.emit("play-state-change", n);
+    }, this.triggerManager.setRules(this.settings.triggerRules || []), this.triggerManager.setTriggerCallback(async (n, l) => {
+      console.log(`[ST-BgLoader] Executing trigger rule: "${l.name}"`), n.mediaIdOrUrl && await this.publicApi.setBackground(n.mediaIdOrUrl), n.bgmUrl && await this.publicApi.playBGM(n.bgmUrl), n.weather && this.publicApi.setWeather(n.weather), n.preset && this.publicApi.applyPreset(n.preset), n.filters && this.publicApi.setFilters(n.filters);
+    }), this.settingsDrawer = new H(this.settings, this.cacheManager, {
+      onSettingsChanged: (n) => {
+        this.settings = n, this.saveSettings(), this.mediaMount.applyFilters(this.settings.filters), this.audioEngine.setVolume(this.settings.volume), this.audioEngine.setMuted(this.settings.muted);
       },
-      onPresetChanged: (a) => {
-        this.mediaMount.applyFilters(a.filters), this.publicApi.emit("preset-change", a.id, a.filters);
+      onPresetChanged: (n) => {
+        this.mediaMount.applyFilters(n.filters), this.publicApi.emit("preset-change", n.id, n.filters);
       },
-      onInteractiveChanged: (a) => {
-        this.mediaMount.setInteractive(a), this.publicApi.emit("interactive-change", a);
+      onInteractiveChanged: (n) => {
+        this.mediaMount.setInteractive(n), this.publicApi.emit("interactive-change", n);
       },
-      onMiniPlayerToggle: (a) => {
-        this.miniPlayer?.setVisible(a);
+      onMiniPlayerToggle: (n) => {
+        this.miniPlayer?.setVisible(n);
       },
-      onCapsuleOnPlayToggle: (a) => {
-        this.miniPlayer?.setCapsuleOnPlayOnly(a);
+      onCapsuleOnPlayToggle: (n) => {
+        this.miniPlayer?.setCapsuleOnPlayOnly(n);
       },
-      onPlaybackModeChanged: (a) => {
-        this.audioEngine.setPlaybackMode(a);
+      onPlaybackModeChanged: (n) => {
+        this.audioEngine.setPlaybackMode(n);
       },
-      onMediaSelected: async (a) => {
-        await this.applyMedia(a);
+      onWeatherChanged: (n) => {
+        this.atmosphereFX.setWeather(n), this.publicApi.emit("weather-change", n);
       },
-      onMediaDeleted: async (a) => {
-        this.settings.activeMediaId === a && (this.settings.activeMediaId = null, this.mediaMount.clear(), this.audioEngine.stopTrack(), this.saveSettings());
-        const n = await this.cacheManager.listMedia();
-        this.audioEngine.setPlaylist(n.filter((r) => r.type === "audio"));
+      onVisualizerChanged: (n) => {
+        this.audioVisualizer.setOptions(n), this.publicApi.emit("visualizer-change", n);
       },
-      onMediaUploaded: async (a) => {
+      onParallaxChanged: (n) => {
+        this.parallaxController.setOptions(n), this.publicApi.emit("parallax-change", n);
+      },
+      onTransitionChanged: (n, l) => {
+        this.mediaMount.setTransition(n, l), this.publicApi.emit("transition-change", n, l);
+      },
+      onMuffleChanged: (n) => {
+        this.audioEngine.setMuffled(n), this.publicApi.emit("muffle-change", n);
+      },
+      onMediaSelected: async (n) => {
+        await this.applyMedia(n);
+      },
+      onMediaDeleted: async (n) => {
+        this.settings.activeMediaId === n && (this.settings.activeMediaId = null, this.mediaMount.clear(), this.audioEngine.stopTrack(), this.saveSettings());
+        const l = await this.cacheManager.listMedia();
+        this.audioEngine.setPlaylist(l.filter((c) => c.type === "audio"));
+      },
+      onMediaUploaded: async (n) => {
         if (this.settings.lruAutoClean) {
-          const n = this.settings.cacheQuotaMB * 1024 * 1024;
-          await this.cacheManager.cleanLRU(n);
+          const l = this.settings.cacheQuotaMB * 1024 * 1024;
+          await this.cacheManager.cleanLRU(l);
         }
-        if (a.type === "audio") {
-          const n = await this.cacheManager.listMedia();
-          this.audioEngine.setPlaylist(n.filter((r) => r.type === "audio"));
+        if (n.type === "audio") {
+          const l = await this.cacheManager.listMedia();
+          this.audioEngine.setPlaylist(l.filter((c) => c.type === "audio"));
         }
-        await this.applyMedia(a);
+        await this.applyMedia(n);
       }
-    }), this.settingsDrawer.render(), this.nativeAugmenter = new $(async (a, n, r) => {
-      const o = {
-        id: "native_" + r,
-        name: r,
-        type: n,
+    }), this.settingsDrawer.render(), this.nativeAugmenter = new j(async (n, l, c) => {
+      const h = {
+        id: "native_" + c,
+        name: c,
+        type: l,
         source: "server",
-        url: a,
-        cacheKey: a,
+        url: n,
+        cacheKey: n,
         size: 0,
         mimeType: "",
         addedTimestamp: Date.now(),
         lastUsedTimestamp: Date.now()
       };
-      await this.applyMedia(o);
+      await this.applyMedia(h);
     }), this.nativeAugmenter.start(), document.addEventListener("visibilitychange", () => {
       this.audioEngine.handleVisibilityChange(document.hidden, this.settings.pauseOnBlur);
     }), this.hookSillyTavernEvents(), this.settings.activeMediaId) {
-      const a = await this.cacheManager.getMedia(this.settings.activeMediaId);
-      a && await this.applyMedia(a);
+      const n = await this.cacheManager.getMedia(this.settings.activeMediaId);
+      n && await this.applyMedia(n);
     }
-    this.isInitialized = !0, console.log("[ST-BgLoader] Initialization complete.");
+    this.isInitialized = !0, console.log("[ST-BgLoader] Full-Power Initialization complete.");
   }
   async applyMedia(e) {
     this.settings.activeMediaId = e.id, this.saveSettings();
@@ -1303,12 +2053,12 @@ class j {
   }
   hookSillyTavernEvents() {
     const e = window;
-    e.eventSource && e.event_types && e.eventSource.on(e.event_types.CHAT_CHANGED, async () => {
+    e.eventSource && (this.triggerManager.bindSillyTavernEvents(e.eventSource, e.event_types), e.event_types && e.event_types.CHAT_CHANGED && e.eventSource.on(e.event_types.CHAT_CHANGED, async () => {
       const t = e.getCurrentChatId ? e.getCurrentChatId() : null;
       if (t && this.settings.chatBindings[t]) {
-        const i = this.settings.chatBindings[t], s = await this.cacheManager.getMedia(i);
-        if (s) {
-          await this.applyMedia(s);
+        const i = this.settings.chatBindings[t], a = await this.cacheManager.getMedia(i);
+        if (a) {
+          await this.applyMedia(a);
           return;
         }
       }
@@ -1316,28 +2066,28 @@ class j {
         const i = await this.cacheManager.getMedia(this.settings.activeMediaId);
         i && await this.applyMedia(i);
       }
-    });
+    }));
   }
   loadSettings() {
     try {
-      const e = localStorage.getItem(P);
-      e && (this.settings = { ...E, ...JSON.parse(e) });
+      const e = localStorage.getItem(O);
+      e && (this.settings = { ...L, ...JSON.parse(e) });
     } catch (e) {
-      console.error("[ST-BgLoader] Failed to parse saved settings:", e), this.settings = { ...E };
+      console.error("[ST-BgLoader] Failed to parse saved settings:", e), this.settings = { ...L };
     }
   }
   saveSettings() {
     try {
-      localStorage.setItem(P, JSON.stringify(this.settings));
+      localStorage.setItem(O, JSON.stringify(this.settings));
     } catch (e) {
       console.error("[ST-BgLoader] Failed to save settings:", e);
     }
   }
 }
-const w = new j();
-document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", () => w.init()) : w.init();
-window.STBgLoader = w;
-window.stBgLoader = w.getAPI();
+const S = new Q();
+document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", () => S.init()) : S.init();
+window.STBgLoader = S;
+window.stBgLoader = S.getAPI();
 export {
-  j as STBgLoaderExtension
+  Q as STBgLoaderExtension
 };

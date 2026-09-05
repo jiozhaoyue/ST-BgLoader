@@ -1,4 +1,18 @@
-import { VisualFilters, BUILTIN_PRESETS, MediaItem, MediaType, PlaybackState, BgLoaderSettings, PreloadOptions, PreloadResult } from '../types';
+import {
+    VisualFilters,
+    BUILTIN_PRESETS,
+    MediaItem,
+    MediaType,
+    PlaybackState,
+    PreloadOptions,
+    PreloadResult,
+    WeatherOptions,
+    WeatherType,
+    VisualizerOptions,
+    VisualizerMode,
+    TransitionType,
+    TriggerRule,
+} from '../types';
 import type { STBgLoaderExtension } from '../index';
 
 export interface BackgroundOptions {
@@ -31,12 +45,10 @@ export class PublicAPI {
      * Supports MP4/WebM video, HTML/Canvas sandboxed pages, SVG animations, and images.
      */
     public async setBackground(urlOrId: string, options?: BackgroundOptions): Promise<void> {
-        // 1. Check if urlOrId matches an existing item in library
         const items = await this.ext.getCacheManager().listMedia();
         let targetItem = items.find(i => i.id === urlOrId || i.name === urlOrId || i.url === urlOrId || i.cacheKey === urlOrId);
 
         if (!targetItem) {
-            // Treat as URL or path
             const name = options?.name || urlOrId.split('/').pop()?.split('?')[0] || 'remote_background';
             const type = options?.type || this.detectType(urlOrId);
 
@@ -58,12 +70,10 @@ export class PublicAPI {
             }
         }
 
-        // Apply filters if provided
         if (options?.filters) {
             this.setFilters(options.filters);
         }
 
-        // Apply interactive if specified
         if (typeof options?.interactive === 'boolean') {
             this.setInteractive(options.interactive);
         }
@@ -120,30 +130,18 @@ export class PublicAPI {
         this.emit('track-change', null);
     }
 
-    /**
-     * Toggle play/pause for background audio
-     */
     public togglePlay(): void {
         this.ext.getAudioEngine().togglePlay();
     }
 
-    /**
-     * Play next track in playlist
-     */
     public nextTrack(): void {
         this.ext.getAudioEngine().playNext();
     }
 
-    /**
-     * Play previous track in playlist
-     */
     public prevTrack(): void {
         this.ext.getAudioEngine().playPrev();
     }
 
-    /**
-     * Set master volume (0.0 to 1.0)
-     */
     public setVolume(volume: number): void {
         const clamped = Math.max(0, Math.min(1, volume));
         this.ext.getSettings().volume = clamped;
@@ -152,9 +150,6 @@ export class PublicAPI {
         this.emit('volume-change', clamped);
     }
 
-    /**
-     * Mute or unmute audio
-     */
     public setMuted(muted: boolean): void {
         this.ext.getSettings().muted = muted;
         this.ext.getAudioEngine().setMuted(muted);
@@ -163,8 +158,19 @@ export class PublicAPI {
     }
 
     /**
-     * Dynamically adjust CSS visual filters
+     * Toggle or set Lo-Fi acoustic muffle effect (800Hz lowpass filter)
      */
+    public setMuffled(muffled: boolean): void {
+        this.ext.getSettings().muffleBGM = muffled;
+        this.ext.getAudioEngine().setMuffled(muffled);
+        this.ext.saveSettings();
+        this.emit('muffle-change', muffled);
+    }
+
+    public getMuffled(): boolean {
+        return this.ext.getAudioEngine().getMuffled();
+    }
+
     public setFilters(filters: Partial<VisualFilters>): void {
         const current = this.ext.getSettings().filters;
         const updated: VisualFilters = {
@@ -179,9 +185,6 @@ export class PublicAPI {
         this.emit('filters-change', updated);
     }
 
-    /**
-     * Apply built-in or custom filter preset
-     */
     public applyPreset(presetId: string): void {
         const settings = this.ext.getSettings();
         let filters: VisualFilters | undefined = BUILTIN_PRESETS[presetId]?.filters;
@@ -200,9 +203,6 @@ export class PublicAPI {
         }
     }
 
-    /**
-     * Set mouse interaction passthrough for HTML/Canvas/WebGL backgrounds
-     */
     public setInteractive(enabled: boolean): void {
         this.ext.getSettings().interactiveBackground = enabled;
         this.ext.getMediaMount().setInteractive(enabled);
@@ -211,8 +211,102 @@ export class PublicAPI {
     }
 
     /**
-     * Return current playback, filter, and media status
+     * Atmospheric weather & particle FX
      */
+    public setWeather(typeOrOptions: WeatherType | WeatherOptions, options?: Partial<WeatherOptions>): void {
+        let opts: WeatherOptions;
+        if (typeof typeOrOptions === 'string') {
+            opts = {
+                ...this.ext.getSettings().weather,
+                type: typeOrOptions,
+                ...(options || {}),
+            };
+        } else {
+            opts = { ...typeOrOptions };
+        }
+
+        this.ext.getSettings().weather = opts;
+        this.ext.getAtmosphereFX().setWeather(opts);
+        this.ext.saveSettings();
+        this.emit('weather-change', opts);
+    }
+
+    public getWeather(): WeatherOptions {
+        return { ...this.ext.getSettings().weather };
+    }
+
+    /**
+     * Audio visualizer options
+     */
+    public setVisualizer(modeOrOptions: VisualizerMode | VisualizerOptions): void {
+        let opts: VisualizerOptions;
+        if (typeof modeOrOptions === 'string') {
+            opts = {
+                ...this.ext.getSettings().visualizer,
+                mode: modeOrOptions,
+            };
+        } else {
+            opts = { ...modeOrOptions };
+        }
+
+        this.ext.getSettings().visualizer = opts;
+        this.ext.getAudioVisualizer().setOptions(opts);
+        this.ext.saveSettings();
+        this.emit('visualizer-change', opts);
+    }
+
+    public getVisualizer(): VisualizerOptions {
+        return { ...this.ext.getSettings().visualizer };
+    }
+
+    /**
+     * 2.5D Parallax controls
+     */
+    public setParallax(enabled: boolean, intensity?: number): void {
+        const parallax = {
+            enabled,
+            intensity: intensity !== undefined ? intensity : this.ext.getSettings().parallax.intensity,
+        };
+        this.ext.getSettings().parallax = parallax;
+        this.ext.getParallaxController().setOptions(parallax);
+        this.ext.saveSettings();
+        this.emit('parallax-change', parallax);
+    }
+
+    /**
+     * Transition effect and duration
+     */
+    public setTransition(type: TransitionType, durationMs?: number): void {
+        this.ext.getSettings().transitionEffect = type;
+        if (durationMs !== undefined) {
+            this.ext.getSettings().transitionDurationMs = durationMs;
+        }
+        this.ext.getMediaMount().setTransition(type, this.ext.getSettings().transitionDurationMs);
+        this.ext.saveSettings();
+        this.emit('transition-change', type, this.ext.getSettings().transitionDurationMs);
+    }
+
+    /**
+     * Trigger rule management
+     */
+    public addTriggerRule(rule: TriggerRule): void {
+        this.ext.getTriggerManager().addRule(rule);
+        this.ext.getSettings().triggerRules = this.ext.getTriggerManager().getRules();
+        this.ext.saveSettings();
+        this.emit('trigger-rules-change', this.ext.getSettings().triggerRules);
+    }
+
+    public removeTriggerRule(id: string): void {
+        this.ext.getTriggerManager().removeRule(id);
+        this.ext.getSettings().triggerRules = this.ext.getTriggerManager().getRules();
+        this.ext.saveSettings();
+        this.emit('trigger-rules-change', this.ext.getSettings().triggerRules);
+    }
+
+    public getTriggerRules(): TriggerRule[] {
+        return this.ext.getTriggerManager().getRules();
+    }
+
     public getPlaybackState(): PlaybackState {
         const settings = this.ext.getSettings();
         const audioEngine = this.ext.getAudioEngine();
@@ -226,20 +320,18 @@ export class PublicAPI {
             activePresetId: settings.activePresetId,
             filters: { ...settings.filters },
             isInteractive: settings.interactiveBackground,
+            weather: settings.weather.type,
+            visualizerMode: settings.visualizer.mode,
+            parallaxEnabled: settings.parallax.enabled,
+            transitionEffect: settings.transitionEffect,
+            isMuffled: audioEngine.getMuffled(),
         };
     }
 
-    /**
-     * Get list of all media items in cache library
-     */
     public async getMediaList(): Promise<MediaItem[]> {
         return this.ext.getCacheManager().listMedia();
     }
 
-    /**
-     * Preload remote media files (video, audio, html, svg, images) into CacheStorage.
-     * Guarantees zero-network-delay instant switching when subsequently set as background or BGM.
-     */
     public async preloadMedia(
         urls: string | string[],
         options?: PreloadOptions
@@ -284,10 +376,6 @@ export class PublicAPI {
 
     // --- Event Bus ---
 
-    /**
-     * Subscribe to ST-BgLoader events. Returns unsubscribe function.
-     * Events: 'media-change', 'track-change', 'play-state-change', 'volume-change', 'mute-change', 'filters-change', 'preset-change', 'interactive-change'
-     */
     public on(event: string, callback: EventCallback): () => void {
         if (!this.eventListeners.has(event)) {
             this.eventListeners.set(event, new Set());

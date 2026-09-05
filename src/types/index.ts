@@ -77,6 +77,41 @@ export interface PreloadResult {
     error?: string;
 }
 
+export type WeatherType = 'off' | 'rain' | 'snow' | 'sakura' | 'cyber_motes' | 'scanlines';
+export type VisualizerMode = 'off' | 'pulse' | 'spectrum';
+export type TransitionType = 'fade' | 'zoom_fade' | 'blur_fade' | 'slide_left' | 'slide_right';
+
+export interface WeatherOptions {
+    type: WeatherType;
+    density: 'low' | 'medium' | 'high';
+    speed: number;       // 0.5 to 2.0
+    opacity: number;     // 0.1 to 1.0
+    wind: number;        // -2 to 2
+}
+
+export interface VisualizerOptions {
+    mode: VisualizerMode;
+    color: string;
+    sensitivity: number; // 0.5 to 2.0
+}
+
+export interface TriggerAction {
+    mediaIdOrUrl?: string;
+    bgmUrl?: string;
+    weather?: WeatherType;
+    preset?: string;
+    filters?: Partial<VisualFilters>;
+}
+
+export interface TriggerRule {
+    id: string;
+    name: string;
+    enabled: boolean;
+    type: 'character' | 'chat' | 'regex';
+    pattern: string;     // character name, chatId, or regex pattern
+    action: TriggerAction;
+}
+
 export interface PlaybackState {
     isPlaying: boolean;
     currentTrack: MediaItem | null;
@@ -87,6 +122,11 @@ export interface PlaybackState {
     activePresetId: string;
     filters: VisualFilters;
     isInteractive: boolean;
+    weather: WeatherType;
+    visualizerMode: VisualizerMode;
+    parallaxEnabled: boolean;
+    transitionEffect: TransitionType;
+    isMuffled: boolean;
 }
 
 export interface BgLoaderSettings {
@@ -106,6 +146,19 @@ export interface BgLoaderSettings {
     cacheQuotaMB: number;
     lruAutoClean: boolean;
     chatBindings: Record<string, string>; // chatId -> mediaId
+
+    // New Modular Subsystems
+    weather: WeatherOptions;
+    visualizer: VisualizerOptions;
+    parallax: {
+        enabled: boolean;
+        intensity: number; // 0.0 to 1.0
+    };
+    transitionEffect: TransitionType;
+    transitionDurationMs: number;
+    muffleBGM: boolean;
+    muffleOnDrawer: boolean;
+    triggerRules: TriggerRule[];
 }
 
 export const DEFAULT_SETTINGS: BgLoaderSettings = {
@@ -130,4 +183,27 @@ export const DEFAULT_SETTINGS: BgLoaderSettings = {
     cacheQuotaMB: 1024,
     lruAutoClean: true,
     chatBindings: {},
+
+    // New Subsystem Defaults
+    weather: {
+        type: 'off',
+        density: 'medium',
+        speed: 1.0,
+        opacity: 0.75,
+        wind: 0.5,
+    },
+    visualizer: {
+        mode: 'off',
+        color: '#4fa3d1',
+        sensitivity: 1.0,
+    },
+    parallax: {
+        enabled: false,
+        intensity: 0.3,
+    },
+    transitionEffect: 'fade',
+    transitionDurationMs: 400,
+    muffleBGM: false,
+    muffleOnDrawer: false,
+    triggerRules: [],
 };

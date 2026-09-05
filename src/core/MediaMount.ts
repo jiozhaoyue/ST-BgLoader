@@ -1,4 +1,4 @@
-import { VisualFilters, MediaItem } from '../types';
+import { VisualFilters, MediaItem, TransitionType } from '../types';
 import { VideoRenderer } from '../renderers/VideoRenderer';
 import { IframeRenderer } from '../renderers/IframeRenderer';
 import { ImageRenderer } from '../renderers/ImageRenderer';
@@ -22,14 +22,29 @@ export class MediaMount {
     private observer: MutationObserver | null = null;
     private crossfadeTimer: number | null = null;
 
+    private transitionType: TransitionType = 'fade';
+    private transitionDurationMs: number = 400;
+
     constructor(audioEngine: AudioEngine) {
         this.audioEngine = audioEngine;
+    }
+
+    public setTransition(type: TransitionType, durationMs: number = 400): void {
+        this.transitionType = type;
+        this.transitionDurationMs = Math.max(100, Math.min(2000, durationMs));
+    }
+
+    public getContainerElement(): HTMLElement | null {
+        return this.containerEl;
+    }
+
+    public getHostElement(): HTMLElement | null {
+        return this.hostEl;
     }
 
     public init(): void {
         this.hostEl = document.querySelector('#bg1');
         if (!this.hostEl) {
-            // If #bg1 is not ready yet, observe body until it appears
             const docObserver = new MutationObserver(() => {
                 const bg1 = document.querySelector('#bg1') as HTMLElement;
                 if (bg1) {
@@ -48,13 +63,11 @@ export class MediaMount {
     private setupContainer(): void {
         if (!this.hostEl) return;
 
-        // Ensure host has relative/absolute positioning
         const computedStyle = window.getComputedStyle(this.hostEl);
         if (computedStyle.position === 'static') {
             this.hostEl.style.position = 'relative';
         }
 
-        // Check if container already exists
         let container = this.hostEl.querySelector('.st-bg-media-container') as HTMLElement;
         if (!container) {
             container = document.createElement('div');
@@ -87,7 +100,6 @@ export class MediaMount {
 
         this.containerEl = container;
 
-        // Initialize Renderers for each layer
         this.videoRendererA = new VideoRenderer(this.layerA!, this.audioEngine);
         this.videoRendererB = new VideoRenderer(this.layerB!, this.audioEngine);
         this.iframeRendererA = new IframeRenderer(this.layerA!);
@@ -95,7 +107,6 @@ export class MediaMount {
         this.imageRendererA = new ImageRenderer(this.layerA!);
         this.imageRendererB = new ImageRenderer(this.layerB!);
 
-        // Observe fitting class changes on #bg1
         this.observer = new MutationObserver(() => this.syncFitting());
         this.observer.observe(this.hostEl, { attributes: true, attributeFilter: ['class'] });
         this.syncFitting();
@@ -108,7 +119,7 @@ export class MediaMount {
         layer.style.width = '100%';
         layer.style.height = '100%';
         layer.style.opacity = '0';
-        layer.style.transition = 'opacity 400ms ease-in-out';
+        layer.style.transition = `all ${this.transitionDurationMs}ms cubic-bezier(0.4, 0, 0.2, 1)`;
         layer.style.pointerEvents = 'none';
     }
 
@@ -134,7 +145,7 @@ export class MediaMount {
     }
 
     public syncFitting(): void {
-        // Can notify active video or image renderer
+        // Fitted via CSS cover/contain
     }
 
     public async mountMedia(item: MediaItem, mediaUrl: string): Promise<void> {
@@ -151,7 +162,11 @@ export class MediaMount {
             inactiveIframeR.destroy();
             inactiveImageR.destroy();
             const inactiveLayer = this.activeLayer === 'A' ? this.layerB : this.layerA;
-            if (inactiveLayer) inactiveLayer.style.opacity = '0';
+            if (inactiveLayer) {
+                inactiveLayer.style.opacity = '0';
+                inactiveLayer.style.transform = 'none';
+                inactiveLayer.style.filter = 'none';
+            }
         }
 
         const nextLayerName = this.activeLayer === 'A' ? 'B' : 'A';
@@ -182,17 +197,59 @@ export class MediaMount {
                 await imageR.render(mediaUrl, fitting);
                 break;
             case 'audio':
-                // For audio, we play track via AudioEngine and hide background layer
                 await this.audioEngine.playMediaItem(item, mediaUrl);
                 break;
         }
 
-        // Crossfade
-        targetLayer.style.opacity = '1';
-        oldLayer.style.opacity = '0';
+        // Apply transition styling
+        const dur = this.transitionDurationMs;
+        targetLayer.style.transition = `all ${dur}ms cubic-bezier(0.4, 0, 0.2, 1)`;
+        oldLayer.style.transition = `all ${dur}ms cubic-bezier(0.4, 0, 0.2, 1)`;
+
+        const transition = this.transitionType;
+        if (transition === 'zoom_fade') {
+            targetLayer.style.transform = 'scale(1.06)';
+            targetLayer.style.opacity = '0';
+            targetLayer.offsetHeight; // Force reflow
+            targetLayer.style.transform = 'scale(1)';
+            targetLayer.style.opacity = '1';
+            oldLayer.style.transform = 'scale(0.96)';
+            oldLayer.style.opacity = '0';
+        } else if (transition === 'blur_fade') {
+            targetLayer.style.filter = 'blur(10px)';
+            targetLayer.style.opacity = '0';
+            targetLayer.offsetHeight; // Force reflow
+            targetLayer.style.filter = 'blur(0px)';
+            targetLayer.style.opacity = '1';
+            oldLayer.style.filter = 'blur(10px)';
+            oldLayer.style.opacity = '0';
+        } else if (transition === 'slide_left') {
+            targetLayer.style.transform = 'translate3d(100%, 0, 0)';
+            targetLayer.style.opacity = '1';
+            targetLayer.offsetHeight; // Force reflow
+            targetLayer.style.transform = 'translate3d(0, 0, 0)';
+            oldLayer.style.transform = 'translate3d(-100%, 0, 0)';
+            oldLayer.style.opacity = '0';
+        } else if (transition === 'slide_right') {
+            targetLayer.style.transform = 'translate3d(-100%, 0, 0)';
+            targetLayer.style.opacity = '1';
+            targetLayer.offsetHeight; // Force reflow
+            targetLayer.style.transform = 'translate3d(0, 0, 0)';
+            oldLayer.style.transform = 'translate3d(100%, 0, 0)';
+            oldLayer.style.opacity = '0';
+        } else {
+            // Default 'fade'
+            targetLayer.style.transform = 'none';
+            targetLayer.style.filter = 'none';
+            targetLayer.style.opacity = '1';
+            oldLayer.style.transform = 'none';
+            oldLayer.style.filter = 'none';
+            oldLayer.style.opacity = '0';
+        }
+
         this.activeLayer = nextLayerName;
 
-        // Wait for crossfade to finish, then destroy previous layer renderers
+        // Clean up old layer after transition completes
         this.crossfadeTimer = window.setTimeout(() => {
             this.crossfadeTimer = null;
             const oldVideoR = this.activeLayer === 'A' ? this.videoRendererB! : this.videoRendererA!;
@@ -201,7 +258,9 @@ export class MediaMount {
             oldVideoR.destroy();
             oldIframeR.destroy();
             oldImageR.destroy();
-        }, 450);
+            oldLayer.style.transform = 'none';
+            oldLayer.style.filter = 'none';
+        }, dur + 50);
     }
 
     public clear(): void {
@@ -209,8 +268,16 @@ export class MediaMount {
             clearTimeout(this.crossfadeTimer);
             this.crossfadeTimer = null;
         }
-        if (this.layerA) this.layerA.style.opacity = '0';
-        if (this.layerB) this.layerB.style.opacity = '0';
+        if (this.layerA) {
+            this.layerA.style.opacity = '0';
+            this.layerA.style.transform = 'none';
+            this.layerA.style.filter = 'none';
+        }
+        if (this.layerB) {
+            this.layerB.style.opacity = '0';
+            this.layerB.style.transform = 'none';
+            this.layerB.style.filter = 'none';
+        }
         this.videoRendererA?.destroy();
         this.videoRendererB?.destroy();
         this.iframeRendererA?.destroy();

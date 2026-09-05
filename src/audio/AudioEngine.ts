@@ -16,8 +16,16 @@ export class AudioEngine {
     private userHasInteracted: boolean = false;
     private isWaitingForInteractionUnmute: boolean = false;
 
+    // WebAudio Graph for Lo-Fi muffle and Visualizer
+    private audioContext: AudioContext | null = null;
+    private sourceNode: MediaElementAudioSourceNode | null = null;
+    private biquadFilter: BiquadFilterNode | null = null;
+    private analyserNode: AnalyserNode | null = null;
+    private isMuffled: boolean = false;
+
     public onTrackChange?: (item: MediaItem | null) => void;
     public onPlayStateChange?: (isPlaying: boolean) => void;
+    public onAnalyserReady?: (analyser: AnalyserNode) => void;
 
     public setUrlResolver(resolver: (item: MediaItem) => Promise<string>): void {
         this.urlResolver = resolver;
@@ -29,10 +37,67 @@ export class AudioEngine {
 
     public notifyUserInteraction(): void {
         this.userHasInteracted = true;
+        this.resumeAudioContext();
+        this.initWebAudio();
         if (this.isWaitingForInteractionUnmute) {
             this.isWaitingForInteractionUnmute = false;
             this.fadeInVolume(this.volume, 400);
         }
+    }
+
+    private resumeAudioContext(): void {
+        if (this.audioContext && this.audioContext.state === 'suspended') {
+            this.audioContext.resume().catch(() => {});
+        }
+    }
+
+    public initWebAudio(): void {
+        if (this.audioContext || !this.audioElement) return;
+        try {
+            const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+            if (!AudioCtx) return;
+            this.audioContext = new AudioCtx();
+            this.audioElement.crossOrigin = 'anonymous';
+            this.sourceNode = this.audioContext.createMediaElementSource(this.audioElement);
+
+            // Biquad filter for Lo-Fi Room Acoustic Muffle effect
+            this.biquadFilter = this.audioContext.createBiquadFilter();
+            this.biquadFilter.type = 'lowpass';
+            this.biquadFilter.frequency.value = this.isMuffled ? 800 : 20000;
+            this.biquadFilter.Q.value = 1.0;
+
+            // Analyser for real-time visualizer
+            this.analyserNode = this.audioContext.createAnalyser();
+            this.analyserNode.fftSize = 256;
+
+            this.sourceNode.connect(this.biquadFilter);
+            this.biquadFilter.connect(this.analyserNode);
+            this.analyserNode.connect(this.audioContext.destination);
+
+            if (this.onAnalyserReady) {
+                this.onAnalyserReady(this.analyserNode);
+            }
+        } catch (err) {
+            console.warn('[ST-BgLoader AudioEngine] WebAudio graph init note (falling back to direct output):', err);
+        }
+    }
+
+    public getAnalyserNode(): AnalyserNode | null {
+        return this.analyserNode;
+    }
+
+    public setMuffled(muffled: boolean): void {
+        this.isMuffled = muffled;
+        if (this.biquadFilter && this.audioContext) {
+            const targetFreq = muffled ? 800 : 20000;
+            const currTime = this.audioContext.currentTime;
+            this.biquadFilter.frequency.cancelScheduledValues(currTime);
+            this.biquadFilter.frequency.setTargetAtTime(targetFreq, currTime, 0.08);
+        }
+    }
+
+    public getMuffled(): boolean {
+        return this.isMuffled;
     }
 
     public async playMediaItem(item: MediaItem, mediaUrl?: string): Promise<void> {
@@ -65,6 +130,8 @@ export class AudioEngine {
         }
 
         try {
+            this.initWebAudio();
+            this.resumeAudioContext();
             await this.audioElement.play();
             this.onTrackChange?.(item);
         } catch (err) {
@@ -185,6 +252,8 @@ export class AudioEngine {
         if (!this.audioElement) return;
 
         if (this.audioElement.paused) {
+            this.initWebAudio();
+            this.resumeAudioContext();
             if (!this.audioElement.src && this.playlist.length > 0) {
                 if (this.currentIndex === -1) this.currentIndex = 0;
                 await this.playCurrentTrack();
@@ -196,10 +265,8 @@ export class AudioEngine {
         }
     }
 
-
     private handleTrackEnded(): void {
         if (this.playbackMode === 'single') {
-            // Native loop will repeat it
             return;
         }
         if (this.playlist.length > 1) {
@@ -229,6 +296,8 @@ export class AudioEngine {
         }
 
         try {
+            this.initWebAudio();
+            this.resumeAudioContext();
             await this.audioElement.play();
         } catch (err) {
             console.warn('[ST-BgLoader AudioEngine] Autoplay was prevented by browser policy:', err);
@@ -353,6 +422,10 @@ export class AudioEngine {
             this.audioElement.pause();
             this.audioElement.src = '';
             this.audioElement = null;
+        }
+        if (this.audioContext) {
+            this.audioContext.close().catch(() => {});
+            this.audioContext = null;
         }
         this.attachedVideo = null;
         this.playlist = [];
