@@ -59,3 +59,40 @@ Researched official plugin limitations, brainstormed requirements, implemented z
 ### Status
 
 [OK] **Completed**
+
+
+## Session 2: Phase 2: Filter Presets, Audio Playlist & Interactive Sandbox
+<!-- trellis-session: v=2 fp=01aa378ccbb5f24c -->
+
+**Date**: 2026-09-05
+**Task**: Phase 2: Filter Presets, Audio Playlist & Interactive Sandbox
+**Branch**: `master`
+
+### Summary
+
+Completed filter presets, playlist audio queue, glassmorphic floating mini player capsule, and interactive sandbox pointer-events toggle. All 10 automated E2E tests passed.
+
+### Main Changes
+
+- Extended types with PlaybackMode, FilterPreset, and built-in preset collection
+- Upgraded AudioEngine with playlist queue, track advancement, and playback modes (loop, single, shuffle)
+- Created MiniPlayer floating capsule with track marquee, mode toggling, and transport buttons
+- Added sandbox interactive mode toggle to MediaMount and SettingsDrawer
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `ede2cf4` | feat: add filter presets, audio playlist, mini player, and interactive sandbox mode |
+
+### Testing
+
+- [OK] 10/10 automated E2E tests passed on live SillyTavern instance with Puppeteer
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- Explore character-specific background binding or additional visual effects if needed
