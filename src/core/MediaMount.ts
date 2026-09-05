@@ -20,6 +20,7 @@ export class MediaMount {
 
     private audioEngine: AudioEngine;
     private observer: MutationObserver | null = null;
+    private crossfadeTimer: number | null = null;
 
     constructor(audioEngine: AudioEngine) {
         this.audioEngine = audioEngine;
@@ -139,6 +140,20 @@ export class MediaMount {
     public async mountMedia(item: MediaItem, mediaUrl: string): Promise<void> {
         if (!this.containerEl || !this.layerA || !this.layerB) return;
 
+        // Cancel pending crossfade and finalize previous state immediately
+        if (this.crossfadeTimer !== null) {
+            clearTimeout(this.crossfadeTimer);
+            this.crossfadeTimer = null;
+            const inactiveVideoR = this.activeLayer === 'A' ? this.videoRendererB! : this.videoRendererA!;
+            const inactiveIframeR = this.activeLayer === 'A' ? this.iframeRendererB! : this.iframeRendererA!;
+            const inactiveImageR = this.activeLayer === 'A' ? this.imageRendererB! : this.imageRendererA!;
+            inactiveVideoR.destroy();
+            inactiveIframeR.destroy();
+            inactiveImageR.destroy();
+            const inactiveLayer = this.activeLayer === 'A' ? this.layerB : this.layerA;
+            if (inactiveLayer) inactiveLayer.style.opacity = '0';
+        }
+
         const nextLayerName = this.activeLayer === 'A' ? 'B' : 'A';
         const targetLayer = nextLayerName === 'B' ? this.layerB : this.layerA;
         const oldLayer = this.activeLayer === 'A' ? this.layerA : this.layerB;
@@ -175,20 +190,25 @@ export class MediaMount {
         // Crossfade
         targetLayer.style.opacity = '1';
         oldLayer.style.opacity = '0';
+        this.activeLayer = nextLayerName;
 
         // Wait for crossfade to finish, then destroy previous layer renderers
-        setTimeout(() => {
-            const oldVideoR = this.activeLayer === 'A' ? this.videoRendererA! : this.videoRendererB!;
-            const oldIframeR = this.activeLayer === 'A' ? this.iframeRendererA! : this.iframeRendererB!;
-            const oldImageR = this.activeLayer === 'A' ? this.imageRendererA! : this.imageRendererB!;
+        this.crossfadeTimer = window.setTimeout(() => {
+            this.crossfadeTimer = null;
+            const oldVideoR = this.activeLayer === 'A' ? this.videoRendererB! : this.videoRendererA!;
+            const oldIframeR = this.activeLayer === 'A' ? this.iframeRendererB! : this.iframeRendererA!;
+            const oldImageR = this.activeLayer === 'A' ? this.imageRendererB! : this.imageRendererA!;
             oldVideoR.destroy();
             oldIframeR.destroy();
             oldImageR.destroy();
-            this.activeLayer = nextLayerName;
         }, 450);
     }
 
     public clear(): void {
+        if (this.crossfadeTimer !== null) {
+            clearTimeout(this.crossfadeTimer);
+            this.crossfadeTimer = null;
+        }
         if (this.layerA) this.layerA.style.opacity = '0';
         if (this.layerB) this.layerB.style.opacity = '0';
         this.videoRendererA?.destroy();
