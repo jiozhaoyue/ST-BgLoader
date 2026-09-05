@@ -96,3 +96,40 @@ Completed filter presets, playlist audio queue, glassmorphic floating mini playe
 ### Next Steps
 
 - Explore character-specific background binding or additional visual effects if needed
+
+
+## Session 3: Phase 3: Public Infrastructure API & Autoplay Unmute Engine
+<!-- trellis-session: v=2 fp=653377aa20578b6c -->
+
+**Date**: 2026-09-05
+**Task**: Phase 3: Public Infrastructure API & Autoplay Unmute Engine
+**Branch**: `master`
+
+### Summary
+
+Implemented public JavaScript SDK and event bus on window.stBgLoader, gesture-driven smooth unmute ramp for browser autoplay compliance, and smart mini player capsule auto-visibility. Passed all 13 automated E2E tests.
+
+### Main Changes
+
+- Created PublicAPI facade with setBackground, playBGM, stopBGM, setFilters, applyPreset, setInteractive, and event bus
+- Exported window.stBgLoader global object for character cards and external scripts
+- Added gesture-driven smooth audio unmute (fadeInVolume) avoiding browser autoplay blocks
+- Added smart capsule auto-visibility on playback in MiniPlayer and SettingsDrawer
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `7f44d24` | feat: implement public infrastructure API, interaction-driven smooth unmute, and smart capsule lifecycle |
+
+### Testing
+
+- [OK] All 13 automated E2E tests passed against live SillyTavern instance via Puppeteer
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- Provide developer guide and character card integration examples in README
