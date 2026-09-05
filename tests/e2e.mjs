@@ -35,7 +35,7 @@ async function runE2ETests() {
         // Wait for SillyTavern to bootstrap extensions (waiting for STBgLoader)
         console.log('⏳ Waiting for SillyTavern to activate third-party/ST-BgLoader...');
         await page.waitForFunction(() => {
-            return typeof window.STBgLoader !== 'undefined';
+            return window.STBgLoader && window.STBgLoader.isInitialized;
         }, { timeout: 35000 });
 
         // 1. Check window.STBgLoader
@@ -152,9 +152,157 @@ async function runE2ETests() {
         }
         console.log('✅ Test 6 Passed: Settings drawer and UI components verified.');
 
-        console.log('\n========================================');
-        console.log('🎉 ALL 6 AUTOMATED E2E TESTS PASSED! 🎉');
-        console.log('========================================\n');
+        // 7. Test Visual Filter Presets
+        console.log('🧪 Test 7: Testing Visual Filter Presets & Custom Preset saving...');
+        const presetResult = await page.evaluate(() => {
+            const ext = window.STBgLoader;
+            const select = document.querySelector('#st_preset_select');
+            if (!select) return { success: false, reason: 'preset select missing' };
+
+            // Switch to cyberpunk preset
+            select.value = 'cyberpunk';
+            select.dispatchEvent(new Event('change'));
+
+            const container = document.querySelector('#bg1 .st-bg-media-container');
+            const cyberpunkApplied = container && container.style.filter.includes('saturate(160%)');
+
+            // Save custom preset
+            ext.settings.userPresets['E2E_Custom'] = { blur: 3, brightness: 115, opacity: 95, saturate: 140 };
+            ext.settings.activePresetId = 'E2E_Custom';
+            ext.mediaMount.applyFilters(ext.settings.userPresets['E2E_Custom']);
+
+            const customApplied = container && container.style.filter.includes('blur(3px)');
+
+            return {
+                success: cyberpunkApplied && customApplied,
+                cyberpunkApplied,
+                customApplied,
+                activePreset: ext.settings.activePresetId,
+            };
+        });
+        console.log('   Preset test result:', presetResult);
+        if (!presetResult.success) {
+            console.error('❌ Test 7 Failed: Filter presets failed!');
+            process.exit(1);
+        }
+        console.log('✅ Test 7 Passed: Built-in and custom filter presets verified.');
+
+        // 8. Test Floating Mini Player Capsule
+        console.log('🧪 Test 8: Verifying Floating Mini Player Capsule & Controls...');
+        const miniPlayerResult = await page.evaluate(() => {
+            const player = document.querySelector('#st_bg_mini_player');
+            const prevBtn = document.querySelector('#st_mini_prev');
+            const playBtn = document.querySelector('#st_mini_play');
+            const nextBtn = document.querySelector('#st_mini_next');
+            const titleEl = document.querySelector('#st_mini_title');
+            const modeBtn = document.querySelector('#st_mini_mode');
+
+            return {
+                hasPlayer: !!player,
+                hasPrev: !!prevBtn,
+                hasPlay: !!playBtn,
+                hasNext: !!nextBtn,
+                hasTitle: !!titleEl,
+                hasMode: !!modeBtn,
+                titleText: titleEl?.textContent || '',
+            };
+        });
+        console.log('   Mini Player elements:', miniPlayerResult);
+        if (!miniPlayerResult.hasPlayer || !miniPlayerResult.hasPlay || !miniPlayerResult.hasTitle) {
+            console.error('❌ Test 8 Failed: Mini Player elements missing!');
+            process.exit(1);
+        }
+        console.log('✅ Test 8 Passed: Floating mini player capsule verified.');
+
+        // 9. Test Audio Engine Playlist & Playback Modes
+        console.log('🧪 Test 9: Testing Audio Engine Playlist & Playback Modes...');
+        const playlistResult = await page.evaluate(async () => {
+            const ext = window.STBgLoader;
+            const track1 = {
+                id: 'bg_track_1',
+                name: 'Ambient Track 1.mp3',
+                type: 'audio',
+                source: 'local',
+                url: 'blob:fake-url-1',
+                cacheKey: '/fake/1',
+                size: 1024,
+                mimeType: 'audio/mpeg',
+                addedTimestamp: Date.now(),
+                lastUsedTimestamp: Date.now(),
+            };
+            const track2 = {
+                id: 'bg_track_2',
+                name: 'Ambient Track 2.mp3',
+                type: 'audio',
+                source: 'local',
+                url: 'blob:fake-url-2',
+                cacheKey: '/fake/2',
+                size: 2048,
+                mimeType: 'audio/mpeg',
+                addedTimestamp: Date.now(),
+                lastUsedTimestamp: Date.now(),
+            };
+
+            ext.audioEngine.setPlaylist([track1, track2]);
+            const current = ext.audioEngine.getCurrentTrack();
+
+            ext.audioEngine.setPlaybackMode('shuffle');
+            const modeShuffle = ext.audioEngine.getPlaybackMode();
+
+            ext.audioEngine.setPlaybackMode('single');
+            const modeSingle = ext.audioEngine.getPlaybackMode();
+
+            ext.audioEngine.setPlaybackMode('loop');
+            const modeLoop = ext.audioEngine.getPlaybackMode();
+
+            return {
+                hasCurrent: !!current,
+                trackName: current?.name,
+                modeShuffle,
+                modeSingle,
+                modeLoop,
+            };
+        });
+        console.log('   Playlist & modes result:', playlistResult);
+        if (!playlistResult.hasCurrent || playlistResult.modeShuffle !== 'shuffle' || playlistResult.modeLoop !== 'loop') {
+            console.error('❌ Test 9 Failed: Audio playlist logic failed!');
+            process.exit(1);
+        }
+        console.log('✅ Test 9 Passed: Audio playlist queue and playback modes verified.');
+
+        // 10. Test Interactive Sandbox Mode Toggle
+        console.log('🧪 Test 10: Testing Interactive Sandbox Pointer Events Toggle...');
+        const interactiveResult = await page.evaluate(() => {
+            const ext = window.STBgLoader;
+            const container = document.querySelector('#bg1 .st-bg-media-container');
+
+            // Default or disabled: pointer-events: none
+            ext.mediaMount.setInteractive(false);
+            const pointerNone = container ? window.getComputedStyle(container).pointerEvents : '';
+
+            // Enabled: pointer-events: auto
+            ext.mediaMount.setInteractive(true);
+            const pointerAuto = container ? window.getComputedStyle(container).pointerEvents : '';
+
+            // Reset back
+            ext.mediaMount.setInteractive(false);
+
+            return {
+                pointerNone,
+                pointerAuto,
+                toggledCorrectly: pointerNone === 'none' && pointerAuto === 'auto',
+            };
+        });
+        console.log('   Interactive toggle result:', interactiveResult);
+        if (!interactiveResult.toggledCorrectly) {
+            console.error('❌ Test 10 Failed: Interactive toggle failed!');
+            process.exit(1);
+        }
+        console.log('✅ Test 10 Passed: Interactive sandbox pointer-events toggle verified.');
+
+        console.log('\n==========================================');
+        console.log('🎉 ALL 10 AUTOMATED E2E TESTS PASSED! 🎉');
+        console.log('==========================================\n');
 
     } catch (err) {
         console.error('💥 Test Execution Error:', err);

@@ -5,16 +5,19 @@ import { AudioEngine } from './audio/AudioEngine';
 import { MediaMount } from './core/MediaMount';
 import { SettingsDrawer } from './ui/SettingsDrawer';
 import { NativeBgAugmenter } from './ui/NativeBgAugmenter';
+import { MiniPlayer } from './ui/MiniPlayer';
 
 const SETTINGS_KEY = 'st_bgloader_settings';
 
 export class STBgLoaderExtension {
+    public isInitialized: boolean = false;
     private settings: BgLoaderSettings = { ...DEFAULT_SETTINGS };
     private cacheManager: CacheManager;
     private audioEngine: AudioEngine;
     private mediaMount: MediaMount;
     private settingsDrawer: SettingsDrawer | null = null;
     private nativeAugmenter: NativeBgAugmenter | null = null;
+    private miniPlayer: MiniPlayer | null = null;
 
     constructor() {
         this.cacheManager = new CacheManager();
@@ -32,10 +35,23 @@ export class STBgLoaderExtension {
         await this.cacheManager.init();
         this.mediaMount.init();
         this.mediaMount.applyFilters(this.settings.filters);
+        this.mediaMount.setInteractive(this.settings.interactiveBackground);
+
+        // 3. Configure AudioEngine
+        this.audioEngine.setUrlResolver((item) => this.cacheManager.getMediaBlobUrl(item));
         this.audioEngine.setVolume(this.settings.volume);
         this.audioEngine.setMuted(this.settings.muted);
+        this.audioEngine.setPlaybackMode(this.settings.playbackMode);
 
-        // 3. Setup Settings Drawer & Native Augmenter
+        const allItems = await this.cacheManager.listMedia();
+        const audioItems = allItems.filter(i => i.type === 'audio');
+        this.audioEngine.setPlaylist(audioItems);
+
+        // 4. Initialize MiniPlayer
+        this.miniPlayer = new MiniPlayer(this.audioEngine);
+        this.miniPlayer.render(this.settings.showMiniPlayer);
+
+        // 5. Setup Settings Drawer & Native Augmenter
         this.settingsDrawer = new SettingsDrawer(this.settings, this.cacheManager, {
             onSettingsChanged: (updated) => {
                 this.settings = updated;
@@ -44,22 +60,40 @@ export class STBgLoaderExtension {
                 this.audioEngine.setVolume(this.settings.volume);
                 this.audioEngine.setMuted(this.settings.muted);
             },
+            onPresetChanged: (preset) => {
+                this.mediaMount.applyFilters(preset.filters);
+            },
+            onInteractiveChanged: (enabled) => {
+                this.mediaMount.setInteractive(enabled);
+            },
+            onMiniPlayerToggle: (visible) => {
+                this.miniPlayer?.setVisible(visible);
+            },
+            onPlaybackModeChanged: (mode) => {
+                this.audioEngine.setPlaybackMode(mode);
+            },
             onMediaSelected: async (item) => {
                 await this.applyMedia(item);
             },
-            onMediaDeleted: (id) => {
+            onMediaDeleted: async (id) => {
                 if (this.settings.activeMediaId === id) {
                     this.settings.activeMediaId = null;
                     this.mediaMount.clear();
                     this.audioEngine.stopTrack();
                     this.saveSettings();
                 }
+                const currentItems = await this.cacheManager.listMedia();
+                this.audioEngine.setPlaylist(currentItems.filter(i => i.type === 'audio'));
             },
             onMediaUploaded: async (item) => {
                 // Check quota and auto-clean if needed
                 if (this.settings.lruAutoClean) {
                     const maxBytes = this.settings.cacheQuotaMB * 1024 * 1024;
                     await this.cacheManager.cleanLRU(maxBytes);
+                }
+                if (item.type === 'audio') {
+                    const currentItems = await this.cacheManager.listMedia();
+                    this.audioEngine.setPlaylist(currentItems.filter(i => i.type === 'audio'));
                 }
                 // Automatically activate newly uploaded media
                 await this.applyMedia(item);
@@ -101,6 +135,7 @@ export class STBgLoaderExtension {
             }
         }
 
+        this.isInitialized = true;
         console.log('[ST-BgLoader] Initialization complete.');
     }
 

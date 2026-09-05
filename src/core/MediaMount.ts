@@ -117,6 +117,13 @@ export class MediaMount {
         this.containerEl.style.filter = filterStr;
     }
 
+    public setInteractive(enabled: boolean): void {
+        const value = enabled ? 'auto' : 'none';
+        if (this.containerEl) this.containerEl.style.pointerEvents = value;
+        if (this.layerA) this.layerA.style.pointerEvents = value;
+        if (this.layerB) this.layerB.style.pointerEvents = value;
+    }
+
     public getFitting(): string {
         if (!this.hostEl) return 'cover';
         if (this.hostEl.classList.contains('contain')) return 'contain';
@@ -161,7 +168,7 @@ export class MediaMount {
                 break;
             case 'audio':
                 // For audio, we play track via AudioEngine and hide background layer
-                await this.audioEngine.playTrack(mediaUrl);
+                await this.audioEngine.playMediaItem(item, mediaUrl);
                 break;
         }
 

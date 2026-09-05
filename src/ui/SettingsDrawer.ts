@@ -1,4 +1,4 @@
-import { BgLoaderSettings, MediaItem, MediaType } from '../types';
+import { BgLoaderSettings, BUILTIN_PRESETS, FilterPreset, MediaItem, MediaType, PlaybackMode } from '../types';
 import { CacheManager } from '../cache/CacheManager';
 
 export interface SettingsDrawerCallbacks {
@@ -6,6 +6,10 @@ export interface SettingsDrawerCallbacks {
     onMediaSelected: (item: MediaItem) => void;
     onMediaDeleted: (id: string) => void;
     onMediaUploaded: (item: MediaItem) => void;
+    onPresetChanged: (preset: FilterPreset) => void;
+    onInteractiveChanged: (enabled: boolean) => void;
+    onMiniPlayerToggle: (visible: boolean) => void;
+    onPlaybackModeChanged: (mode: PlaybackMode) => void;
 }
 
 export class SettingsDrawer {
@@ -23,7 +27,14 @@ export class SettingsDrawer {
     public render(): void {
         const target = document.querySelector('#extensions_settings');
         if (!target) {
-            console.warn('[ST-BgLoader] #extensions_settings not found yet');
+            console.warn('[ST-BgLoader] #extensions_settings not found yet, waiting for DOM insertion...');
+            const observer = new MutationObserver(() => {
+                if (document.querySelector('#extensions_settings')) {
+                    observer.disconnect();
+                    this.render();
+                }
+            });
+            observer.observe(document.body, { childList: true, subtree: true });
             return;
         }
 
@@ -65,10 +76,23 @@ export class SettingsDrawer {
                         </div>
                     </div>
 
-                    <!-- Visual Filters Section -->
+                    <!-- Visual Filters & Presets Section -->
                     <div class="st-bgloader-section">
-                        <h4><i class="fa-solid fa-sliders"></i> Visual Adjustments</h4>
+                        <h4><i class="fa-solid fa-sliders"></i> Visual Adjustments & Presets</h4>
                         
+                        <div class="st-bgloader-preset-row">
+                            <label style="font-size: 0.9em; flex: 0 0 60px;">Preset:</label>
+                            <select id="st_preset_select">
+                                <!-- Populated dynamically -->
+                            </select>
+                            <button id="st_preset_save_btn" class="menu_button" title="Save current sliders as custom preset">
+                                <i class="fa-solid fa-floppy-disk"></i>
+                            </button>
+                            <button id="st_preset_del_btn" class="menu_button" title="Delete custom preset">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
+                        </div>
+
                         <div class="st-bgloader-slider-row">
                             <label>Blur</label>
                             <input type="range" id="st_filter_blur" min="0" max="20" step="1" value="${this.settings.filters.blur}" />
@@ -92,11 +116,19 @@ export class SettingsDrawer {
                             <input type="range" id="st_filter_saturate" min="0" max="200" step="5" value="${this.settings.filters.saturate}" />
                             <span class="st-bgloader-slider-val" id="st_filter_saturate_val">${this.settings.filters.saturate}%</span>
                         </div>
+
+                        <!-- Sandbox Interactive Mode Toggle -->
+                        <div style="margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 8px;">
+                            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                                <input type="checkbox" id="st_bg_interactive" ${this.settings.interactiveBackground ? 'checked' : ''} />
+                                <span>Allow background mouse interaction (3D/Canvas/Games)</span>
+                            </label>
+                        </div>
                     </div>
 
-                    <!-- Audio Engine Controls -->
+                    <!-- Audio Engine & Playlist Controls -->
                     <div class="st-bgloader-section">
-                        <h4><i class="fa-solid fa-volume-high"></i> Audio & BGM</h4>
+                        <h4><i class="fa-solid fa-volume-high"></i> Audio & BGM Playlist</h4>
                         
                         <div class="st-bgloader-slider-row">
                             <label>Volume</label>
@@ -104,7 +136,16 @@ export class SettingsDrawer {
                             <span class="st-bgloader-slider-val" id="st_audio_volume_val">${Math.round(this.settings.volume * 100)}%</span>
                         </div>
 
-                        <div style="display: flex; gap: 15px; margin-top: 8px;">
+                        <div class="st-bgloader-preset-row" style="margin-top: 6px;">
+                            <label style="font-size: 0.9em; flex: 0 0 90px;">Play Mode:</label>
+                            <select id="st_playback_mode">
+                                <option value="loop" ${this.settings.playbackMode === 'loop' ? 'selected' : ''}>Loop Playlist (循环列表)</option>
+                                <option value="single" ${this.settings.playbackMode === 'single' ? 'selected' : ''}>Single Track Loop (单曲循环)</option>
+                                <option value="shuffle" ${this.settings.playbackMode === 'shuffle' ? 'selected' : ''}>Shuffle (随机播放)</option>
+                            </select>
+                        </div>
+
+                        <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 8px;">
                             <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
                                 <input type="checkbox" id="st_audio_mute" ${this.settings.muted ? 'checked' : ''} />
                                 <span>Mute Audio</span>
@@ -112,6 +153,10 @@ export class SettingsDrawer {
                             <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
                                 <input type="checkbox" id="st_audio_blur" ${this.settings.pauseOnBlur ? 'checked' : ''} />
                                 <span>Pause when tab inactive</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                                <input type="checkbox" id="st_mini_player_toggle" ${this.settings.showMiniPlayer ? 'checked' : ''} />
+                                <span>Show floating mini player capsule</span>
                             </label>
                         </div>
                     </div>
@@ -132,8 +177,34 @@ export class SettingsDrawer {
         target.appendChild(drawer);
         this.container = drawer;
         this.bindEvents();
+        this.populatePresets();
         this.refreshMediaGrid();
         this.updateCacheStats();
+    }
+
+    private populatePresets(): void {
+        const select = this.container?.querySelector('#st_preset_select') as HTMLSelectElement;
+        if (!select) return;
+
+        select.innerHTML = '';
+
+        // Add built-ins
+        Object.values(BUILTIN_PRESETS).forEach((p) => {
+            const opt = document.createElement('option');
+            opt.value = p.id;
+            opt.textContent = p.name;
+            if (p.id === this.settings.activePresetId) opt.selected = true;
+            select.appendChild(opt);
+        });
+
+        // Add user presets
+        Object.entries(this.settings.userPresets || {}).forEach(([id, filters]) => {
+            const opt = document.createElement('option');
+            opt.value = id;
+            opt.textContent = `★ ${id} (Custom)`;
+            if (id === this.settings.activePresetId) opt.selected = true;
+            select.appendChild(opt);
+        });
     }
 
     private bindEvents(): void {
@@ -189,6 +260,54 @@ export class SettingsDrawer {
             }
         });
 
+        // Preset Change
+        const presetSelect = this.container.querySelector('#st_preset_select') as HTMLSelectElement;
+        presetSelect?.addEventListener('change', () => {
+            const id = presetSelect.value;
+            this.settings.activePresetId = id;
+            let filters = BUILTIN_PRESETS[id]?.filters;
+            if (!filters && this.settings.userPresets[id]) {
+                filters = this.settings.userPresets[id];
+            }
+            if (filters) {
+                this.settings.filters = { ...filters };
+                this.updateSliders(filters);
+                this.callbacks.onPresetChanged({ id, name: id, filters });
+                this.callbacks.onSettingsChanged(this.settings);
+            }
+        });
+
+        // Preset Save
+        this.container.querySelector('#st_preset_save_btn')?.addEventListener('click', () => {
+            const name = prompt('Enter a name for this custom preset:');
+            if (name && name.trim()) {
+                const cleanName = name.trim();
+                this.settings.userPresets[cleanName] = { ...this.settings.filters };
+                this.settings.activePresetId = cleanName;
+                this.populatePresets();
+                this.callbacks.onSettingsChanged(this.settings);
+            }
+        });
+
+        // Preset Delete
+        this.container.querySelector('#st_preset_del_btn')?.addEventListener('click', () => {
+            const current = presetSelect.value;
+            if (this.settings.userPresets[current]) {
+                if (confirm(`Delete custom preset "${current}"?`)) {
+                    delete this.settings.userPresets[current];
+                    this.settings.activePresetId = 'default';
+                    this.populatePresets();
+                    const def = BUILTIN_PRESETS.default.filters;
+                    this.settings.filters = { ...def };
+                    this.updateSliders(def);
+                    this.callbacks.onPresetChanged(BUILTIN_PRESETS.default);
+                    this.callbacks.onSettingsChanged(this.settings);
+                }
+            } else {
+                alert('Cannot delete built-in presets.');
+            }
+        });
+
         // Sliders
         const bindSlider = (id: string, valId: string, unit: string, onChange: (val: number) => void) => {
             const slider = this.container!.querySelector(id) as HTMLInputElement;
@@ -207,6 +326,30 @@ export class SettingsDrawer {
         bindSlider('#st_filter_saturate', '#st_filter_saturate_val', '%', (v) => this.settings.filters.saturate = v);
 
         bindSlider('#st_audio_volume', '#st_audio_volume_val', '%', (v) => this.settings.volume = v / 100);
+
+        // Playback mode
+        const modeSelect = this.container.querySelector('#st_playback_mode') as HTMLSelectElement;
+        modeSelect?.addEventListener('change', () => {
+            this.settings.playbackMode = modeSelect.value as PlaybackMode;
+            this.callbacks.onPlaybackModeChanged(this.settings.playbackMode);
+            this.callbacks.onSettingsChanged(this.settings);
+        });
+
+        // Interactive toggle
+        const interCb = this.container.querySelector('#st_bg_interactive') as HTMLInputElement;
+        interCb?.addEventListener('change', () => {
+            this.settings.interactiveBackground = interCb.checked;
+            this.callbacks.onInteractiveChanged(interCb.checked);
+            this.callbacks.onSettingsChanged(this.settings);
+        });
+
+        // Mini player toggle
+        const miniCb = this.container.querySelector('#st_mini_player_toggle') as HTMLInputElement;
+        miniCb?.addEventListener('change', () => {
+            this.settings.showMiniPlayer = miniCb.checked;
+            this.callbacks.onMiniPlayerToggle(miniCb.checked);
+            this.callbacks.onSettingsChanged(this.settings);
+        });
 
         // Checkboxes
         const muteCb = this.container.querySelector('#st_audio_mute') as HTMLInputElement;
@@ -230,6 +373,19 @@ export class SettingsDrawer {
                 await this.updateCacheStats();
             }
         });
+    }
+
+    private updateSliders(filters: { blur: number; brightness: number; opacity: number; saturate: number }): void {
+        const setVal = (id: string, valId: string, val: number, unit: string) => {
+            const input = this.container?.querySelector(id) as HTMLInputElement;
+            const label = this.container?.querySelector(valId);
+            if (input) input.value = val.toString();
+            if (label) label.textContent = `${val}${unit}`;
+        };
+        setVal('#st_filter_blur', '#st_filter_blur_val', filters.blur, 'px');
+        setVal('#st_filter_brightness', '#st_filter_brightness_val', filters.brightness, '%');
+        setVal('#st_filter_opacity', '#st_filter_opacity_val', filters.opacity, '%');
+        setVal('#st_filter_saturate', '#st_filter_saturate_val', filters.saturate, '%');
     }
 
     public async refreshMediaGrid(): Promise<void> {

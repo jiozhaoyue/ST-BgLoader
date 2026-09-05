@@ -1,3 +1,5 @@
+import { MediaItem, PlaybackMode } from '../types';
+
 export class AudioEngine {
     private audioElement: HTMLAudioElement | null = null;
     private attachedVideo: HTMLVideoElement | null = null;
@@ -6,10 +8,65 @@ export class AudioEngine {
     private isPausedForBlur: boolean = false;
     private fadeTimer: number | null = null;
 
+    private playlist: MediaItem[] = [];
+    private currentIndex: number = -1;
+    private playbackMode: PlaybackMode = 'loop';
+
+    private urlResolver?: (item: MediaItem) => Promise<string>;
+
+    public onTrackChange?: (item: MediaItem | null) => void;
+    public onPlayStateChange?: (isPlaying: boolean) => void;
+
+    public setUrlResolver(resolver: (item: MediaItem) => Promise<string>): void {
+        this.urlResolver = resolver;
+    }
+
+    public async playMediaItem(item: MediaItem, mediaUrl?: string): Promise<void> {
+        const idx = this.playlist.findIndex(p => p.id === item.id);
+        if (idx !== -1) {
+            this.currentIndex = idx;
+        } else {
+            this.playlist.push(item);
+            this.currentIndex = this.playlist.length - 1;
+        }
+        const url = mediaUrl || (this.urlResolver ? await this.urlResolver(item) : item.url);
+        await this.playTrack(url, this.playbackMode === 'single');
+        this.onTrackChange?.(item);
+    }
+
+    public async playCurrentTrack(): Promise<void> {
+        const item = this.getCurrentTrack();
+        if (!item || !this.audioElement) return;
+
+        this.clearFade();
+        const url = this.urlResolver ? await this.urlResolver(item) : item.url;
+        this.audioElement.src = url;
+        this.audioElement.loop = this.playbackMode === 'single';
+        this.applyVolume();
+
+        try {
+            await this.audioElement.play();
+            this.onTrackChange?.(item);
+        } catch (err) {
+            console.warn('[ST-BgLoader AudioEngine] Autoplay was prevented by browser policy:', err);
+        }
+    }
+
     constructor() {
         this.audioElement = new Audio();
-        this.audioElement.loop = true;
         this.audioElement.preload = 'auto';
+
+        this.audioElement.addEventListener('ended', () => {
+            this.handleTrackEnded();
+        });
+
+        this.audioElement.addEventListener('play', () => {
+            this.onPlayStateChange?.(true);
+        });
+
+        this.audioElement.addEventListener('pause', () => {
+            this.onPlayStateChange?.(false);
+        });
     }
 
     public setVolume(volume: number): void {
@@ -28,6 +85,91 @@ export class AudioEngine {
 
     public isMuted(): boolean {
         return this.muted;
+    }
+
+    public isPlaying(): boolean {
+        return !!(this.audioElement && !this.audioElement.paused);
+    }
+
+    public setPlaybackMode(mode: PlaybackMode): void {
+        this.playbackMode = mode;
+        if (this.audioElement) {
+            this.audioElement.loop = mode === 'single';
+        }
+    }
+
+    public getPlaybackMode(): PlaybackMode {
+        return this.playbackMode;
+    }
+
+    public setPlaylist(items: MediaItem[], autoPlay: boolean = false): void {
+        this.playlist = items;
+        if (this.playlist.length > 0 && this.currentIndex === -1) {
+            this.currentIndex = 0;
+            if (autoPlay) {
+                this.playCurrentTrack();
+            }
+        }
+    }
+
+    public getPlaylist(): MediaItem[] {
+        return this.playlist;
+    }
+
+    public getCurrentTrack(): MediaItem | null {
+        if (this.currentIndex >= 0 && this.currentIndex < this.playlist.length) {
+            return this.playlist[this.currentIndex];
+        }
+        return null;
+    }
+
+    public async playNext(): Promise<void> {
+        if (this.playlist.length === 0) return;
+
+        if (this.playbackMode === 'shuffle') {
+            let nextIndex = Math.floor(Math.random() * this.playlist.length);
+            if (this.playlist.length > 1 && nextIndex === this.currentIndex) {
+                nextIndex = (nextIndex + 1) % this.playlist.length;
+            }
+            this.currentIndex = nextIndex;
+        } else {
+            this.currentIndex = (this.currentIndex + 1) % this.playlist.length;
+        }
+
+        await this.playCurrentTrack();
+    }
+
+    public async playPrev(): Promise<void> {
+        if (this.playlist.length === 0) return;
+
+        this.currentIndex = (this.currentIndex - 1 + this.playlist.length) % this.playlist.length;
+        await this.playCurrentTrack();
+    }
+
+    public async togglePlay(): Promise<void> {
+        if (!this.audioElement) return;
+
+        if (this.audioElement.paused) {
+            if (!this.audioElement.src && this.playlist.length > 0) {
+                if (this.currentIndex === -1) this.currentIndex = 0;
+                await this.playCurrentTrack();
+            } else {
+                await this.audioElement.play().catch(() => {});
+            }
+        } else {
+            this.audioElement.pause();
+        }
+    }
+
+
+    private handleTrackEnded(): void {
+        if (this.playbackMode === 'single') {
+            // Native loop will repeat it
+            return;
+        }
+        if (this.playlist.length > 1) {
+            this.playNext().catch(err => console.error(err));
+        }
     }
 
     public attachVideo(video: HTMLVideoElement | null): void {
@@ -136,5 +278,6 @@ export class AudioEngine {
             this.audioElement = null;
         }
         this.attachedVideo = null;
+        this.playlist = [];
     }
 }
