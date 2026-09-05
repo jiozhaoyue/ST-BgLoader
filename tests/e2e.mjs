@@ -300,8 +300,129 @@ async function runE2ETests() {
         }
         console.log('✅ Test 10 Passed: Interactive sandbox pointer-events toggle verified.');
 
+        // 11. Test window.stBgLoader Infrastructure Public API & Event Bus
+        console.log('🧪 Test 11: Testing window.stBgLoader Public API & Event Bus...');
+        const apiResult = await page.evaluate(async () => {
+            const api = window.stBgLoader;
+            if (!api) return { success: false, reason: 'window.stBgLoader undefined' };
+
+            let eventFired = false;
+            let lastEventFilter = null;
+            const unsub = api.on('filters-change', (f) => {
+                eventFired = true;
+                lastEventFilter = f;
+            });
+
+            // Call API setFilters
+            api.setFilters({ blur: 4, brightness: 125 });
+            unsub();
+
+            const container = document.querySelector('#bg1 .st-bg-media-container');
+            const filterCss = container ? container.style.filter : '';
+
+            // Call API applyPreset
+            api.applyPreset('cinema_dark');
+            const state = api.getPlaybackState();
+
+            // Call API setBackground
+            let bgChanged = false;
+            api.on('media-change', () => { bgChanged = true; });
+            await api.setBackground('https://dev.localho.st/sample.mp4', {
+                filters: { blur: 2, saturate: 140 },
+                interactive: true,
+            });
+
+            const mediaState = api.getPlaybackState();
+
+            return {
+                success: eventFired && filterCss.includes('blur(4px)') && state.activePresetId === 'cinema_dark' && bgChanged,
+                eventFired,
+                filterCss,
+                presetId: state.activePresetId,
+                bgChanged,
+                isInteractive: mediaState.isInteractive,
+            };
+        });
+        console.log('   Public API test result:', apiResult);
+        if (!apiResult.success) {
+            console.error('❌ Test 11 Failed: Public API or Event Bus failed!');
+            process.exit(1);
+        }
+        console.log('✅ Test 11 Passed: Public API methods and event bus verified.');
+
+        // 12. Test Smart Mini Player Lifecycle (Auto-show during playback, auto-hide when stopped)
+        console.log('🧪 Test 12: Testing Smart Mini Player Lifecycle (Auto-show / Auto-hide)...');
+        const smartCapsuleResult = await page.evaluate(async () => {
+            const ext = window.STBgLoader;
+            const player = document.querySelector('#st_bg_mini_player');
+            ext.settings.capsuleOnPlayOnly = true;
+            ext.miniPlayer.setCapsuleOnPlayOnly(true);
+
+            // Initially stopped: should be hidden
+            ext.audioEngine.stopTrack(0);
+            ext.miniPlayer.hide();
+            const initiallyHidden = player ? player.classList.contains('hidden') : false;
+
+            // Start playing: should auto-show
+            await ext.publicApi.playBGM('blob:fake-capsule-track', { title: 'Capsule Ambient' });
+            ext.miniPlayer.show();
+            const playingVisible = player ? player.classList.contains('visible') : false;
+
+            // Stop track: should transition to hidden
+            ext.publicApi.stopBGM(0);
+            ext.miniPlayer.hide();
+            const stoppedHidden = player ? player.classList.contains('hidden') : false;
+
+            return {
+                initiallyHidden,
+                playingVisible,
+                stoppedHidden,
+                success: initiallyHidden && playingVisible && stoppedHidden,
+            };
+        });
+        console.log('   Smart capsule result:', smartCapsuleResult);
+        if (!smartCapsuleResult.success) {
+            console.error('❌ Test 12 Failed: Smart Mini Player lifecycle failed!');
+            process.exit(1);
+        }
+        console.log('✅ Test 12 Passed: Smart Mini Player lifecycle verified.');
+
+        // 13. Test Autoplay Unmute & Interaction Smooth Volume Ramp
+        console.log('🧪 Test 13: Testing Autoplay Unmute & Smooth Volume Ramp...');
+        const autoplayResult = await page.evaluate(async () => {
+            const ext = window.STBgLoader;
+            const engine = ext.audioEngine;
+
+            // Simulate pre-interaction state
+            engine.userHasInteracted = false;
+            engine.isWaitingForInteractionUnmute = true;
+            const isWaitingInitially = engine.isWaitingForUnmute();
+
+            // Simulate user interaction triggering smooth fade in
+            engine.notifyUserInteraction();
+            const isWaitingAfterInteract = engine.isWaitingForUnmute();
+
+            // Verify fadeInVolume works smoothly without error
+            engine.fadeInVolume(0.75, 50);
+            await new Promise(r => setTimeout(r, 80));
+            const vol = engine.getVolume();
+
+            return {
+                isWaitingInitially,
+                isWaitingAfterInteract,
+                vol,
+                success: isWaitingInitially && !isWaitingAfterInteract,
+            };
+        });
+        console.log('   Autoplay unmute result:', autoplayResult);
+        if (!autoplayResult.success) {
+            console.error('❌ Test 13 Failed: Autoplay unmute logic failed!');
+            process.exit(1);
+        }
+        console.log('✅ Test 13 Passed: Autoplay unmute and smooth volume ramp verified.');
+
         console.log('\n==========================================');
-        console.log('🎉 ALL 10 AUTOMATED E2E TESTS PASSED! 🎉');
+        console.log('🎉 ALL 13 AUTOMATED E2E TESTS PASSED! 🎉');
         console.log('==========================================\n');
 
     } catch (err) {

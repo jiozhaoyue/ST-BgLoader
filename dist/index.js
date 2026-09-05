@@ -1,4 +1,4 @@
-const v = {
+const f = {
   default: {
     id: "default",
     name: "Default (原色)",
@@ -29,7 +29,7 @@ const v = {
     name: "Monochrome (黑白极简)",
     filters: { blur: 0, brightness: 100, opacity: 100, saturate: 0 }
   }
-}, _ = {
+}, E = {
   enabled: !0,
   activeMediaId: null,
   volume: 0.8,
@@ -45,23 +45,24 @@ const v = {
   userPresets: {},
   interactiveBackground: !1,
   showMiniPlayer: !0,
+  capsuleOnPlayOnly: !0,
   playbackMode: "loop",
   playlist: [],
   cacheQuotaMB: 1024,
   lruAutoClean: !0,
   chatBindings: {}
-}, I = "st_bg_loader_db", A = 1, h = "media_items", E = "st-bg-cache-v1";
-class R {
+}, B = "st_bg_loader_db", R = 1, g = "media_items", M = "st-bg-cache-v1";
+class V {
   db = null;
   cache = null;
   objectUrls = /* @__PURE__ */ new Map();
   async init() {
-    "caches" in window && (this.cache = await caches.open(E)), this.db = await new Promise((e, i) => {
-      const t = indexedDB.open(I, A);
+    "caches" in window && (this.cache = await caches.open(M)), this.db = await new Promise((e, i) => {
+      const t = indexedDB.open(B, R);
       t.onupgradeneeded = (s) => {
         const a = s.target.result;
-        if (!a.objectStoreNames.contains(h)) {
-          const n = a.createObjectStore(h, { keyPath: "id" });
+        if (!a.objectStoreNames.contains(g)) {
+          const n = a.createObjectStore(g, { keyPath: "id" });
           n.createIndex("type", "type", { unique: !1 }), n.createIndex("lastUsedTimestamp", "lastUsedTimestamp", { unique: !1 });
         }
       }, t.onsuccess = () => e(t.result), t.onerror = () => i(t.error);
@@ -69,26 +70,26 @@ class R {
   }
   async listMedia() {
     return this.db || await this.init(), new Promise((e, i) => {
-      const a = this.db.transaction(h, "readonly").objectStore(h).getAll();
+      const a = this.db.transaction(g, "readonly").objectStore(g).getAll();
       a.onsuccess = () => e(a.result || []), a.onerror = () => i(a.error);
     });
   }
   async getMedia(e) {
     return this.db || await this.init(), new Promise((i, t) => {
-      const n = this.db.transaction(h, "readonly").objectStore(h).get(e);
+      const n = this.db.transaction(g, "readonly").objectStore(g).get(e);
       n.onsuccess = () => i(n.result || null), n.onerror = () => t(n.error);
     });
   }
   async saveMedia(e, i, t, s, a) {
     (!this.db || !this.cache) && await this.init();
     const n = "bg_" + Date.now() + "_" + Math.random().toString(36).substring(2, 9), l = `/st-bg-cache/${n}/${encodeURIComponent(i)}`;
-    let o, c = "", u = 0;
-    typeof e == "string" ? (c = t === "svg" ? "image/svg+xml" : "text/html", o = new Blob([e], { type: c }), u = o.size) : (o = e, c = e.type || this.guessMimeType(i, t), u = e.size);
-    const p = new Headers({
-      "Content-Type": c,
-      "Content-Length": u.toString()
-    }), m = new Response(o, { headers: p });
-    await this.cache.put(l, m);
+    let o, d = "", h = 0;
+    typeof e == "string" ? (d = t === "svg" ? "image/svg+xml" : "text/html", o = new Blob([e], { type: d }), h = o.size) : (o = e, d = e.type || this.guessMimeType(i, t), h = e.size);
+    const u = new Headers({
+      "Content-Type": d,
+      "Content-Length": h.toString()
+    }), p = new Response(o, { headers: u });
+    await this.cache.put(l, p);
     const y = {
       id: n,
       name: i,
@@ -96,15 +97,15 @@ class R {
       source: s,
       url: a || l,
       cacheKey: l,
-      size: u,
-      mimeType: c,
+      size: h,
+      mimeType: d,
       addedTimestamp: Date.now(),
       lastUsedTimestamp: Date.now(),
       hasAudio: t === "video" || t === "audio"
     };
-    return await new Promise((f, M) => {
-      const b = this.db.transaction(h, "readwrite").objectStore(h).put(y);
-      b.onsuccess = () => f(), b.onerror = () => M(b.error);
+    return await new Promise((b, v) => {
+      const c = this.db.transaction(g, "readwrite").objectStore(g).put(y);
+      c.onsuccess = () => b(), c.onerror = () => v(c.error);
     }), y;
   }
   async getMediaBlobUrl(e) {
@@ -131,13 +132,13 @@ class R {
   async touchMedia(e) {
     if (!this.db) return;
     const i = await this.getMedia(e);
-    i && (i.lastUsedTimestamp = Date.now(), this.db.transaction(h, "readwrite").objectStore(h).put(i));
+    i && (i.lastUsedTimestamp = Date.now(), this.db.transaction(g, "readwrite").objectStore(g).put(i));
   }
   async deleteMedia(e) {
     (!this.db || !this.cache) && await this.init();
     const i = await this.getMedia(e);
     i && (await this.cache.delete(i.cacheKey), this.objectUrls.has(e) && (URL.revokeObjectURL(this.objectUrls.get(e)), this.objectUrls.delete(e)), await new Promise((t, s) => {
-      const l = this.db.transaction(h, "readwrite").objectStore(h).delete(e);
+      const l = this.db.transaction(g, "readwrite").objectStore(g).delete(e);
       l.onsuccess = () => t(), l.onerror = () => s(l.error);
     }));
   }
@@ -163,8 +164,8 @@ class R {
     (!this.db || !this.cache) && await this.init();
     for (const e of this.objectUrls.values())
       URL.revokeObjectURL(e);
-    this.objectUrls.clear(), "caches" in window && (await caches.delete(E), this.cache = await caches.open(E)), await new Promise((e, i) => {
-      const a = this.db.transaction(h, "readwrite").objectStore(h).clear();
+    this.objectUrls.clear(), "caches" in window && (await caches.delete(M), this.cache = await caches.open(M)), await new Promise((e, i) => {
+      const a = this.db.transaction(g, "readwrite").objectStore(g).clear();
       a.onsuccess = () => e(), a.onerror = () => i(a.error);
     });
   }
@@ -211,10 +212,18 @@ class q {
   currentIndex = -1;
   playbackMode = "loop";
   urlResolver;
+  userHasInteracted = !1;
+  isWaitingForInteractionUnmute = !1;
   onTrackChange;
   onPlayStateChange;
   setUrlResolver(e) {
     this.urlResolver = e;
+  }
+  isWaitingForUnmute() {
+    return this.isWaitingForInteractionUnmute;
+  }
+  notifyUserInteraction() {
+    this.userHasInteracted = !0, this.isWaitingForInteractionUnmute && (this.isWaitingForInteractionUnmute = !1, this.fadeInVolume(this.volume, 400));
   }
   async playMediaItem(e, i) {
     const t = this.playlist.findIndex((a) => a.id === e.id);
@@ -227,7 +236,7 @@ class q {
     if (!e || !this.audioElement) return;
     this.clearFade();
     const i = this.urlResolver ? await this.urlResolver(e) : e.url;
-    this.audioElement.src = i, this.audioElement.loop = this.playbackMode === "single", this.applyVolume();
+    this.audioElement.src = i, this.audioElement.loop = this.playbackMode === "single", !this.userHasInteracted && !this.muted ? (this.isWaitingForInteractionUnmute = !0, this.audioElement.muted = !0) : this.applyVolume();
     try {
       await this.audioElement.play(), this.onTrackChange?.(e);
     } catch (t) {
@@ -241,7 +250,13 @@ class q {
       this.onPlayStateChange?.(!0);
     }), this.audioElement.addEventListener("pause", () => {
       this.onPlayStateChange?.(!1);
-    });
+    }), this.setupInteractionListener();
+  }
+  setupInteractionListener() {
+    const e = () => {
+      this.notifyUserInteraction(), window.removeEventListener("pointerdown", e), window.removeEventListener("keydown", e), window.removeEventListener("touchstart", e);
+    };
+    window.addEventListener("pointerdown", e, { passive: !0, once: !0 }), window.addEventListener("keydown", e, { passive: !0, once: !0 }), window.addEventListener("touchstart", e, { passive: !0, once: !0 });
   }
   setVolume(e) {
     this.volume = Math.max(0, Math.min(1, e)), this.applyVolume();
@@ -298,13 +313,23 @@ class q {
   }
   async playTrack(e, i = !0) {
     if (this.audioElement) {
-      this.clearFade(), this.audioElement.src = e, this.audioElement.loop = i, this.applyVolume();
+      this.clearFade(), this.audioElement.src = e, this.audioElement.loop = i, !this.userHasInteracted && !this.muted ? (this.isWaitingForInteractionUnmute = !0, this.audioElement.muted = !0) : this.applyVolume();
       try {
         await this.audioElement.play();
       } catch (t) {
         console.warn("[ST-BgLoader AudioEngine] Autoplay was prevented by browser policy:", t);
       }
     }
+  }
+  fadeInVolume(e, i = 400) {
+    this.clearFade();
+    const t = performance.now(), s = Math.max(0, Math.min(1, e));
+    this.audioElement && (this.audioElement.muted = !1, this.audioElement.volume = 0), this.attachedVideo && (this.attachedVideo.muted = !1, this.attachedVideo.volume = 0);
+    const a = () => {
+      const n = performance.now() - t, l = Math.min(1, n / i), o = s * l;
+      this.audioElement && (this.audioElement.volume = o), this.attachedVideo && (this.attachedVideo.volume = o), l < 1 ? this.fadeTimer = requestAnimationFrame(a) : this.applyVolume();
+    };
+    this.fadeTimer = requestAnimationFrame(a);
   }
   stopTrack(e = 300) {
     if (!this.audioElement || this.audioElement.paused) return;
@@ -334,7 +359,7 @@ class q {
     this.clearFade(), this.audioElement && (this.audioElement.pause(), this.audioElement.src = "", this.audioElement = null), this.attachedVideo = null, this.playlist = [];
   }
 }
-class C {
+class x {
   videoElement = null;
   container;
   audioEngine;
@@ -380,7 +405,7 @@ class C {
     this.videoElement && (this.audioEngine.attachVideo(null), this.videoElement.pause(), this.videoElement.removeAttribute("src"), this.videoElement.load(), this.videoElement.remove(), this.videoElement = null);
   }
 }
-class L {
+class T {
   iframeElement = null;
   container;
   constructor(e) {
@@ -402,7 +427,7 @@ class L {
     this.iframeElement && (this.iframeElement.srcdoc = "", this.iframeElement.src = "about:blank", this.iframeElement.remove(), this.iframeElement = null);
   }
 }
-class T {
+class P {
   imageElement = null;
   container;
   constructor(e) {
@@ -440,7 +465,7 @@ class T {
     this.imageElement && (this.imageElement.remove(), this.imageElement = null);
   }
 }
-class V {
+class F {
   hostEl = null;
   containerEl = null;
   layerA = null;
@@ -472,7 +497,7 @@ class V {
     if (!this.hostEl) return;
     window.getComputedStyle(this.hostEl).position === "static" && (this.hostEl.style.position = "relative");
     let i = this.hostEl.querySelector(".st-bg-media-container");
-    i ? (this.layerA = i.querySelector(".st-bg-layer-a"), this.layerB = i.querySelector(".st-bg-layer-b")) : (i = document.createElement("div"), i.className = "st-bg-media-container", i.style.position = "absolute", i.style.top = "0", i.style.left = "0", i.style.width = "100%", i.style.height = "100%", i.style.overflow = "hidden", i.style.zIndex = "0", i.style.pointerEvents = "none", this.layerA = document.createElement("div"), this.layerA.className = "st-bg-layer st-bg-layer-a", this.setupLayerStyle(this.layerA), this.layerB = document.createElement("div"), this.layerB.className = "st-bg-layer st-bg-layer-b", this.setupLayerStyle(this.layerB), i.appendChild(this.layerA), i.appendChild(this.layerB), this.hostEl.appendChild(i)), this.containerEl = i, this.videoRendererA = new C(this.layerA, this.audioEngine), this.videoRendererB = new C(this.layerB, this.audioEngine), this.iframeRendererA = new L(this.layerA), this.iframeRendererB = new L(this.layerB), this.imageRendererA = new T(this.layerA), this.imageRendererB = new T(this.layerB), this.observer = new MutationObserver(() => this.syncFitting()), this.observer.observe(this.hostEl, { attributes: !0, attributeFilter: ["class"] }), this.syncFitting();
+    i ? (this.layerA = i.querySelector(".st-bg-layer-a"), this.layerB = i.querySelector(".st-bg-layer-b")) : (i = document.createElement("div"), i.className = "st-bg-media-container", i.style.position = "absolute", i.style.top = "0", i.style.left = "0", i.style.width = "100%", i.style.height = "100%", i.style.overflow = "hidden", i.style.zIndex = "0", i.style.pointerEvents = "none", this.layerA = document.createElement("div"), this.layerA.className = "st-bg-layer st-bg-layer-a", this.setupLayerStyle(this.layerA), this.layerB = document.createElement("div"), this.layerB.className = "st-bg-layer st-bg-layer-b", this.setupLayerStyle(this.layerB), i.appendChild(this.layerA), i.appendChild(this.layerB), this.hostEl.appendChild(i)), this.containerEl = i, this.videoRendererA = new x(this.layerA, this.audioEngine), this.videoRendererB = new x(this.layerB, this.audioEngine), this.iframeRendererA = new T(this.layerA), this.iframeRendererB = new T(this.layerB), this.imageRendererA = new P(this.layerA), this.imageRendererB = new P(this.layerB), this.observer = new MutationObserver(() => this.syncFitting()), this.observer.observe(this.hostEl, { attributes: !0, attributeFilter: ["class"] }), this.syncFitting();
   }
   setupLayerStyle(e) {
     e.style.position = "absolute", e.style.top = "0", e.style.left = "0", e.style.width = "100%", e.style.height = "100%", e.style.opacity = "0", e.style.transition = "opacity 400ms ease-in-out", e.style.pointerEvents = "none";
@@ -495,25 +520,25 @@ class V {
     if (!this.containerEl || !this.layerA || !this.layerB) return;
     const t = this.activeLayer === "A" ? "B" : "A", s = t === "B" ? this.layerB : this.layerA, a = this.activeLayer === "A" ? this.layerA : this.layerB, n = t === "B" ? this.videoRendererB : this.videoRendererA, l = t === "B" ? this.iframeRendererB : this.iframeRendererA, o = t === "B" ? this.imageRendererB : this.imageRendererA;
     n.destroy(), l.destroy(), o.destroy();
-    const c = this.getFitting();
+    const d = this.getFitting();
     switch (e.type) {
       case "video":
-        await n.render(i, c);
+        await n.render(i, d);
         break;
       case "html":
       case "svg":
         await l.render(i, !0);
         break;
       case "image":
-        await o.render(i, c);
+        await o.render(i, d);
         break;
       case "audio":
         await this.audioEngine.playMediaItem(e, i);
         break;
     }
     s.style.opacity = "1", a.style.opacity = "0", setTimeout(() => {
-      const u = this.activeLayer === "A" ? this.videoRendererA : this.videoRendererB, p = this.activeLayer === "A" ? this.iframeRendererA : this.iframeRendererB, m = this.activeLayer === "A" ? this.imageRendererA : this.imageRendererB;
-      u.destroy(), p.destroy(), m.destroy(), this.activeLayer = t;
+      const h = this.activeLayer === "A" ? this.videoRendererA : this.videoRendererB, u = this.activeLayer === "A" ? this.iframeRendererA : this.iframeRendererB, p = this.activeLayer === "A" ? this.imageRendererA : this.imageRendererB;
+      h.destroy(), u.destroy(), p.destroy(), this.activeLayer = t;
     }, 450);
   }
   clear() {
@@ -653,6 +678,10 @@ class U {
                                 <input type="checkbox" id="st_mini_player_toggle" ${this.settings.showMiniPlayer ? "checked" : ""} />
                                 <span>Show floating mini player capsule</span>
                             </label>
+                            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; margin-left: 18px; font-size: 0.9em; opacity: 0.85;">
+                                <input type="checkbox" id="st_capsule_on_play" ${this.settings.capsuleOnPlayOnly ? "checked" : ""} />
+                                <span>Only show capsule during active playback</span>
+                            </label>
                         </div>
                     </div>
 
@@ -671,7 +700,7 @@ class U {
   }
   populatePresets() {
     const e = this.container?.querySelector("#st_preset_select");
-    e && (e.innerHTML = "", Object.values(v).forEach((i) => {
+    e && (e.innerHTML = "", Object.values(f).forEach((i) => {
       const t = document.createElement("option");
       t.value = i.id, t.textContent = i.name, i.id === this.settings.activePresetId && (t.selected = !0), e.appendChild(t);
     }), Object.entries(this.settings.userPresets || {}).forEach(([i, t]) => {
@@ -692,8 +721,8 @@ class U {
     }), s?.addEventListener("dragover", (r) => {
       r.preventDefault(), s.classList.add("dragover");
     }), s?.addEventListener("dragleave", () => s.classList.remove("dragover")), s?.addEventListener("drop", async (r) => {
-      const d = r;
-      d.preventDefault(), s.classList.remove("dragover"), d.dataTransfer?.files && d.dataTransfer.files.length > 0 && await this.handleFileUpload(d.dataTransfer.files[0]);
+      const c = r;
+      c.preventDefault(), s.classList.remove("dragover"), c.dataTransfer?.files && c.dataTransfer.files.length > 0 && await this.handleFileUpload(c.dataTransfer.files[0]);
     });
     const n = this.container.querySelector("#st_bgloader_url_input");
     this.container.querySelector("#st_bgloader_url_btn")?.addEventListener("click", async () => {
@@ -704,52 +733,56 @@ class U {
     o?.addEventListener("change", () => {
       const r = o.value;
       this.settings.activePresetId = r;
-      let d = v[r]?.filters;
-      !d && this.settings.userPresets[r] && (d = this.settings.userPresets[r]), d && (this.settings.filters = { ...d }, this.updateSliders(d), this.callbacks.onPresetChanged({ id: r, name: r, filters: d }), this.callbacks.onSettingsChanged(this.settings));
+      let c = f[r]?.filters;
+      !c && this.settings.userPresets[r] && (c = this.settings.userPresets[r]), c && (this.settings.filters = { ...c }, this.updateSliders(c), this.callbacks.onPresetChanged({ id: r, name: r, filters: c }), this.callbacks.onSettingsChanged(this.settings));
     }), this.container.querySelector("#st_preset_save_btn")?.addEventListener("click", () => {
       const r = prompt("Enter a name for this custom preset:");
       if (r && r.trim()) {
-        const d = r.trim();
-        this.settings.userPresets[d] = { ...this.settings.filters }, this.settings.activePresetId = d, this.populatePresets(), this.callbacks.onSettingsChanged(this.settings);
+        const c = r.trim();
+        this.settings.userPresets[c] = { ...this.settings.filters }, this.settings.activePresetId = c, this.populatePresets(), this.callbacks.onSettingsChanged(this.settings);
       }
     }), this.container.querySelector("#st_preset_del_btn")?.addEventListener("click", () => {
       const r = o.value;
       if (this.settings.userPresets[r]) {
         if (confirm(`Delete custom preset "${r}"?`)) {
           delete this.settings.userPresets[r], this.settings.activePresetId = "default", this.populatePresets();
-          const d = v.default.filters;
-          this.settings.filters = { ...d }, this.updateSliders(d), this.callbacks.onPresetChanged(v.default), this.callbacks.onSettingsChanged(this.settings);
+          const c = f.default.filters;
+          this.settings.filters = { ...c }, this.updateSliders(c), this.callbacks.onPresetChanged(f.default), this.callbacks.onSettingsChanged(this.settings);
         }
       } else
         alert("Cannot delete built-in presets.");
     });
-    const c = (r, d, b, P) => {
-      const S = this.container.querySelector(r), k = this.container.querySelector(d);
-      S?.addEventListener("input", () => {
-        const x = Number(S.value);
-        k && (k.textContent = `${x}${b}`), P(x), this.callbacks.onSettingsChanged(this.settings);
+    const d = (r, c, I, A) => {
+      const _ = this.container.querySelector(r), S = this.container.querySelector(c);
+      _?.addEventListener("input", () => {
+        const k = Number(_.value);
+        S && (S.textContent = `${k}${I}`), A(k), this.callbacks.onSettingsChanged(this.settings);
       });
     };
-    c("#st_filter_blur", "#st_filter_blur_val", "px", (r) => this.settings.filters.blur = r), c("#st_filter_brightness", "#st_filter_brightness_val", "%", (r) => this.settings.filters.brightness = r), c("#st_filter_opacity", "#st_filter_opacity_val", "%", (r) => this.settings.filters.opacity = r), c("#st_filter_saturate", "#st_filter_saturate_val", "%", (r) => this.settings.filters.saturate = r), c("#st_audio_volume", "#st_audio_volume_val", "%", (r) => this.settings.volume = r / 100);
-    const u = this.container.querySelector("#st_playback_mode");
+    d("#st_filter_blur", "#st_filter_blur_val", "px", (r) => this.settings.filters.blur = r), d("#st_filter_brightness", "#st_filter_brightness_val", "%", (r) => this.settings.filters.brightness = r), d("#st_filter_opacity", "#st_filter_opacity_val", "%", (r) => this.settings.filters.opacity = r), d("#st_filter_saturate", "#st_filter_saturate_val", "%", (r) => this.settings.filters.saturate = r), d("#st_audio_volume", "#st_audio_volume_val", "%", (r) => this.settings.volume = r / 100);
+    const h = this.container.querySelector("#st_playback_mode");
+    h?.addEventListener("change", () => {
+      this.settings.playbackMode = h.value, this.callbacks.onPlaybackModeChanged(this.settings.playbackMode), this.callbacks.onSettingsChanged(this.settings);
+    });
+    const u = this.container.querySelector("#st_bg_interactive");
     u?.addEventListener("change", () => {
-      this.settings.playbackMode = u.value, this.callbacks.onPlaybackModeChanged(this.settings.playbackMode), this.callbacks.onSettingsChanged(this.settings);
+      this.settings.interactiveBackground = u.checked, this.callbacks.onInteractiveChanged(u.checked), this.callbacks.onSettingsChanged(this.settings);
     });
-    const p = this.container.querySelector("#st_bg_interactive");
+    const p = this.container.querySelector("#st_mini_player_toggle");
     p?.addEventListener("change", () => {
-      this.settings.interactiveBackground = p.checked, this.callbacks.onInteractiveChanged(p.checked), this.callbacks.onSettingsChanged(this.settings);
+      this.settings.showMiniPlayer = p.checked, this.callbacks.onMiniPlayerToggle(p.checked), this.callbacks.onSettingsChanged(this.settings);
     });
-    const m = this.container.querySelector("#st_mini_player_toggle");
-    m?.addEventListener("change", () => {
-      this.settings.showMiniPlayer = m.checked, this.callbacks.onMiniPlayerToggle(m.checked), this.callbacks.onSettingsChanged(this.settings);
-    });
-    const y = this.container.querySelector("#st_audio_mute");
+    const y = this.container.querySelector("#st_capsule_on_play");
     y?.addEventListener("change", () => {
-      this.settings.muted = y.checked, this.callbacks.onSettingsChanged(this.settings);
+      this.settings.capsuleOnPlayOnly = y.checked, this.callbacks.onCapsuleOnPlayToggle?.(y.checked), this.callbacks.onSettingsChanged(this.settings);
     });
-    const f = this.container.querySelector("#st_audio_blur");
-    f?.addEventListener("change", () => {
-      this.settings.pauseOnBlur = f.checked, this.callbacks.onSettingsChanged(this.settings);
+    const b = this.container.querySelector("#st_audio_mute");
+    b?.addEventListener("change", () => {
+      this.settings.muted = b.checked, this.callbacks.onSettingsChanged(this.settings);
+    });
+    const v = this.container.querySelector("#st_audio_blur");
+    v?.addEventListener("change", () => {
+      this.settings.pauseOnBlur = v.checked, this.callbacks.onSettingsChanged(this.settings);
     }), this.container.querySelector("#st_cache_clear_btn")?.addEventListener("click", async () => {
       confirm("Are you sure you want to clear all cached media files?") && (await this.cacheManager.clearAll(), await this.refreshMediaGrid(), await this.updateCacheStats());
     });
@@ -801,7 +834,7 @@ class U {
     return ["mp4", "webm", "mov", "m4v", "ogv"].includes(t) || i.startsWith("video/") ? "video" : ["mp3", "wav", "ogg", "flac", "aac", "m4a"].includes(t) || i.startsWith("audio/") ? "audio" : t === "html" || t === "htm" ? "html" : t === "svg" ? "svg" : "image";
   }
 }
-class F {
+class $ {
   observer = null;
   onNativeMediaSelect;
   constructor(e) {
@@ -839,45 +872,49 @@ class F {
     this.observer && (this.observer.disconnect(), this.observer = null);
   }
 }
-class $ {
+class D {
   container = null;
   audioEngine;
   isVisible = !0;
+  capsuleOnPlayOnly = !0;
+  hideTimer = null;
   constructor(e) {
     this.audioEngine = e;
   }
-  render(e = !0) {
-    this.isVisible = e;
-    const i = document.querySelector("#st_bg_mini_player");
-    if (i && i.remove(), !this.isVisible) return;
-    const t = document.createElement("div");
-    t.id = "st_bg_mini_player", t.className = "st-bg-mini-player";
-    const s = this.audioEngine.getCurrentTrack(), a = s ? s.name : "No Audio Selected", n = this.audioEngine.isPlaying(), l = this.audioEngine.getPlaybackMode();
-    t.innerHTML = `
+  render(e = !0, i = !0) {
+    this.isVisible = e, this.capsuleOnPlayOnly = i;
+    const t = document.querySelector("#st_bg_mini_player");
+    t && t.remove();
+    const s = document.createElement("div");
+    s.id = "st_bg_mini_player", s.className = "st-bg-mini-player";
+    const a = this.audioEngine.getCurrentTrack(), n = a ? a.name : "No Audio Selected", l = this.audioEngine.isPlaying(), o = this.audioEngine.getPlaybackMode(), d = this.isVisible && (!this.capsuleOnPlayOnly || l);
+    s.classList.add(d ? "visible" : "hidden"), s.innerHTML = `
             <div class="st-bg-mini-capsule">
                 <button class="st-bg-mini-btn" id="st_mini_prev" title="Previous Track">
                     <i class="fa-solid fa-backward-step"></i>
                 </button>
                 <button class="st-bg-mini-btn st-bg-mini-play" id="st_mini_play" title="Play/Pause">
-                    <i class="fa-solid ${n ? "fa-pause" : "fa-play"}"></i>
+                    <i class="fa-solid ${l ? "fa-pause" : "fa-play"}"></i>
                 </button>
                 <button class="st-bg-mini-btn" id="st_mini_next" title="Next Track">
                     <i class="fa-solid fa-forward-step"></i>
                 </button>
-                <div class="st-bg-mini-track" id="st_mini_title" title="${a}">${a}</div>
-                <button class="st-bg-mini-btn st-bg-mini-mode" id="st_mini_mode" title="Mode: ${l}">
-                    <i class="fa-solid ${this.getModeIcon(l)}"></i>
+                <div class="st-bg-mini-track" id="st_mini_title" title="${n}">${n}</div>
+                <button class="st-bg-mini-btn st-bg-mini-mode" id="st_mini_mode" title="Mode: ${o}">
+                    <i class="fa-solid ${this.getModeIcon(o)}"></i>
                 </button>
             </div>
-        `, document.body.appendChild(t), this.container = t, this.bindEvents(), this.audioEngine.onTrackChange = (o) => {
-      const c = this.container?.querySelector("#st_mini_title");
-      if (c) {
-        const u = o ? o.name : "No Audio";
-        c.textContent = u, c.setAttribute("title", u);
+        `, document.body.appendChild(s), this.container = s, this.bindEvents(), this.audioEngine.onTrackChange = (h) => {
+      const u = this.container?.querySelector("#st_mini_title");
+      if (u) {
+        const p = h ? h.name : "No Audio";
+        u.textContent = p, u.setAttribute("title", p);
       }
-    }, this.audioEngine.onPlayStateChange = (o) => {
-      const c = this.container?.querySelector("#st_mini_play i");
-      c && (c.className = `fa-solid ${o ? "fa-pause" : "fa-play"}`);
+    }, this.audioEngine.onPlayStateChange = (h) => {
+      const u = this.container?.querySelector("#st_mini_play i");
+      u && (u.className = `fa-solid ${h ? "fa-pause" : "fa-play"}`), this.capsuleOnPlayOnly && this.isVisible && (h ? (this.hideTimer !== null && (clearTimeout(this.hideTimer), this.hideTimer = null), this.show()) : (this.hideTimer !== null && clearTimeout(this.hideTimer), this.hideTimer = window.setTimeout(() => {
+        this.hide();
+      }, 1200)));
     };
   }
   bindEvents() {
@@ -909,83 +946,297 @@ class $ {
         return "fa-repeat";
     }
   }
+  show() {
+    this.container || this.render(!0, this.capsuleOnPlayOnly), this.container && (this.container.classList.remove("hidden"), this.container.classList.add("visible"));
+  }
+  hide() {
+    this.container && (this.container.classList.remove("visible"), this.container.classList.add("hidden"));
+  }
   setVisible(e) {
-    this.isVisible = e, this.container ? this.container.style.display = e ? "block" : "none" : e && this.render(!0);
+    this.isVisible = e, e ? this.show() : this.hide();
+  }
+  setCapsuleOnPlayOnly(e) {
+    this.capsuleOnPlayOnly = e, e ? this.audioEngine.isPlaying() || this.hide() : this.isVisible && this.show();
   }
   destroy() {
-    this.container && (this.container.remove(), this.container = null);
+    this.hideTimer !== null && (clearTimeout(this.hideTimer), this.hideTimer = null), this.container && (this.container.remove(), this.container = null);
   }
 }
-const B = "st_bgloader_settings";
-class j {
+class O {
+  ext;
+  eventListeners = /* @__PURE__ */ new Map();
+  constructor(e) {
+    this.ext = e;
+  }
+  /**
+   * Switch background to a URL, cached media ID, or local file.
+   * Supports MP4/WebM video, HTML/Canvas sandboxed pages, SVG animations, and images.
+   */
+  async setBackground(e, i) {
+    let s = (await this.ext.getCacheManager().listMedia()).find((a) => a.id === e || a.name === e);
+    if (!s) {
+      const a = i?.name || e.split("/").pop()?.split("?")[0] || "remote_background", n = i?.type || this.detectType(e);
+      i?.saveToLibrary ? s = await this.ext.getCacheManager().saveMedia(new Blob([]), a, n, "url", e) : s = {
+        id: "custom_" + Date.now(),
+        name: a,
+        type: n,
+        source: "url",
+        url: e,
+        cacheKey: e,
+        size: 0,
+        mimeType: "",
+        addedTimestamp: Date.now(),
+        lastUsedTimestamp: Date.now()
+      };
+    }
+    i?.filters && this.setFilters(i.filters), typeof i?.interactive == "boolean" && this.setInteractive(i.interactive), await this.ext.applyMediaItem(s), this.emit("media-change", s);
+  }
+  /**
+   * Clear the current background
+   */
+  clearBackground() {
+    this.ext.clearActiveBackground(), this.emit("media-change", null);
+  }
+  /**
+   * Play background music or sound track
+   */
+  async playBGM(e, i) {
+    typeof i?.volume == "number" && this.setVolume(i.volume);
+    let s = (await this.ext.getCacheManager().listMedia()).find((n) => n.id === e || n.name === e);
+    if (!s) {
+      const n = i?.title || e.split("/").pop()?.split("?")[0] || "BGM";
+      s = {
+        id: "bgm_" + Date.now(),
+        name: n,
+        type: "audio",
+        source: "url",
+        url: e,
+        cacheKey: e,
+        size: 0,
+        mimeType: "audio/mpeg",
+        addedTimestamp: Date.now(),
+        lastUsedTimestamp: Date.now()
+      };
+    }
+    await this.ext.getAudioEngine().playMediaItem(s), this.emit("track-change", s);
+  }
+  /**
+   * Stop background music with optional fade-out
+   */
+  stopBGM(e = 300) {
+    this.ext.getAudioEngine().stopTrack(e), this.emit("track-change", null);
+  }
+  /**
+   * Toggle play/pause for background audio
+   */
+  togglePlay() {
+    this.ext.getAudioEngine().togglePlay();
+  }
+  /**
+   * Play next track in playlist
+   */
+  nextTrack() {
+    this.ext.getAudioEngine().playNext();
+  }
+  /**
+   * Play previous track in playlist
+   */
+  prevTrack() {
+    this.ext.getAudioEngine().playPrev();
+  }
+  /**
+   * Set master volume (0.0 to 1.0)
+   */
+  setVolume(e) {
+    const i = Math.max(0, Math.min(1, e));
+    this.ext.getSettings().volume = i, this.ext.getAudioEngine().setVolume(i), this.ext.saveSettings(), this.emit("volume-change", i);
+  }
+  /**
+   * Mute or unmute audio
+   */
+  setMuted(e) {
+    this.ext.getSettings().muted = e, this.ext.getAudioEngine().setMuted(e), this.ext.saveSettings(), this.emit("mute-change", e);
+  }
+  /**
+   * Dynamically adjust CSS visual filters
+   */
+  setFilters(e) {
+    const i = this.ext.getSettings().filters, t = {
+      blur: e.blur !== void 0 ? e.blur : i.blur,
+      brightness: e.brightness !== void 0 ? e.brightness : i.brightness,
+      opacity: e.opacity !== void 0 ? e.opacity : i.opacity,
+      saturate: e.saturate !== void 0 ? e.saturate : i.saturate
+    };
+    this.ext.getSettings().filters = t, this.ext.getMediaMount().applyFilters(t), this.ext.saveSettings(), this.emit("filters-change", t);
+  }
+  /**
+   * Apply built-in or custom filter preset
+   */
+  applyPreset(e) {
+    const i = this.ext.getSettings();
+    let t = f[e]?.filters;
+    !t && i.userPresets[e] && (t = i.userPresets[e]), t ? (i.activePresetId = e, i.filters = { ...t }, this.ext.getMediaMount().applyFilters(t), this.ext.saveSettings(), this.emit("preset-change", e, t)) : console.warn(`[ST-BgLoader PublicAPI] Preset "${e}" not found.`);
+  }
+  /**
+   * Set mouse interaction passthrough for HTML/Canvas/WebGL backgrounds
+   */
+  setInteractive(e) {
+    this.ext.getSettings().interactiveBackground = e, this.ext.getMediaMount().setInteractive(e), this.ext.saveSettings(), this.emit("interactive-change", e);
+  }
+  /**
+   * Return current playback, filter, and media status
+   */
+  getPlaybackState() {
+    const e = this.ext.getSettings(), i = this.ext.getAudioEngine();
+    return {
+      isPlaying: i.isPlaying(),
+      currentTrack: i.getCurrentTrack(),
+      volume: i.getVolume(),
+      muted: i.isMuted(),
+      playbackMode: i.getPlaybackMode(),
+      activeMediaId: e.activeMediaId,
+      activePresetId: e.activePresetId,
+      filters: { ...e.filters },
+      isInteractive: e.interactiveBackground
+    };
+  }
+  /**
+   * Get list of all media items in cache library
+   */
+  async getMediaList() {
+    return this.ext.getCacheManager().listMedia();
+  }
+  // --- Event Bus ---
+  /**
+   * Subscribe to ST-BgLoader events. Returns unsubscribe function.
+   * Events: 'media-change', 'track-change', 'play-state-change', 'volume-change', 'mute-change', 'filters-change', 'preset-change', 'interactive-change'
+   */
+  on(e, i) {
+    return this.eventListeners.has(e) || this.eventListeners.set(e, /* @__PURE__ */ new Set()), this.eventListeners.get(e).add(i), () => this.off(e, i);
+  }
+  off(e, i) {
+    this.eventListeners.get(e)?.delete(i);
+  }
+  emit(e, ...i) {
+    this.eventListeners.get(e)?.forEach((t) => {
+      try {
+        t(...i);
+      } catch (s) {
+        console.error(`[ST-BgLoader PublicAPI] Error in listener for "${e}":`, s);
+      }
+    });
+  }
+  detectType(e) {
+    const i = e.split(".").pop()?.toLowerCase().split("?")[0] || "";
+    return ["mp4", "webm", "mov", "m4v", "ogv"].includes(i) ? "video" : ["mp3", "wav", "ogg", "flac", "aac", "m4a"].includes(i) ? "audio" : i === "html" || i === "htm" ? "html" : i === "svg" ? "svg" : "image";
+  }
+}
+const L = "st_bgloader_settings";
+class N {
   isInitialized = !1;
-  settings = { ..._ };
+  settings = { ...E };
   cacheManager;
   audioEngine;
   mediaMount;
   settingsDrawer = null;
   nativeAugmenter = null;
   miniPlayer = null;
+  publicApi;
   constructor() {
-    this.cacheManager = new R(), this.audioEngine = new q(), this.mediaMount = new V(this.audioEngine);
+    this.cacheManager = new V(), this.audioEngine = new q(), this.mediaMount = new F(this.audioEngine), this.publicApi = new O(this);
+  }
+  getCacheManager() {
+    return this.cacheManager;
+  }
+  getAudioEngine() {
+    return this.audioEngine;
+  }
+  getMediaMount() {
+    return this.mediaMount;
+  }
+  getSettings() {
+    return this.settings;
+  }
+  getMiniPlayer() {
+    return this.miniPlayer;
+  }
+  getAPI() {
+    return this.publicApi;
+  }
+  clearActiveBackground() {
+    this.settings.activeMediaId = null, this.mediaMount.clear(), this.saveSettings(), this.settingsDrawer && this.settingsDrawer.refreshMediaGrid();
+  }
+  async applyMediaItem(e) {
+    await this.applyMedia(e);
   }
   async init() {
-    console.log("[ST-BgLoader] Initializing Rich Media Background Plugin..."), this.loadSettings(), await this.cacheManager.init(), this.mediaMount.init(), this.mediaMount.applyFilters(this.settings.filters), this.mediaMount.setInteractive(this.settings.interactiveBackground), this.audioEngine.setUrlResolver((t) => this.cacheManager.getMediaBlobUrl(t)), this.audioEngine.setVolume(this.settings.volume), this.audioEngine.setMuted(this.settings.muted), this.audioEngine.setPlaybackMode(this.settings.playbackMode);
-    const i = (await this.cacheManager.listMedia()).filter((t) => t.type === "audio");
-    if (this.audioEngine.setPlaylist(i), this.miniPlayer = new $(this.audioEngine), this.miniPlayer.render(this.settings.showMiniPlayer), this.settingsDrawer = new U(this.settings, this.cacheManager, {
-      onSettingsChanged: (t) => {
-        this.settings = t, this.saveSettings(), this.mediaMount.applyFilters(this.settings.filters), this.audioEngine.setVolume(this.settings.volume), this.audioEngine.setMuted(this.settings.muted);
+    console.log("[ST-BgLoader] Initializing Rich Media Background Plugin..."), this.loadSettings(), await this.cacheManager.init(), this.mediaMount.init(), this.mediaMount.applyFilters(this.settings.filters), this.mediaMount.setInteractive(this.settings.interactiveBackground), this.audioEngine.setUrlResolver((a) => this.cacheManager.getMediaBlobUrl(a)), this.audioEngine.setVolume(this.settings.volume), this.audioEngine.setMuted(this.settings.muted), this.audioEngine.setPlaybackMode(this.settings.playbackMode);
+    const i = (await this.cacheManager.listMedia()).filter((a) => a.type === "audio");
+    this.audioEngine.setPlaylist(i), this.miniPlayer = new D(this.audioEngine), this.miniPlayer.render(this.settings.showMiniPlayer, this.settings.capsuleOnPlayOnly);
+    const t = this.audioEngine.onTrackChange;
+    this.audioEngine.onTrackChange = (a) => {
+      t?.(a), this.publicApi.emit("track-change", a);
+    };
+    const s = this.audioEngine.onPlayStateChange;
+    if (this.audioEngine.onPlayStateChange = (a) => {
+      s?.(a), this.publicApi.emit("play-state-change", a);
+    }, this.settingsDrawer = new U(this.settings, this.cacheManager, {
+      onSettingsChanged: (a) => {
+        this.settings = a, this.saveSettings(), this.mediaMount.applyFilters(this.settings.filters), this.audioEngine.setVolume(this.settings.volume), this.audioEngine.setMuted(this.settings.muted);
       },
-      onPresetChanged: (t) => {
-        this.mediaMount.applyFilters(t.filters);
+      onPresetChanged: (a) => {
+        this.mediaMount.applyFilters(a.filters), this.publicApi.emit("preset-change", a.id, a.filters);
       },
-      onInteractiveChanged: (t) => {
-        this.mediaMount.setInteractive(t);
+      onInteractiveChanged: (a) => {
+        this.mediaMount.setInteractive(a), this.publicApi.emit("interactive-change", a);
       },
-      onMiniPlayerToggle: (t) => {
-        this.miniPlayer?.setVisible(t);
+      onMiniPlayerToggle: (a) => {
+        this.miniPlayer?.setVisible(a);
       },
-      onPlaybackModeChanged: (t) => {
-        this.audioEngine.setPlaybackMode(t);
+      onCapsuleOnPlayToggle: (a) => {
+        this.miniPlayer?.setCapsuleOnPlayOnly(a);
       },
-      onMediaSelected: async (t) => {
-        await this.applyMedia(t);
+      onPlaybackModeChanged: (a) => {
+        this.audioEngine.setPlaybackMode(a);
       },
-      onMediaDeleted: async (t) => {
-        this.settings.activeMediaId === t && (this.settings.activeMediaId = null, this.mediaMount.clear(), this.audioEngine.stopTrack(), this.saveSettings());
-        const s = await this.cacheManager.listMedia();
-        this.audioEngine.setPlaylist(s.filter((a) => a.type === "audio"));
+      onMediaSelected: async (a) => {
+        await this.applyMedia(a);
       },
-      onMediaUploaded: async (t) => {
+      onMediaDeleted: async (a) => {
+        this.settings.activeMediaId === a && (this.settings.activeMediaId = null, this.mediaMount.clear(), this.audioEngine.stopTrack(), this.saveSettings());
+        const n = await this.cacheManager.listMedia();
+        this.audioEngine.setPlaylist(n.filter((l) => l.type === "audio"));
+      },
+      onMediaUploaded: async (a) => {
         if (this.settings.lruAutoClean) {
-          const s = this.settings.cacheQuotaMB * 1024 * 1024;
-          await this.cacheManager.cleanLRU(s);
+          const n = this.settings.cacheQuotaMB * 1024 * 1024;
+          await this.cacheManager.cleanLRU(n);
         }
-        if (t.type === "audio") {
-          const s = await this.cacheManager.listMedia();
-          this.audioEngine.setPlaylist(s.filter((a) => a.type === "audio"));
+        if (a.type === "audio") {
+          const n = await this.cacheManager.listMedia();
+          this.audioEngine.setPlaylist(n.filter((l) => l.type === "audio"));
         }
-        await this.applyMedia(t);
+        await this.applyMedia(a);
       }
-    }), this.settingsDrawer.render(), this.nativeAugmenter = new F(async (t, s, a) => {
-      const n = {
-        id: "native_" + a,
-        name: a,
-        type: s,
+    }), this.settingsDrawer.render(), this.nativeAugmenter = new $(async (a, n, l) => {
+      const o = {
+        id: "native_" + l,
+        name: l,
+        type: n,
         source: "server",
-        url: t,
-        cacheKey: t,
+        url: a,
+        cacheKey: a,
         size: 0,
         mimeType: "",
         addedTimestamp: Date.now(),
         lastUsedTimestamp: Date.now()
       };
-      await this.applyMedia(n);
+      await this.applyMedia(o);
     }), this.nativeAugmenter.start(), document.addEventListener("visibilitychange", () => {
       this.audioEngine.handleVisibilityChange(document.hidden, this.settings.pauseOnBlur);
     }), this.hookSillyTavernEvents(), this.settings.activeMediaId) {
-      const t = await this.cacheManager.getMedia(this.settings.activeMediaId);
-      t && await this.applyMedia(t);
+      const a = await this.cacheManager.getMedia(this.settings.activeMediaId);
+      a && await this.applyMedia(a);
     }
     this.isInitialized = !0, console.log("[ST-BgLoader] Initialization complete.");
   }
@@ -1013,23 +1264,24 @@ class j {
   }
   loadSettings() {
     try {
-      const e = localStorage.getItem(B);
-      e && (this.settings = { ..._, ...JSON.parse(e) });
+      const e = localStorage.getItem(L);
+      e && (this.settings = { ...E, ...JSON.parse(e) });
     } catch (e) {
-      console.error("[ST-BgLoader] Failed to parse saved settings:", e), this.settings = { ..._ };
+      console.error("[ST-BgLoader] Failed to parse saved settings:", e), this.settings = { ...E };
     }
   }
   saveSettings() {
     try {
-      localStorage.setItem(B, JSON.stringify(this.settings));
+      localStorage.setItem(L, JSON.stringify(this.settings));
     } catch (e) {
       console.error("[ST-BgLoader] Failed to save settings:", e);
     }
   }
 }
-const w = new j();
+const w = new N();
 document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", () => w.init()) : w.init();
 window.STBgLoader = w;
+window.stBgLoader = w.getAPI();
 export {
-  j as STBgLoaderExtension
+  N as STBgLoaderExtension
 };

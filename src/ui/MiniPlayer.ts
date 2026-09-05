@@ -5,17 +5,19 @@ export class MiniPlayer {
     private container: HTMLElement | null = null;
     private audioEngine: AudioEngine;
     private isVisible: boolean = true;
+    private capsuleOnPlayOnly: boolean = true;
+    private hideTimer: number | null = null;
 
     constructor(audioEngine: AudioEngine) {
         this.audioEngine = audioEngine;
     }
 
-    public render(visible: boolean = true): void {
+    public render(visible: boolean = true, capsuleOnPlayOnly: boolean = true): void {
         this.isVisible = visible;
+        this.capsuleOnPlayOnly = capsuleOnPlayOnly;
+
         const existing = document.querySelector('#st_bg_mini_player');
         if (existing) existing.remove();
-
-        if (!this.isVisible) return;
 
         const el = document.createElement('div');
         el.id = 'st_bg_mini_player';
@@ -25,6 +27,10 @@ export class MiniPlayer {
         const trackTitle = currentTrack ? currentTrack.name : 'No Audio Selected';
         const isPlaying = this.audioEngine.isPlaying();
         const mode = this.audioEngine.getPlaybackMode();
+
+        // Determine initial visibility state
+        const shouldShow = this.isVisible && (!this.capsuleOnPlayOnly || isPlaying);
+        el.classList.add(shouldShow ? 'visible' : 'hidden');
 
         el.innerHTML = `
             <div class="st-bg-mini-capsule">
@@ -62,6 +68,21 @@ export class MiniPlayer {
             const icon = this.container?.querySelector('#st_mini_play i');
             if (icon) {
                 icon.className = `fa-solid ${playing ? 'fa-pause' : 'fa-play'}`;
+            }
+
+            if (this.capsuleOnPlayOnly && this.isVisible) {
+                if (playing) {
+                    if (this.hideTimer !== null) {
+                        clearTimeout(this.hideTimer);
+                        this.hideTimer = null;
+                    }
+                    this.show();
+                } else {
+                    if (this.hideTimer !== null) clearTimeout(this.hideTimer);
+                    this.hideTimer = window.setTimeout(() => {
+                        this.hide();
+                    }, 1200);
+                }
             }
         };
     }
@@ -105,16 +126,46 @@ export class MiniPlayer {
         }
     }
 
+    public show(): void {
+        if (!this.container) this.render(true, this.capsuleOnPlayOnly);
+        if (this.container) {
+            this.container.classList.remove('hidden');
+            this.container.classList.add('visible');
+        }
+    }
+
+    public hide(): void {
+        if (this.container) {
+            this.container.classList.remove('visible');
+            this.container.classList.add('hidden');
+        }
+    }
+
     public setVisible(visible: boolean): void {
         this.isVisible = visible;
-        if (this.container) {
-            this.container.style.display = visible ? 'block' : 'none';
-        } else if (visible) {
-            this.render(true);
+        if (visible) {
+            this.show();
+        } else {
+            this.hide();
+        }
+    }
+
+    public setCapsuleOnPlayOnly(enabled: boolean): void {
+        this.capsuleOnPlayOnly = enabled;
+        if (!enabled) {
+            if (this.isVisible) this.show();
+        } else {
+            if (!this.audioEngine.isPlaying()) {
+                this.hide();
+            }
         }
     }
 
     public destroy(): void {
+        if (this.hideTimer !== null) {
+            clearTimeout(this.hideTimer);
+            this.hideTimer = null;
+        }
         if (this.container) {
             this.container.remove();
             this.container = null;

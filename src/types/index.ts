@@ -64,6 +64,18 @@ export interface MediaItem {
     hasAudio?: boolean;
 }
 
+export interface PlaybackState {
+    isPlaying: boolean;
+    currentTrack: MediaItem | null;
+    volume: number;
+    muted: boolean;
+    playbackMode: PlaybackMode;
+    activeMediaId: string | null;
+    activePresetId: string;
+    filters: VisualFilters;
+    isInteractive: boolean;
+}
+
 export interface BgLoaderSettings {
     enabled: boolean;
     activeMediaId: string | null;
@@ -75,6 +87,7 @@ export interface BgLoaderSettings {
     userPresets: Record<string, VisualFilters>;
     interactiveBackground: boolean;
     showMiniPlayer: boolean;
+    capsuleOnPlayOnly: boolean;
     playbackMode: PlaybackMode;
     playlist: string[];           // IDs of MediaItems in playlist
     cacheQuotaMB: number;
@@ -98,6 +111,7 @@ export const DEFAULT_SETTINGS: BgLoaderSettings = {
     userPresets: {},
     interactiveBackground: false,
     showMiniPlayer: true,
+    capsuleOnPlayOnly: true,
     playbackMode: 'loop',
     playlist: [],
     cacheQuotaMB: 1024,

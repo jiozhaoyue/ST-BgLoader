@@ -6,6 +6,7 @@ import { MediaMount } from './core/MediaMount';
 import { SettingsDrawer } from './ui/SettingsDrawer';
 import { NativeBgAugmenter } from './ui/NativeBgAugmenter';
 import { MiniPlayer } from './ui/MiniPlayer';
+import { PublicAPI } from './api/PublicAPI';
 
 const SETTINGS_KEY = 'st_bgloader_settings';
 
@@ -18,11 +19,33 @@ export class STBgLoaderExtension {
     private settingsDrawer: SettingsDrawer | null = null;
     private nativeAugmenter: NativeBgAugmenter | null = null;
     private miniPlayer: MiniPlayer | null = null;
+    public publicApi: PublicAPI;
 
     constructor() {
         this.cacheManager = new CacheManager();
         this.audioEngine = new AudioEngine();
         this.mediaMount = new MediaMount(this.audioEngine);
+        this.publicApi = new PublicAPI(this);
+    }
+
+    public getCacheManager(): CacheManager { return this.cacheManager; }
+    public getAudioEngine(): AudioEngine { return this.audioEngine; }
+    public getMediaMount(): MediaMount { return this.mediaMount; }
+    public getSettings(): BgLoaderSettings { return this.settings; }
+    public getMiniPlayer(): MiniPlayer | null { return this.miniPlayer; }
+    public getAPI(): PublicAPI { return this.publicApi; }
+
+    public clearActiveBackground(): void {
+        this.settings.activeMediaId = null;
+        this.mediaMount.clear();
+        this.saveSettings();
+        if (this.settingsDrawer) {
+            this.settingsDrawer.refreshMediaGrid();
+        }
+    }
+
+    public async applyMediaItem(item: MediaItem): Promise<void> {
+        await this.applyMedia(item);
     }
 
     public async init(): Promise<void> {
@@ -49,7 +72,20 @@ export class STBgLoaderExtension {
 
         // 4. Initialize MiniPlayer
         this.miniPlayer = new MiniPlayer(this.audioEngine);
-        this.miniPlayer.render(this.settings.showMiniPlayer);
+        this.miniPlayer.render(this.settings.showMiniPlayer, this.settings.capsuleOnPlayOnly);
+
+        // Connect AudioEngine events to PublicAPI
+        const origTrackChange = this.audioEngine.onTrackChange;
+        this.audioEngine.onTrackChange = (item) => {
+            origTrackChange?.(item);
+            this.publicApi.emit('track-change', item);
+        };
+
+        const origPlayChange = this.audioEngine.onPlayStateChange;
+        this.audioEngine.onPlayStateChange = (playing) => {
+            origPlayChange?.(playing);
+            this.publicApi.emit('play-state-change', playing);
+        };
 
         // 5. Setup Settings Drawer & Native Augmenter
         this.settingsDrawer = new SettingsDrawer(this.settings, this.cacheManager, {
@@ -62,12 +98,17 @@ export class STBgLoaderExtension {
             },
             onPresetChanged: (preset) => {
                 this.mediaMount.applyFilters(preset.filters);
+                this.publicApi.emit('preset-change', preset.id, preset.filters);
             },
             onInteractiveChanged: (enabled) => {
                 this.mediaMount.setInteractive(enabled);
+                this.publicApi.emit('interactive-change', enabled);
             },
             onMiniPlayerToggle: (visible) => {
                 this.miniPlayer?.setVisible(visible);
+            },
+            onCapsuleOnPlayToggle: (enabled) => {
+                this.miniPlayer?.setCapsuleOnPlayOnly(enabled);
             },
             onPlaybackModeChanged: (mode) => {
                 this.audioEngine.setPlaybackMode(mode);
@@ -86,7 +127,6 @@ export class STBgLoaderExtension {
                 this.audioEngine.setPlaylist(currentItems.filter(i => i.type === 'audio'));
             },
             onMediaUploaded: async (item) => {
-                // Check quota and auto-clean if needed
                 if (this.settings.lruAutoClean) {
                     const maxBytes = this.settings.cacheQuotaMB * 1024 * 1024;
                     await this.cacheManager.cleanLRU(maxBytes);
@@ -95,7 +135,6 @@ export class STBgLoaderExtension {
                     const currentItems = await this.cacheManager.listMedia();
                     this.audioEngine.setPlaylist(currentItems.filter(i => i.type === 'audio'));
                 }
-                // Automatically activate newly uploaded media
                 await this.applyMedia(item);
             },
         });
@@ -188,7 +227,7 @@ export class STBgLoaderExtension {
         }
     }
 
-    private saveSettings(): void {
+    public saveSettings(): void {
         try {
             localStorage.setItem(SETTINGS_KEY, JSON.stringify(this.settings));
         } catch (e) {
@@ -207,3 +246,4 @@ if (document.readyState === 'loading') {
 
 // Export global reference for debugging or external plugins
 (window as any).STBgLoader = instance;
+(window as any).stBgLoader = instance.getAPI();

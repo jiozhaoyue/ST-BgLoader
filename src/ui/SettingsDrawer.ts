@@ -9,6 +9,7 @@ export interface SettingsDrawerCallbacks {
     onPresetChanged: (preset: FilterPreset) => void;
     onInteractiveChanged: (enabled: boolean) => void;
     onMiniPlayerToggle: (visible: boolean) => void;
+    onCapsuleOnPlayToggle?: (enabled: boolean) => void;
     onPlaybackModeChanged: (mode: PlaybackMode) => void;
 }
 
@@ -157,6 +158,10 @@ export class SettingsDrawer {
                             <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
                                 <input type="checkbox" id="st_mini_player_toggle" ${this.settings.showMiniPlayer ? 'checked' : ''} />
                                 <span>Show floating mini player capsule</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; margin-left: 18px; font-size: 0.9em; opacity: 0.85;">
+                                <input type="checkbox" id="st_capsule_on_play" ${this.settings.capsuleOnPlayOnly ? 'checked' : ''} />
+                                <span>Only show capsule during active playback</span>
                             </label>
                         </div>
                     </div>
@@ -348,6 +353,13 @@ export class SettingsDrawer {
         miniCb?.addEventListener('change', () => {
             this.settings.showMiniPlayer = miniCb.checked;
             this.callbacks.onMiniPlayerToggle(miniCb.checked);
+            this.callbacks.onSettingsChanged(this.settings);
+        });
+
+        const capsulePlayCb = this.container.querySelector('#st_capsule_on_play') as HTMLInputElement;
+        capsulePlayCb?.addEventListener('change', () => {
+            this.settings.capsuleOnPlayOnly = capsulePlayCb.checked;
+            this.callbacks.onCapsuleOnPlayToggle?.(capsulePlayCb.checked);
             this.callbacks.onSettingsChanged(this.settings);
         });
 

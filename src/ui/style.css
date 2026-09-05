@@ -207,6 +207,19 @@
     z-index: 9999;
     user-select: none;
     pointer-events: auto;
+    transition: opacity 0.35s ease, transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.st-bg-mini-player.hidden {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(12px) scale(0.96);
+}
+
+.st-bg-mini-player.visible {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0) scale(1);
 }
 
 .st-bg-mini-capsule {

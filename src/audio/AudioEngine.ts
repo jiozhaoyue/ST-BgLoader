@@ -13,12 +13,26 @@ export class AudioEngine {
     private playbackMode: PlaybackMode = 'loop';
 
     private urlResolver?: (item: MediaItem) => Promise<string>;
+    private userHasInteracted: boolean = false;
+    private isWaitingForInteractionUnmute: boolean = false;
 
     public onTrackChange?: (item: MediaItem | null) => void;
     public onPlayStateChange?: (isPlaying: boolean) => void;
 
     public setUrlResolver(resolver: (item: MediaItem) => Promise<string>): void {
         this.urlResolver = resolver;
+    }
+
+    public isWaitingForUnmute(): boolean {
+        return this.isWaitingForInteractionUnmute;
+    }
+
+    public notifyUserInteraction(): void {
+        this.userHasInteracted = true;
+        if (this.isWaitingForInteractionUnmute) {
+            this.isWaitingForInteractionUnmute = false;
+            this.fadeInVolume(this.volume, 400);
+        }
     }
 
     public async playMediaItem(item: MediaItem, mediaUrl?: string): Promise<void> {
@@ -42,7 +56,13 @@ export class AudioEngine {
         const url = this.urlResolver ? await this.urlResolver(item) : item.url;
         this.audioElement.src = url;
         this.audioElement.loop = this.playbackMode === 'single';
-        this.applyVolume();
+
+        if (!this.userHasInteracted && !this.muted) {
+            this.isWaitingForInteractionUnmute = true;
+            this.audioElement.muted = true;
+        } else {
+            this.applyVolume();
+        }
 
         try {
             await this.audioElement.play();
@@ -67,6 +87,21 @@ export class AudioEngine {
         this.audioElement.addEventListener('pause', () => {
             this.onPlayStateChange?.(false);
         });
+
+        this.setupInteractionListener();
+    }
+
+    private setupInteractionListener(): void {
+        const onInteract = () => {
+            this.notifyUserInteraction();
+            window.removeEventListener('pointerdown', onInteract);
+            window.removeEventListener('keydown', onInteract);
+            window.removeEventListener('touchstart', onInteract);
+        };
+
+        window.addEventListener('pointerdown', onInteract, { passive: true, once: true });
+        window.addEventListener('keydown', onInteract, { passive: true, once: true });
+        window.addEventListener('touchstart', onInteract, { passive: true, once: true });
     }
 
     public setVolume(volume: number): void {
@@ -185,13 +220,55 @@ export class AudioEngine {
         this.clearFade();
         this.audioElement.src = url;
         this.audioElement.loop = loop;
-        this.applyVolume();
+
+        if (!this.userHasInteracted && !this.muted) {
+            this.isWaitingForInteractionUnmute = true;
+            this.audioElement.muted = true;
+        } else {
+            this.applyVolume();
+        }
 
         try {
             await this.audioElement.play();
         } catch (err) {
             console.warn('[ST-BgLoader AudioEngine] Autoplay was prevented by browser policy:', err);
         }
+    }
+
+    public fadeInVolume(targetVolume: number, durationMs: number = 400): void {
+        this.clearFade();
+        const startTime = performance.now();
+        const target = Math.max(0, Math.min(1, targetVolume));
+
+        if (this.audioElement) {
+            this.audioElement.muted = false;
+            this.audioElement.volume = 0;
+        }
+        if (this.attachedVideo) {
+            this.attachedVideo.muted = false;
+            this.attachedVideo.volume = 0;
+        }
+
+        const step = () => {
+            const elapsed = performance.now() - startTime;
+            const progress = Math.min(1, elapsed / durationMs);
+            const currentVol = target * progress;
+
+            if (this.audioElement) {
+                this.audioElement.volume = currentVol;
+            }
+            if (this.attachedVideo) {
+                this.attachedVideo.volume = currentVol;
+            }
+
+            if (progress < 1) {
+                this.fadeTimer = requestAnimationFrame(step);
+            } else {
+                this.applyVolume();
+            }
+        };
+
+        this.fadeTimer = requestAnimationFrame(step);
     }
 
     public stopTrack(fadeOutMs: number = 300): void {
