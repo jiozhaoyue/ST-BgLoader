@@ -6,8 +6,27 @@
   "scripts": {
     "build": "vite build",
     "dev": "vite build --watch",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "test:e2e": "node tests/e2e.mjs",
+    "test:stress": "node tests/stress.mjs"
   },
+  "author": "jiozhaoyue",
+  "license": "MIT",
+  "homepage": "https://github.com/jiozhaoyue/ST-BgLoader#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jiozhaoyue/ST-BgLoader.git"
+  },
+  "keywords": [
+    "sillytavern",
+    "sillytavern-extension",
+    "backgrounds",
+    "rich-media",
+    "video-background",
+    "audio-visualizer",
+    "ambient-sound",
+    "weather-fx"
+  ],
   "devDependencies": {
     "puppeteer-core": "^25.10.0",
     "typescript": "^5.4.0",

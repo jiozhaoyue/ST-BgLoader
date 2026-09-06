@@ -1,7 +1,14 @@
 import puppeteer from 'puppeteer-core';
 
-const CHROME_PATH = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
-const TARGET_URL = 'https://dev.localho.st:8003';
+const CHROME_PATH = process.env.PUPPETEER_EXECUTABLE_PATH
+    || process.env.CHROME_PATH
+    || (process.platform === 'win32'
+        ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
+        : '/usr/bin/google-chrome');
+
+const TARGET_URL = process.env.TEST_TARGET_URL
+    || process.env.TARGET_URL
+    || 'http://localhost:8000';
 
 async function runStressTests() {
     console.log('⚡ Starting Large File Streaming & Resilience Stress Tests on', TARGET_URL);
@@ -106,11 +113,11 @@ async function runStressTests() {
             const api = window.stBgLoader;
 
             const items = [
-                { type: 'image', url: 'https://dev.localho.st/sample1.png' },
-                { type: 'html', url: 'https://dev.localho.st/sample-canvas.html' },
-                { type: 'video', url: 'https://dev.localho.st/sample-video.mp4' },
-                { type: 'audio', url: 'https://dev.localho.st/sample-bgm.mp3' },
-                { type: 'svg', url: 'https://dev.localho.st/vector.svg' },
+                { type: 'image', url: 'https://assets.example.com/sample1.png' },
+                { type: 'html', url: 'https://assets.example.com/sample-canvas.html' },
+                { type: 'video', url: 'https://assets.example.com/sample-video.mp4' },
+                { type: 'audio', url: 'https://assets.example.com/sample-bgm.mp3' },
+                { type: 'svg', url: 'https://assets.example.com/vector.svg' },
             ];
 
             // Rapid fire 10 mounts with 20ms delay (much faster than 450ms crossfade)
@@ -168,7 +175,7 @@ async function runStressTests() {
             }
 
             // 2. Non-existent 404 URL preload
-            const preload404 = await ext.publicApi.preloadMedia('https://dev.localho.st:8003/non-existent-file-404.mp4');
+            const preload404 = await ext.publicApi.preloadMedia('https://assets.example.com/non-existent-file-404.mp4');
             const handled404 = preload404.length === 1 && preload404[0].success === false;
 
             // Clean up empty item

@@ -28,7 +28,7 @@
   - `src/index.ts`: SillyTavern extension entry point with eventSource hooks and localStorage persistence.
   - `dist/`: Successfully compiled production bundle with Vite (index.js 34.7KB, style.css 3.0KB).
 - **Automated Verification**:
-  - Attached to live local instance `https://dev.localho.st:8003` via junction links.
+  - Attached to live local test environment via junction links.
   - Implemented Puppeteer headless E2E suite (`tests/e2e.mjs`).
   - Executed 6 automated browser test cases against live SillyTavern runtime:
     1. Extension activation & `window.STBgLoader` availability: PASS
@@ -203,7 +203,7 @@ Conducted large file streaming and edge case resilience stress testing against l
 
 ### Next Steps
 
-- Keep local private git repository secure and report completion to user
+- Keep git repository clean and report completion to user
 
 
 ## Session 6: Full-Power Modular Expansion and Project Wiki

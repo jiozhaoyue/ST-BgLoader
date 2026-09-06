@@ -1,7 +1,14 @@
 import puppeteer from 'puppeteer-core';
 
-const CHROME_PATH = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
-const TARGET_URL = 'https://dev.localho.st:8003';
+const CHROME_PATH = process.env.PUPPETEER_EXECUTABLE_PATH
+    || process.env.CHROME_PATH
+    || (process.platform === 'win32'
+        ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
+        : '/usr/bin/google-chrome');
+
+const TARGET_URL = process.env.TEST_TARGET_URL
+    || process.env.TARGET_URL
+    || 'http://localhost:8000';
 
 async function runE2ETests() {
     console.log('🚀 Starting Automated E2E Test on', TARGET_URL);
@@ -327,7 +334,7 @@ async function runE2ETests() {
             // Call API setBackground
             let bgChanged = false;
             api.on('media-change', () => { bgChanged = true; });
-            await api.setBackground('https://dev.localho.st/sample.mp4', {
+            await api.setBackground('https://assets.example.com/sample.mp4', {
                 filters: { blur: 2, saturate: 140 },
                 interactive: true,
             });
