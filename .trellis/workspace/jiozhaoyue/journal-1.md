@@ -244,3 +244,24 @@ Added procedural WebAudio ambient soundscape synthesizer, frosted glass transpar
 ### Status
 
 [OK] **Completed**
+
+
+## Session 8: Authority 后端能力集成研究（可行性 + PRD）
+<!-- trellis-session: v=2 fp=authority-research-20260913 -->
+
+**Date**: 2026-09-13
+**Task**: 09-13-authority-integration
+**Branch**: `master`
+
+### Summary
+
+深度研究 Youzini-afk/ST-Delegation-of-authority（服务端能力与权限治理插件）：通过 GitHub API + 官方 example-extension 源码与 docs/server 文档，确认第三方前端扩展接入面（AuthoritySDK.init + declaredPermissions + storage.kv/blob + http.fetch + jobs + events.subscribe + agent.browser）。结论：可以结合，且互补性强——ST-BgLoader 纯前端的存储墙（浏览器配额/单浏览器/无 CORS/无 Agent 通道）恰好被 Authority 的 blob/kv/sse/http.fetch/agent.browser 补齐。已产出 PRD，列出 8 项纯前端做不到的能力与 P0-P2 分期路线（云媒体库 L1/L2 分层缓存 → 设置与场景云同步 → 定时氛围任务 + Agent 氛围工具），全程无 Authority 时优雅降级。
+
+### Research Artifacts
+
+- .trellis/tasks/09-13-authority-integration/prd.md（需求 + 验收标准 + 非目标）
+- .trellis/tasks/09-13-authority-integration/research/（authority-capabilities.md、authority-agent-platform.md、authority-example-index.ts、authority-ai-integration.md）
+
+### Status
+
+[OK] PRD 完成，待用户确认实施范围后进入 design.md / 实现阶段
