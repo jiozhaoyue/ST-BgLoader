@@ -13,6 +13,10 @@ export class SceneManager {
         this.onApplySceneCallback = cb;
     }
 
+    public setUserScenes(scenes: Record<string, SceneSnapshot>): void {
+        this.userScenes = { ...scenes };
+    }
+
     public getAllScenes(): Record<string, SceneSnapshot> {
         return {
             ...BUILTIN_SCENES,

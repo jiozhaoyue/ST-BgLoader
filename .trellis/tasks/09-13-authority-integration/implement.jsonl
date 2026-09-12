@@ -1,0 +1,5 @@
+{"file": ".trellis/tasks/09-13-authority-integration/prd.md", "reason": "需求、验收标准、降级策略（用户已确认存储倒置重构）"}
+{"file": ".trellis/tasks/09-13-authority-integration/design.md", "reason": "存储倒置架构、MediaOrigin 接口契约、SQL schema、L1/L2 语义、分阶段计划"}
+{"file": ".trellis/tasks/09-13-authority-integration/research/sdk/client.ts", "reason": "Authority SDK AuthorityClient 精确 API 签名（blob.put 分块传输/kv/sql/agent.browser/events/jobs）"}
+{"file": ".trellis/tasks/09-13-authority-integration/research/authority-capabilities.md", "reason": "权限资源、判定链、数据隔离与常见误区"}
+{"file": ".trellis/tasks/09-13-authority-integration/research/authority-agent-platform.md", "reason": "Agent 浏览器工具注册/认领/回传协议"}

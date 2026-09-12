@@ -1,57 +1,82 @@
 import { MediaItem, MediaType, MediaSource } from '../types';
+import { AuthorityBridge } from '../backend/AuthorityBridge';
+import { AuthorityOrigin } from '../backend/AuthorityOrigin';
+import { LocalOrigin, guessMimeType } from '../backend/LocalOrigin';
+import { MediaOrigin, MediaPutInput } from '../backend/MediaOrigin';
+import { RemoteImporter } from '../backend/RemoteImporter';
 
-const DB_NAME = 'st_bg_loader_db';
-const DB_VERSION = 1;
-const STORE_MEDIA = 'media_items';
-const CACHE_NAME = 'st-bg-cache-v1';
-
+/**
+ * Media library facade. Public API is unchanged from the pre-refactor manager; call sites
+ * (index.ts, SettingsDrawer, PublicAPI, SceneManager, AudioEngine) keep working as-is.
+ *
+ * Storage inversion: the selected MediaOrigin is the source of truth (Authority server when
+ * available, otherwise the browser). In authority mode CacheStorage acts only as an evictable
+ * hot cache (L1): writes go through to the origin first, cache misses are pulled back from the
+ * origin, and LRU eviction never touches server data.
+ */
 export class CacheManager {
-    private db: IDBDatabase | null = null;
-    private cache: Cache | null = null;
+    private origin: MediaOrigin;
+    private localOrigin: LocalOrigin;
+    private authorityOrigin: AuthorityOrigin | null = null;
+    private bridge: AuthorityBridge | null = null;
+    private remoteImporter: RemoteImporter | null = null;
+    private l1: Cache | null = null;
     private objectUrls: Map<string, string> = new Map();
 
-    public async init(): Promise<void> {
-        // Initialize CacheStorage
+    constructor() {
+        this.localOrigin = new LocalOrigin();
+        this.origin = this.localOrigin;
+    }
+
+    public async init(bridge?: AuthorityBridge): Promise<void> {
         if ('caches' in window) {
-            this.cache = await caches.open(CACHE_NAME);
+            this.l1 = await caches.open('st-bg-cache-v1');
         }
 
-        // Initialize IndexedDB
-        this.db = await new Promise<IDBDatabase>((resolve, reject) => {
-            const request = indexedDB.open(DB_NAME, DB_VERSION);
-            request.onupgradeneeded = (event) => {
-                const db = (event.target as IDBOpenDBRequest).result;
-                if (!db.objectStoreNames.contains(STORE_MEDIA)) {
-                    const store = db.createObjectStore(STORE_MEDIA, { keyPath: 'id' });
-                    store.createIndex('type', 'type', { unique: false });
-                    store.createIndex('lastUsedTimestamp', 'lastUsedTimestamp', { unique: false });
+        if (bridge) {
+            this.bridge = bridge;
+            const caps = await bridge.detectAndInit();
+            const client = bridge.getClient();
+            if (caps.available && client) {
+                this.authorityOrigin = new AuthorityOrigin(client);
+                try {
+                    await this.authorityOrigin.init();
+                    this.origin = this.authorityOrigin;
+                    this.remoteImporter = new RemoteImporter(bridge);
+                    console.log('[ST-BgLoader] Media library source of truth: Authority backend (cloud).');
+                } catch (err) {
+                    this.authorityOrigin = null;
+                    console.warn('[ST-BgLoader] Cloud catalog unavailable, using local source of truth:', err);
                 }
-            };
-            request.onsuccess = () => resolve(request.result);
-            request.onerror = () => reject(request.error);
-        });
+            }
+        }
+
+        if (this.origin === this.localOrigin) {
+            console.log('[ST-BgLoader] Media library source of truth: this browser (local mode).');
+        }
+        await this.origin.init();
+    }
+
+    public isCloudBacked(): boolean {
+        return this.origin.kind === 'authority';
+    }
+
+    /** Exposed for the one-time local->cloud migration and diagnostics. */
+    public getLocalOrigin(): LocalOrigin {
+        return this.localOrigin;
+    }
+
+    /** Null when the Authority backend is unavailable. */
+    public getAuthorityOrigin(): AuthorityOrigin | null {
+        return this.authorityOrigin;
     }
 
     public async listMedia(): Promise<MediaItem[]> {
-        if (!this.db) await this.init();
-        return new Promise<MediaItem[]>((resolve, reject) => {
-            const tx = this.db!.transaction(STORE_MEDIA, 'readonly');
-            const store = tx.objectStore(STORE_MEDIA);
-            const request = store.getAll();
-            request.onsuccess = () => resolve(request.result || []);
-            request.onerror = () => reject(request.error);
-        });
+        return this.origin.listCatalog();
     }
 
     public async getMedia(id: string): Promise<MediaItem | null> {
-        if (!this.db) await this.init();
-        return new Promise<MediaItem | null>((resolve, reject) => {
-            const tx = this.db!.transaction(STORE_MEDIA, 'readonly');
-            const store = tx.objectStore(STORE_MEDIA);
-            const request = store.get(id);
-            request.onsuccess = () => resolve(request.result || null);
-            request.onerror = () => reject(request.error);
-        });
+        return this.origin.getCatalogItem(id);
     }
 
     public async saveMedia(
@@ -61,126 +86,75 @@ export class CacheManager {
         source: MediaSource,
         remoteUrl?: string
     ): Promise<MediaItem> {
-        if (!this.db || !this.cache) await this.init();
+        const blob = typeof content === 'string'
+            ? new Blob([content], { type: type === 'svg' ? 'image/svg+xml' : 'text/html' })
+            : content;
 
-        const id = 'bg_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
-        const cacheKey = `/st-bg-cache/${id}/${encodeURIComponent(name)}`;
+        const input: MediaPutInput = { blob, name, type, source, remoteUrl };
+        const item = await this.origin.putMedia(input);
 
-        let blob: Blob;
-        let mimeType = '';
-        let size = 0;
-
-        if (typeof content === 'string') {
-            // HTML or SVG text string
-            mimeType = type === 'svg' ? 'image/svg+xml' : 'text/html';
-            blob = new Blob([content], { type: mimeType });
-            size = blob.size;
-        } else {
-            blob = content;
-            mimeType = content.type || this.guessMimeType(name, type);
-            size = content.size;
+        // Backfill the hot cache so first playback is instant (empty URL stubs have no binary).
+        if (this.origin.kind === 'authority' && this.l1 && blob.size > 0) {
+            await this.l1.put(item.cacheKey, new Response(blob, {
+                headers: { 'Content-Type': item.mimeType },
+            }));
         }
-
-        // Put into CacheStorage
-        const headers = new Headers({
-            'Content-Type': mimeType,
-            'Content-Length': size.toString(),
-        });
-        const response = new Response(blob, { headers });
-        await this.cache!.put(cacheKey, response);
-
-        const item: MediaItem = {
-            id,
-            name,
-            type,
-            source,
-            url: remoteUrl || cacheKey,
-            cacheKey,
-            size,
-            mimeType,
-            addedTimestamp: Date.now(),
-            lastUsedTimestamp: Date.now(),
-            hasAudio: type === 'video' || type === 'audio',
-        };
-
-        // Put into IndexedDB
-        await new Promise<void>((resolve, reject) => {
-            const tx = this.db!.transaction(STORE_MEDIA, 'readwrite');
-            const store = tx.objectStore(STORE_MEDIA);
-            const request = store.put(item);
-            request.onsuccess = () => resolve();
-            request.onerror = () => reject(request.error);
-        });
-
         return item;
     }
 
     public async getMediaBlobUrl(item: MediaItem): Promise<string> {
-        if (this.objectUrls.has(item.id)) {
-            // Update last used timestamp
-            this.touchMedia(item.id);
-            return this.objectUrls.get(item.id)!;
+        const existingUrl = this.objectUrls.get(item.id);
+        if (existingUrl) {
+            void this.touchMedia(item.id);
+            return existingUrl;
         }
 
-        if (!this.cache) await this.init();
+        let blob: Blob | null = null;
 
-        let response = await this.cache!.match(item.cacheKey);
-        if (!response && item.source === 'url' && item.url) {
-            // Fetch remote URL and cache it
-            try {
-                const fetched = await fetch(item.url);
-                if (fetched.ok) {
-                    const clone = fetched.clone();
-                    await this.cache!.put(item.cacheKey, clone);
-                    response = fetched;
-                }
-            } catch (err) {
-                console.warn('[ST-BgLoader] Failed to fetch and cache remote URL:', item.url, err);
+        // L1 hot cache (authority mode only; in local mode L1 is the origin itself).
+        if (this.origin.kind === 'authority' && this.l1) {
+            const hit = await this.l1.match(item.cacheKey);
+            if (hit) {
+                blob = await hit.blob();
             }
         }
 
-        if (response) {
-            const blob = await response.blob();
+        if (!blob) {
+            blob = await this.origin.readMedia(item);
+            if (blob && this.origin.kind === 'authority' && this.l1) {
+                await this.l1.put(item.cacheKey, new Response(blob, {
+                    headers: { 'Content-Type': blob.type || item.mimeType },
+                }));
+            }
+        }
+
+        if (blob) {
             const blobUrl = URL.createObjectURL(blob);
             this.objectUrls.set(item.id, blobUrl);
-            this.touchMedia(item.id);
+            void this.touchMedia(item.id);
             return blobUrl;
         }
 
-        // Fallback to original URL
+        // Not stored in the catalog (e.g. native background virtual items): use the original URL.
         return item.url;
     }
 
     public async touchMedia(id: string): Promise<void> {
-        if (!this.db) return;
-        const item = await this.getMedia(id);
-        if (item) {
-            item.lastUsedTimestamp = Date.now();
-            const tx = this.db.transaction(STORE_MEDIA, 'readwrite');
-            tx.objectStore(STORE_MEDIA).put(item);
-        }
+        await this.origin.touchMedia(id, Date.now());
     }
 
     public async deleteMedia(id: string): Promise<void> {
-        if (!this.db || !this.cache) await this.init();
-
         const item = await this.getMedia(id);
+        await this.origin.deleteMedia(id);
+
         if (item) {
-            // Delete from CacheStorage
-            await this.cache!.delete(item.cacheKey);
-            // Revoke Blob URL
             if (this.objectUrls.has(id)) {
                 URL.revokeObjectURL(this.objectUrls.get(id)!);
                 this.objectUrls.delete(id);
             }
-            // Delete from IndexedDB
-            await new Promise<void>((resolve, reject) => {
-                const tx = this.db!.transaction(STORE_MEDIA, 'readwrite');
-                const store = tx.objectStore(STORE_MEDIA);
-                const request = store.delete(id);
-                request.onsuccess = () => resolve();
-                request.onerror = () => reject(request.error);
-            });
+            if (this.origin.kind === 'authority' && this.l1) {
+                await this.l1.delete(item.cacheKey);
+            }
         }
     }
 
@@ -198,47 +172,57 @@ export class CacheManager {
         let totalBytes = items.reduce((sum, item) => sum + (item.size || 0), 0);
         if (totalBytes <= maxQuotaBytes) return;
 
-        // Sort oldest used first
         items.sort((a, b) => a.lastUsedTimestamp - b.lastUsedTimestamp);
 
         for (const item of items) {
             if (totalBytes <= maxQuotaBytes) break;
-            console.log('[ST-BgLoader] LRU evicting:', item.name, item.size);
+
+            if (this.origin.kind === 'authority') {
+                // Cloud mode: evict only the local hot cache; the server copy is never deleted.
+                if (this.l1) {
+                    await this.l1.delete(item.cacheKey);
+                }
+                if (this.objectUrls.has(item.id)) {
+                    URL.revokeObjectURL(this.objectUrls.get(item.id)!);
+                    this.objectUrls.delete(item.id);
+                }
+            } else {
+                await this.origin.deleteMedia(item.id);
+            }
             totalBytes -= item.size || 0;
-            await this.deleteMedia(item.id);
         }
     }
 
     public async clearAll(): Promise<void> {
-        if (!this.db || !this.cache) await this.init();
-
-        // Revoke all Blob URLs
+        // Revoke all Blob URLs first.
         for (const url of this.objectUrls.values()) {
             URL.revokeObjectURL(url);
         }
         this.objectUrls.clear();
 
-        // Clear CacheStorage
-        if ('caches' in window) {
-            await caches.delete(CACHE_NAME);
-            this.cache = await caches.open(CACHE_NAME);
+        if (this.origin.kind === 'authority') {
+            // Cloud mode: clear catalog + binaries on the server and the local hot cache.
+            const items = await this.listMedia();
+            for (const item of items) {
+                await this.origin.deleteMedia(item.id);
+            }
+            if (this.l1 && 'caches' in window) {
+                await caches.delete('st-bg-cache-v1');
+                this.l1 = await caches.open('st-bg-cache-v1');
+            }
+            return;
         }
 
-        // Clear IndexedDB
-        await new Promise<void>((resolve, reject) => {
-            const tx = this.db!.transaction(STORE_MEDIA, 'readwrite');
-            const store = tx.objectStore(STORE_MEDIA);
-            const request = store.clear();
-            request.onsuccess = () => resolve();
-            request.onerror = () => reject(request.error);
-        });
+        // Local mode: pre-refactor behavior — wipe the browser-resident library.
+        if (this.l1 && 'caches' in window) {
+            await caches.delete('st-bg-cache-v1');
+            this.l1 = await caches.open('st-bg-cache-v1');
+        }
+        await this.localOrigin.clearCatalog();
     }
 
     public async preloadUrl(url: string, type?: MediaType): Promise<{ item: MediaItem; isNew: boolean }> {
-        if (!this.db || !this.cache) await this.init();
-
-        const all = await this.listMedia();
-        const existing = all.find(i => i.url === url || i.cacheKey === url);
+        const existing = await this.origin.findByUrl(url);
         if (existing) {
             await this.touchMedia(existing.id);
             return { item: existing, isNew: false };
@@ -247,13 +231,29 @@ export class CacheManager {
         const filename = url.split('/').pop()?.split('?')[0] || 'preloaded_media';
         const detectedType = type || this.detectMediaType(filename);
 
-        const response = await fetch(url);
-        if (!response.ok) {
-            throw new Error(`Failed to fetch media from ${url}: ${response.status} ${response.statusText}`);
+        let blob: Blob | null = null;
+        try {
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error(`Failed to fetch media from ${url}: ${response.status} ${response.statusText}`);
+            }
+            blob = await response.blob();
+        } catch (err) {
+            // Direct fetch failed (CORS/network): fall back to a server-side import when available.
+            if (this.remoteImporter) {
+                console.warn('[ST-BgLoader] Direct fetch failed, importing through the Authority server:', err);
+                blob = await this.remoteImporter.import(url);
+            } else {
+                throw err;
+            }
         }
 
-        const blob = await response.blob();
-        const item = await this.saveMedia(blob, filename, detectedType, 'url', url);
+        const item = await this.origin.putMedia({ blob, name: filename, type: detectedType, source: 'url', remoteUrl: url });
+        if (this.origin.kind === 'authority' && this.l1 && blob.size > 0) {
+            await this.l1.put(item.cacheKey, new Response(blob, {
+                headers: { 'Content-Type': item.mimeType },
+            }));
+        }
         return { item, isNew: true };
     }
 
@@ -266,28 +266,7 @@ export class CacheManager {
         return 'image';
     }
 
-    private guessMimeType(name: string, type: MediaType): string {
-        const ext = name.split('.').pop()?.toLowerCase();
-        switch (ext) {
-            case 'mp4': return 'video/mp4';
-            case 'webm': return 'video/webm';
-            case 'mp3': return 'audio/mpeg';
-            case 'wav': return 'audio/wav';
-            case 'ogg': return 'audio/ogg';
-            case 'flac': return 'audio/flac';
-            case 'svg': return 'image/svg+xml';
-            case 'html': return 'text/html';
-            case 'png': return 'image/png';
-            case 'jpg':
-            case 'jpeg': return 'image/jpeg';
-            case 'webp': return 'image/webp';
-            case 'gif': return 'image/gif';
-            default:
-                if (type === 'video') return 'video/mp4';
-                if (type === 'audio') return 'audio/mpeg';
-                if (type === 'svg') return 'image/svg+xml';
-                if (type === 'html') return 'text/html';
-                return 'image/png';
-        }
+    public getMimeType(name: string, type: MediaType): string {
+        return guessMimeType(name, type);
     }
 }

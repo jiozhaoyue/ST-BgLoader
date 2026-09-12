@@ -265,3 +265,24 @@ Added procedural WebAudio ambient soundscape synthesizer, frosted glass transpar
 ### Status
 
 [OK] PRD 完成，待用户确认实施范围后进入 design.md / 实现阶段
+
+## Session 9: 存储倒置重构实现（Authority 为媒体库源端）
+<!-- trellis-session: v=2 fp=authority-refactor-impl-20260913 -->
+
+**Date**: 2026-09-13
+**Task**: 09-13-authority-integration
+**Branch**: `master`
+
+### Summary
+
+用户确认：媒体本就应以后端存储为源端，浏览器优先架构是错的 → 执行存储倒置重构。新增 `src/backend/`：MediaOrigin 源端抽象、LocalOrigin（原 CacheStorage+IndexedDB 逻辑下沉）、AuthorityBridge（SDK 检测/init/能力位/一次性降级提示）、AuthorityOrigin（storage.blob 二进制源端 + sql.private 目录源端，migrate 建表、大文件走 SDK 分块传输）、SettingsSync（KV 镜像 revision+fingerprint 防回环 + 轮询收敛）、RemoteImporter（CORS 失败回退 http.fetch + hostname 增量声明）、LocalToCloudMigrator（一次性幂等迁移，保留 id 使场景/聊天绑定不断）。CacheManager 重构为库门面：公共 API 零改动，云模式写穿源端→回填 L1 热缓存、L1 未命中自动拉取、LRU 仅逐 L1 源端永不驱逐；顺带修复 URL 占位条目命中空缓存的隐患。index.ts 接线迁移与设置同步；SettingsDrawer.applyRemoteSettings / SceneManager.setUserScenes 支持远端应用。tsc + vite build 全绿（146.5KB）。
+
+### Verification
+
+- [OK] `npm run type-check` 通过
+- [OK] `npm run build` 通过
+- [PENDING] 24 项 E2E 回归：需测试实例运行后 `npm run test:e2e`（实例环境由用户启动，遵守实例隔离规范）
+
+### Status
+
+[OK] 实现完成已推送，E2E 回归待测试实例可用后执行

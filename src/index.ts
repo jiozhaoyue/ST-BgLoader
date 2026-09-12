@@ -15,6 +15,9 @@ import { AmbientSoundGenerator } from './audio/AmbientSoundGenerator';
 import { FrostedGlassController } from './ui/FrostedGlassController';
 import { SceneManager } from './core/SceneManager';
 import { ShortcutManager } from './core/ShortcutManager';
+import { AuthorityBridge } from './backend/AuthorityBridge';
+import { SettingsSync } from './backend/SettingsSync';
+import { LocalToCloudMigrator } from './backend/Migration';
 
 const SETTINGS_KEY = 'st_bgloader_settings';
 
@@ -35,6 +38,8 @@ export class STBgLoaderExtension {
     private frostedGlassController: FrostedGlassController;
     private sceneManager: SceneManager;
     private shortcutManager: ShortcutManager;
+    private authorityBridge: AuthorityBridge = new AuthorityBridge();
+    private settingsSync: SettingsSync | null = null;
     public publicApi: PublicAPI;
 
     constructor() {
@@ -65,6 +70,7 @@ export class STBgLoaderExtension {
     public getFrostedGlassController(): FrostedGlassController { return this.frostedGlassController; }
     public getSceneManager(): SceneManager { return this.sceneManager; }
     public getShortcutManager(): ShortcutManager { return this.shortcutManager; }
+    public getAuthorityBridge(): AuthorityBridge { return this.authorityBridge; }
     public getAPI(): PublicAPI { return this.publicApi; }
 
     public clearActiveBackground(): void {
@@ -86,8 +92,11 @@ export class STBgLoaderExtension {
         // 1. Load persisted settings
         this.loadSettings();
 
-        // 2. Initialize Cache & Mount
-        await this.cacheManager.init();
+        // 2. Initialize storage (Authority cloud source of truth when available, browser otherwise)
+        await this.cacheManager.init(this.authorityBridge);
+        if (this.cacheManager.isCloudBacked()) {
+            this.startCloudMigration();
+        }
         this.mediaMount.init();
         this.mediaMount.applyFilters(this.settings.filters);
         this.mediaMount.setInteractive(this.settings.interactiveBackground);
@@ -229,12 +238,7 @@ export class STBgLoaderExtension {
             onSettingsChanged: (updated) => {
                 this.settings = updated;
                 this.saveSettings();
-                this.mediaMount.applyFilters(this.settings.filters);
-                this.audioEngine.setVolume(this.settings.volume);
-                this.audioEngine.setMuted(this.settings.muted);
-                this.ambientSoundGenerator.setSound(this.settings.ambientSound);
-                this.frostedGlassController.setOptions(this.settings.frostedChat);
-                this.shortcutManager.setEnabled(this.settings.shortcutsEnabled);
+                this.applySettingsToSubsystems();
             },
             onPresetChanged: (preset) => {
                 this.mediaMount.applyFilters(preset.filters);
@@ -323,6 +327,9 @@ export class STBgLoaderExtension {
             this.audioEngine.handleVisibilityChange(document.hidden, this.settings.pauseOnBlur);
         });
 
+        // 11.5 Cross-device settings sync (Authority cloud mirror; no-op in local mode)
+        await this.startSettingsSync();
+
         // 12. Hook into SillyTavern EventSource
         this.hookSillyTavernEvents();
 
@@ -349,6 +356,55 @@ export class STBgLoaderExtension {
             this.settingsDrawer.refreshMediaGrid();
             this.settingsDrawer.updateCacheStats();
         }
+    }
+
+    private applySettingsToSubsystems(): void {
+        this.mediaMount.applyFilters(this.settings.filters);
+        this.mediaMount.setInteractive(this.settings.interactiveBackground);
+        this.mediaMount.setTransition(this.settings.transitionEffect, this.settings.transitionDurationMs);
+        this.audioEngine.setVolume(this.settings.volume);
+        this.audioEngine.setMuted(this.settings.muted);
+        this.audioEngine.setMuffled(this.settings.muffleBGM);
+        this.audioEngine.setPlaybackMode(this.settings.playbackMode);
+        this.atmosphereFX.setWeather(this.settings.weather);
+        this.audioVisualizer.setOptions(this.settings.visualizer);
+        this.parallaxController.setOptions(this.settings.parallax);
+        this.ambientSoundGenerator.setSound(this.settings.ambientSound);
+        this.frostedGlassController.setOptions(this.settings.frostedChat);
+        this.shortcutManager.setEnabled(this.settings.shortcutsEnabled);
+        this.triggerManager.setRules(this.settings.triggerRules || []);
+        this.sceneManager.setUserScenes(this.settings.scenes || {});
+    }
+
+    private startCloudMigration(): void {
+        const localOrigin = this.cacheManager.getLocalOrigin();
+        const cloudOrigin = this.cacheManager.getAuthorityOrigin();
+        const client = this.authorityBridge.getClient();
+        if (!localOrigin || !cloudOrigin || !client) return;
+
+        void new LocalToCloudMigrator(localOrigin, cloudOrigin, client).runIfNeeded((progress) => {
+            console.log(`[ST-BgLoader] Cloud migration: ${progress.done}/${progress.total} (${progress.current})`);
+            if (progress.done === 1 && progress.total > 0) {
+                const toastr = (window as unknown as { toastr?: { info(msg: string, title?: string): void } }).toastr;
+                toastr?.info(`开始迁移本地媒体库到云端（${progress.total} 项）...`, 'ST-BgLoader');
+            }
+        });
+    }
+
+    private async startSettingsSync(): Promise<void> {
+        const client = this.authorityBridge.getClient();
+        if (!client) return;
+
+        this.settingsSync = new SettingsSync(client, (remoteSettings) => {
+            this.settings = remoteSettings;
+            try {
+                localStorage.setItem(SETTINGS_KEY, JSON.stringify(this.settings));
+            } catch { /* quota errors keep the cloud copy authoritative */ }
+            this.applySettingsToSubsystems();
+            this.settingsDrawer?.applyRemoteSettings(this.settings);
+            this.publicApi.emit('settings-sync', this.settings);
+        });
+        await this.settingsSync.start();
     }
 
     private hookSillyTavernEvents(): void {
@@ -396,6 +452,7 @@ export class STBgLoaderExtension {
         } catch (e) {
             console.error('[ST-BgLoader] Failed to save settings:', e);
         }
+        this.settingsSync?.schedulePush(this.settings);
     }
 }
 

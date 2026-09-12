@@ -47,29 +47,38 @@ Agent 浏览器工具注册模型见 `research/authority-agent-platform.md`。
 
 ## Requirements
 
-### R1 AuthorityBridge 适配层（新增 `src/backend/AuthorityBridge.ts`）
-- 特征检测 `window.STAuthority?.AuthoritySDK`；不可用时 `available=false`，全部功能退回现状，零行为变化。
-- 暴露能力位：`cloudLibrary` / `sync` / `httpImport` / `agentTools`，UI 按能力位渲染。
+> **用户决策（2026-09-13）**：媒体本就应以后端存储为源端，现行"浏览器 CacheStorage 为唯一事实源"
+> 架构是错的。本任务按**存储倒置重构**执行：Authority 可用时后端即源端，浏览器降级为缓存；
+> Authority 缺席/权限被拒时静默降级为现状本地模式并提示一次。技术设计见 `design.md`。
 
-### R2 云端媒体库（P0，能力 #1+#3）
-- 上传/导入时双写：本地 CacheStorage（L1 热缓存）+ `storage.blob`（L2 源端），元数据进 `sql.private`。
-- 本地缺失时从 blob 拉取回填 L1（pull-through），LRU 只驱逐 L1，源端不丢。
-- `http.fetch` 服务端导入：URL → 服务端抓取 → blob 落盘，绕过 CORS。
+### R1 存储倒置核心（P0）
+- 新增 `MediaOrigin` 源端抽象：`AuthorityOrigin`（blob 二进制源端 + sql.private 目录源端）与
+  `LocalOrigin`（现 CacheStorage+IndexedDB 逻辑原样下沉）。
+- `CacheManager` 重构为库门面：**公共方法签名不变**（6 个调用点零改动）；
+  云模式写穿源端→回填 L1 热缓存；L1 未命中自动从源端拉取播放；
+  云模式 LRU 仅逐 L1，**源端永不驱逐**。
 
-### R3 设置与场景云同步（P1，能力 #2+#4）
-- 设置/场景书签/播放列表本地先行写，后台推 KV；订阅自有 channel 收远端变更并应用（防回环：变更指纹比对）。
-- `sql.backup` 延迟任务周期备份元数据库。
+### R2 AuthorityBridge 连接层（P0）
+- 特征检测 `window.STAuthority?.AuthoritySDK` + `init` + 声明权限
+  （storage.kv/blob、sql.private、jobs、events）。
+- 永不 throw；能力位 `{available, cloudLibrary, sync, serverFetch, agentTools, degradedReason}`。
 
-### R4 定时氛围任务（P2，能力 #5）
-- UI 允许创建"定时切换场景"计划 → `jobs.create('delay', …)` → SSE 收 `authority.job` 完成事件 → 应用场景。
+### R3 一次性本地→云端迁移（P1）
+- 首次云连接且云目录为空、本地非空 → 后台逐条上传（幂等、进度提示、本地数据保留）。
 
-### R5 Agent 氛围工具（P2，能力 #6）
-- 经 `client.agent.browser.*` 注册只读级氛围工具集（set_background/set_scene/set_weather/play_bgm/apply_preset/set_filters），每个工具 JSON Schema 明确、幂等、无文件副作用。
-- 默认关闭，设置面板显式开关 + 说明；依赖 `agent.browser` 授权。
+### R4 设置/场景/播放列表云同步（P1）
+- 本地先行 + 防抖推 KV（revision+fingerprint 防回环）+ SSE 订阅应用远端变更，双端 ≤2s。
 
-### R6 降级与兼容（贯穿）
-- 无 Authority：一切照旧（现状 24 项 E2E 不回归）。
-- 权限被拒/服务端离线：云功能静默降级为本地模式并提示一次，不阻塞本地功能。
+### R5 服务端 CORS 导入回退（P2）
+- 直连 fetch 失败且 `http.fetch` 可用 → 服务端抓取入库（hostname 增量声明 + 内建授权提示）。
+
+### R6 Agent 氛围工具（P2，默认关闭）
+- `agent.browser.registerTools` 注册 `stbg_*` 幂等只读氛围工具集（背景/场景/天气/BGM/滤镜/预设），
+  claim 循环 + submitResult；设置面板显式开关。
+
+### R7 降级与兼容（贯穿，用户已确认策略）
+- 无 Authority / init 失败 / 权限被拒：静默降级本地模式 + **一次性** toastr 提示；本地功能零阻塞。
+- 现有 24 项 E2E 零回归（LocalOrigin 路径 = 现状行为）。
 
 ## Acceptance Criteria
 

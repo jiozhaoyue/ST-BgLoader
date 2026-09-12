@@ -50,6 +50,12 @@ export class SettingsDrawer {
         this.callbacks = callbacks;
     }
 
+    /** Replace the drawer's settings copy with a remotely synced one and re-render the panel. */
+    public applyRemoteSettings(next: BgLoaderSettings): void {
+        this.settings = next;
+        this.render();
+    }
+
     public render(): void {
         const target = document.querySelector('#extensions_settings');
         if (!target) {
