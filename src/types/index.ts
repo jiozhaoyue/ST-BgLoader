@@ -1,5 +1,5 @@
 export type MediaType = 'video' | 'audio' | 'html' | 'svg' | 'image';
-export type MediaSource = 'local' | 'url' | 'server';
+export type MediaSource = 'url' | 'server';
 export type PlaybackMode = 'loop' | 'single' | 'shuffle';
 
 export interface VisualFilters {

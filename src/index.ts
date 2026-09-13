@@ -95,8 +95,7 @@ export class STBgLoaderExtension {
         this.loadSettings();
 
         // 2. Initialize storage: the server backgrounds/ directory is the source of truth
-        //    (Authority is an optional enhancement); the browser keeps an evictable cache and
-        //    any legacy browser library is migrated to the server once.
+        //    (Authority is an optional enhancement); the browser keeps an evictable cache.
         await this.cacheManager.init(this.authorityBridge);
         this.mediaMount.init();
         this.mediaMount.applyFilters(this.settings.filters);

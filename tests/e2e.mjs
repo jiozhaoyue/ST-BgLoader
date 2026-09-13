@@ -102,7 +102,7 @@ async function runE2ETests() {
                 </body>
                 </html>
             `;
-            const item = await ext.cacheManager.saveMedia(sampleHtml, 'test-animation.html', 'html', 'local');
+            const item = await ext.cacheManager.saveMedia(sampleHtml, 'test-animation.html', 'html', 'server');
             await ext.applyMedia(item);
 
             // Wait for crossfade
@@ -229,7 +229,7 @@ async function runE2ETests() {
                 id: 'bg_track_1',
                 name: 'Ambient Track 1.mp3',
                 type: 'audio',
-                source: 'local',
+                source: 'server',
                 url: 'blob:fake-url-1',
                 cacheKey: '/fake/1',
                 size: 1024,
@@ -241,7 +241,7 @@ async function runE2ETests() {
                 id: 'bg_track_2',
                 name: 'Ambient Track 2.mp3',
                 type: 'audio',
-                source: 'local',
+                source: 'server',
                 url: 'blob:fake-url-2',
                 cacheKey: '/fake/2',
                 size: 2048,

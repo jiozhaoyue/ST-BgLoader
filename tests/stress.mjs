@@ -67,7 +67,7 @@ async function runStressTests() {
                 largeBlob,
                 'extreme-4k-bg-105mb.mp4',
                 'video',
-                'local'
+                'server'
             );
             const saveDurationMs = Math.round(performance.now() - startTime);
 
@@ -166,7 +166,7 @@ async function runStressTests() {
 
             // 1. Zero-byte blob
             const emptyBlob = new Blob([], { type: 'video/mp4' });
-            const emptyItem = await ext.cacheManager.saveMedia(emptyBlob, 'corrupted_zero_byte.mp4', 'video', 'local');
+            const emptyItem = await ext.cacheManager.saveMedia(emptyBlob, 'corrupted_zero_byte.mp4', 'video', 'server');
             let zeroByteHandled = true;
             try {
                 await ext.applyMedia(emptyItem);
@@ -212,7 +212,7 @@ async function runStressTests() {
 
             // Save and mount a test item
             const sampleBlob = new Blob(['sample-test-content'], { type: 'text/html' });
-            const item = await ext.cacheManager.saveMedia(sampleBlob, 'temp-revoke-test.html', 'html', 'local');
+            const item = await ext.cacheManager.saveMedia(sampleBlob, 'temp-revoke-test.html', 'html', 'server');
             const blobUrl = await ext.cacheManager.getMediaBlobUrl(item);
 
             // Delete item and verify revoke was invoked

@@ -1009,7 +1009,7 @@ export class SettingsDrawer {
 
     private async handleFileUpload(file: File): Promise<void> {
         const type = this.detectMediaType(file.name, file.type);
-        const item = await this.cacheManager.saveMedia(file, file.name, type, 'local');
+        const item = await this.cacheManager.saveMedia(file, file.name, type, 'server');
         await this.refreshMediaGrid();
         await this.updateCacheStats();
         this.callbacks.onMediaUploaded(item);

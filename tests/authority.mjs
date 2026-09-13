@@ -76,51 +76,9 @@ function injectAuthorityMock() {
     };
 }
 
-/** Seeds the LEGACY browser library (old IndexedDB schema) so migration has something to move. */
-function seedLegacyLibrary() {
-    const seed = async () => {
-        const db = await new Promise((resolve, reject) => {
-            const req = indexedDB.open('st_bg_loader_db', 1);
-            req.onupgradeneeded = (event) => {
-                const d = event.target.result;
-                if (!d.objectStoreNames.contains('media_items')) {
-                    const store = d.createObjectStore('media_items', { keyPath: 'id' });
-                    store.createIndex('type', 'type', { unique: false });
-                    store.createIndex('lastUsedTimestamp', 'lastUsedTimestamp', { unique: false });
-                }
-            };
-            req.onsuccess = () => resolve(req.result);
-            req.onerror = () => reject(req.error);
-        });
-        const item = {
-            id: 'bg_legacy_seed_1',
-            name: 'legacy-seed.html',
-            type: 'html',
-            source: 'local',
-            url: '/st-bg-cache/legacy/legacy-seed.html',
-            cacheKey: '/st-bg-cache/legacy/legacy-seed.html',
-            size: 4,
-            mimeType: 'text/html',
-            addedTimestamp: Date.now(),
-            lastUsedTimestamp: Date.now(),
-            hasAudio: false,
-        };
-        await new Promise((resolve, reject) => {
-            const tx = db.transaction('media_items', 'readwrite');
-            tx.objectStore('media_items').put(item);
-            tx.oncomplete = () => resolve();
-            tx.onerror = () => reject(tx.error);
-        });
-        const cache = await caches.open('st-bg-cache-v1');
-        await cache.put(item.cacheKey, new Response(new Blob(['seed'], { type: 'text/html' }), { headers: { 'Content-Type': 'text/html' } }));
-    };
-    void seed();
-}
-
-async function openPage(browser, { mock = false, seedLegacy = false } = {}) {
+async function openPage(browser, { mock = false } = {}) {
     const page = await browser.newPage();
     if (mock) await page.evaluateOnNewDocument(injectAuthorityMock);
-    if (seedLegacy) await page.evaluateOnNewDocument(seedLegacyLibrary);
     await page.goto(TARGET_URL, { waitUntil: 'domcontentloaded', timeout: 30000 });
     await page.waitForFunction(() => window.STBgLoader && window.STBgLoader.isInitialized, { timeout: 35000 });
     return page;
@@ -143,7 +101,7 @@ async function main() {
                 const ext = window.STBgLoader;
                 const item = await ext.cacheManager.saveMedia(
                     '<!DOCTYPE html><html><body style="background:#456">server-origin-test</body></html>',
-                    'stbg-origin-test.html', 'html', 'local');
+                    'stbg-origin-test.html', 'html', 'server');
                 return { id: item.id, url: item.url, name: item.name };
             });
             uploadedId = upload.id;
@@ -229,37 +187,11 @@ async function main() {
             await page.close();
         }
 
-        // ============ S5: legacy browser library migrates once, ids preserved ============
-        {
-            localStorage_flag_recovery: {
-                const page = await openPage(browser, { seedLegacy: true });
-                await page.evaluate(() => localStorage.removeItem('st_bgloader_legacy_migrated_v2'));
-                await page.evaluate(async () => {
-                    // Re-run the migration explicitly for determinism (init may have raced the seed).
-                    const ext = window.STBgLoader;
-                    await ext.cacheManager.migrateLegacyForTest?.();
-                });
-                const migrated = await page.evaluate(async () => {
-                    for (let i = 0; i < 20; i++) {
-                        const item = await window.STBgLoader.cacheManager.getMedia('bg_legacy_seed_1');
-                        if (item) {
-                            const r = await fetch(item.url);
-                            return { found: true, status: r.status };
-                        }
-                        await new Promise(res => setTimeout(res, 250));
-                    }
-                    return { found: false };
-                });
-                ok('S5.1 legacy item migrated with id preserved', migrated.found && migrated.status === 200, JSON.stringify(migrated));
-                await page.close();
-            }
-        }
-
-        // ============ S6: Authority enhancement (mock): settings sync + agent tools ============
+        // ============ S5: Authority enhancement (mock): settings sync + agent tools ============
         {
             const page = await openPage(browser, { mock: true });
             const caps = await page.evaluate(() => window.STBgLoader.getAuthorityBridge().getCapabilities());
-            ok('S6.1 Authority enhancement detected', caps.available === true && caps.sync === true && caps.agentTools === true);
+            ok('S5.1 Authority enhancement detected', caps.available === true && caps.sync === true && caps.agentTools === true);
 
             const pushed = await page.evaluate(async () => {
                 window.STBgLoader.getSettings().volume = 0.33;
@@ -271,7 +203,7 @@ async function main() {
                 }
                 return false;
             });
-            ok('S6.2 settings mirrored to Authority KV', pushed);
+            ok('S5.2 settings mirrored to Authority KV', pushed);
 
             const agentOn = await page.evaluate(async () => {
                 const ext = window.STBgLoader;
@@ -284,20 +216,20 @@ async function main() {
                 }
                 return false;
             });
-            ok('S6.3 agent tools registered on enable (opt-in)', agentOn, `calls=${await page.evaluate(() => window.__authMockState.calls.registerTools)}`);
+            ok('S5.3 agent tools registered on enable (opt-in)', agentOn, `calls=${await page.evaluate(() => window.__authMockState.calls.registerTools)}`);
             await page.close();
         }
 
-        // ============ S7: degradation without Authority keeps media fully working ============
+        // ============ S6: degradation without Authority keeps media fully working ============
         {
             const page = await openPage(browser);
             const caps = await page.evaluate(() => window.STBgLoader.getAuthorityBridge().getCapabilities());
             const media = await page.evaluate(async () => {
                 const items = await window.STBgLoader.cacheManager.listMedia();
-                return { count: items.length, cloud: window.STBgLoader.cacheManager.isCloudBacked() };
+                return { count: items.length };
             });
-            ok('S7.1 no Authority: enhancement off', caps.available === false && caps.sync === false, `reason=${caps.degradedReason}`);
-            ok('S7.2 no Authority: media library fully functional', media.cloud === true && media.count > 0, `items=${media.count}`);
+            ok('S6.1 no Authority: enhancement off', caps.available === false && caps.sync === false, `reason=${caps.degradedReason}`);
+            ok('S6.2 no Authority: media library fully functional', media.count > 0, `items=${media.count}`);
             await page.close();
         }
 

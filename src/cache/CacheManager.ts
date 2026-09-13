@@ -1,9 +1,7 @@
 import { MediaItem, MediaType, MediaSource } from '../types';
-import { LegacyBrowserStore, guessMimeType } from '../backend/LocalOrigin';
-import { ServerOrigin } from '../backend/ServerOrigin';
+import { ServerOrigin, guessMimeType } from '../backend/ServerOrigin';
 import { RemoteImporter } from '../backend/RemoteImporter';
 import { AuthorityBridge } from '../backend/AuthorityBridge';
-import { LegacyMigration } from '../backend/LegacyMigration';
 
 const CACHE_NAME = 'st-bg-cache-v1';
 const INDEX_DB_NAME = 'st_bg_cache_index';
@@ -16,8 +14,7 @@ interface CacheIndexEntry {
 }
 
 /**
- * Media library facade. Public API is unchanged from earlier releases; call sites
- * (index.ts, SettingsDrawer, PublicAPI, SceneManager, AudioEngine) keep working as-is.
+ * Media library facade over the server origin.
  *
  * Storage model: the ONLY source of truth is the SillyTavern server's backgrounds/ directory
  * (ServerOrigin, native endpoints + Range streaming). The browser keeps a pure, evictable hot
@@ -27,7 +24,6 @@ interface CacheIndexEntry {
  */
 export class CacheManager {
     private origin: ServerOrigin;
-    private legacy: LegacyBrowserStore;
     private remoteImporter: RemoteImporter | null = null;
     private l1: Cache | null = null;
     private indexDb: IDBDatabase | null = null;
@@ -35,7 +31,6 @@ export class CacheManager {
 
     constructor() {
         this.origin = new ServerOrigin();
-        this.legacy = new LegacyBrowserStore();
     }
 
     public async init(bridge?: AuthorityBridge): Promise<void> {
@@ -54,16 +49,6 @@ export class CacheManager {
 
         await this.origin.init();
         console.log('[ST-BgLoader] Media library source of truth: server backgrounds/ directory (browser keeps cache only).');
-        void this.migrateLegacyLibrary();
-    }
-
-    public isCloudBacked(): boolean {
-        // Kept for UI compatibility: the source of truth is always the server now.
-        return true;
-    }
-
-    public getLocalOrigin(): LegacyBrowserStore {
-        return this.legacy;
     }
 
     public async listMedia(): Promise<MediaItem[]> {
@@ -293,23 +278,5 @@ export class CacheManager {
             request.onsuccess = () => resolve();
             request.onerror = () => reject(request.error);
         });
-    }
-
-    // ---------- legacy migration ----------
-
-    private async migrateLegacyLibrary(): Promise<void> {
-        try {
-            const migration = new LegacyMigration(this.legacy, this.origin);
-            await migration.runIfNeeded((progress) => {
-                console.log(`[ST-BgLoader] Legacy migration: ${progress.done}/${progress.total} (${progress.current})`);
-            });
-        } catch (err) {
-            console.warn('[ST-BgLoader] Legacy migration failed:', err);
-        }
-    }
-
-    /** Test hook: re-run the idempotent legacy migration pass (flag-gated). */
-    public async migrateLegacyForTest(): Promise<void> {
-        await this.migrateLegacyLibrary();
     }
 }

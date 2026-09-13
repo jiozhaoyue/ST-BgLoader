@@ -1,6 +1,4 @@
-import { MediaItem, MediaType } from '../types';
-import { guessMimeType } from './LocalOrigin';
-import { MediaOrigin, MediaPutInput } from './MediaOrigin';
+import { MediaItem, MediaSource, MediaType } from '../types';
 
 const MANIFEST_NAME = 'st-bg-loader-manifest.json';
 const MANIFEST_VERSION = 1;
@@ -27,6 +25,14 @@ export function mediaUrl(filename: string): string {
     return `backgrounds/${encodeURIComponent(filename)}`;
 }
 
+export interface MediaPutInput {
+    blob: Blob;
+    name: string;
+    type: MediaType;
+    source: MediaSource;
+    remoteUrl?: string;
+}
+
 /**
  * The only media source of truth: the SillyTavern server's own `backgrounds/` user directory,
  * exactly where the native background picker stores files (native upload/delete endpoints and
@@ -36,8 +42,7 @@ export function mediaUrl(filename: string): string {
  * Native `/all` lists images only, so non-image entries are cataloged in a manifest JSON that
  * lives in the same directory (the native listing ignores it; the plugin reads and rewrites it).
  */
-export class ServerOrigin implements MediaOrigin {
-    public readonly kind = 'server' as const;
+export class ServerOrigin {
     private manifest: Manifest = { version: MANIFEST_VERSION, items: [] };
 
     public async init(): Promise<void> {
@@ -120,7 +125,7 @@ export class ServerOrigin implements MediaOrigin {
     }
 
     public async putMedia(input: MediaPutInput): Promise<MediaItem> {
-        const id = input.id ?? 'bg_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
+        const id = 'bg_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
         const mimeType = input.blob.type || guessMimeType(input.name, input.type);
 
         // Remote reference without bytes (URL that could not be downloaded).
@@ -269,7 +274,7 @@ export class ServerOrigin implements MediaOrigin {
             id: entry.id,
             name: entry.filename || entry.remoteUrl || entry.id,
             type: entry.type,
-            source: (entry.source as MediaItem['source']) || 'server',
+            source: entry.source === 'url' ? 'url' : 'server',
             url,
             cacheKey: entry.filename ? mediaUrl(entry.filename) : entry.id,
             size: entry.size,
@@ -298,6 +303,31 @@ function detectType(filename: string): MediaType {
     if (ext === 'html' || ext === 'htm') return 'html';
     if (ext === 'svg') return 'svg';
     return 'image';
+}
+
+export function guessMimeType(name: string, type: MediaType): string {
+    const ext = name.split('.').pop()?.toLowerCase();
+    switch (ext) {
+        case 'mp4': return 'video/mp4';
+        case 'webm': return 'video/webm';
+        case 'mp3': return 'audio/mpeg';
+        case 'wav': return 'audio/wav';
+        case 'ogg': return 'audio/ogg';
+        case 'flac': return 'audio/flac';
+        case 'svg': return 'image/svg+xml';
+        case 'html': return 'text/html';
+        case 'png': return 'image/png';
+        case 'jpg':
+        case 'jpeg': return 'image/jpeg';
+        case 'webp': return 'image/webp';
+        case 'gif': return 'image/gif';
+        default:
+            if (type === 'video') return 'video/mp4';
+            if (type === 'audio') return 'audio/mpeg';
+            if (type === 'svg') return 'image/svg+xml';
+            if (type === 'html') return 'text/html';
+            return 'image/png';
+    }
 }
 
 function sanitizeFilename(name: string): string {
