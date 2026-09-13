@@ -34,14 +34,21 @@ functional features, no rollback paths.
 
 ## Acceptance Criteria
 
-- [ ] `LegacyMigration.ts`, `LocalOrigin.ts`, `MediaOrigin.ts` no longer exist.
-- [ ] No source file references `LegacyBrowserStore`, `LegacyMigration`, `MediaOrigin`, `isCloudBacked`,
-      `getLocalOrigin`, `migrateLegacyForTest`, or `'local'` as a MediaSource value.
-- [ ] `npm run type-check` passes.
-- [ ] `npm run build` passes.
-- [ ] `tests/authority.mjs` updated; remaining suites pass (e2e requires a live ST instance — run if
-      available, otherwise type-check + build + explicit note).
-- [ ] Changes committed and pushed to origin master.
+- [x] `LegacyMigration.ts`, `LocalOrigin.ts`, `MediaOrigin.ts` no longer exist.
+- [x] No source file references `LegacyBrowserStore`, `LegacyMigration`, `MediaOrigin`, `isCloudBacked`,
+      `getLocalOrigin`, `migrateLegacyForTest`, or `'local'` as a MediaSource value (verified by grep sweep;
+      `installType: 'local'` in AuthorityBridge is an unrelated SDK install-type enum).
+- [x] `npm run type-check` passes.
+- [x] `npm run build` passes (dist rebuilt and committed).
+- [x] `tests/authority.mjs` updated; full live suite on https://127.0.0.1:8003 passed 15/15 — the
+      instance extension dir is a junction to this repo, so the suite exercised the refactored code.
+- [x] Changes committed (88fad54) and pushed to origin master.
+
+## Notes on completion
+
+- Spec update: `.trellis/spec/backend/` is still an unfilled template with no mention of the storage
+  layer — nothing to update.
+- The two user-confirmed keeps: TriggerManager event_types fallback and Authority CORS proxy import.
 
 ## Constraints
 
