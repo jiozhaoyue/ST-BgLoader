@@ -308,3 +308,24 @@ Added procedural WebAudio ambient soundscape synthesizer, frosted glass transpar
 ### Status
 
 [OK] 全部完成，提交推送并归档任务
+
+## Session 11: 架构纠偏 —— 服务端原生存储为源，浏览器纯缓存，Authority 仅增强
+<!-- trellis-session: v=2 fp=server-native-storage-20260913 -->
+
+**Date**: 2026-09-13
+**Task**: 09-13-server-native-storage
+**Branch**: `master`
+
+### Summary
+
+用户纠正架构方向：媒体从设计上就该存酒馆服务端原生目录（与原生背景同一逻辑同一位置），不连 Authority 也必须如此；浏览器存储只配当缓存且可管理；Authority 只是增强层（做前端做不到的事）。实测 Dev/Luker 原生端点验证可行性：POST /api/backgrounds/upload（字段 avatar）无 MIME 限制、静态路由 /backgrounds/<file> 带 Range 流式、delete 端点任意文件可删、/all 仅列图片 → 非图片用同目录清单 st-bg-loader-manifest.json 编目（原生列表忽略它）。实现：ServerOrigin（唯一源端：原生上传/删除 + 清单编目 + 目录合并，id 客户端生成保引用）、CacheManager v2（CacheStorage+IDB 索引纯缓存：回填/命中加速/LRU 仅逐缓存/clearAll 仅清缓存/用量即缓存统计；未命中直接走服务端相对 URL 流式）、LegacyBrowserStore（旧库只读）+ LegacyMigration（一次性上载，id 保留，localStorage 旗标）、删除 AuthorityOrigin 与旧云迁移、AuthorityBridge 能力位改为 sync/serverFetch/agentTools、RemoteImporter 保留为 CORS 回退、面板改「存储与 Authority 增强」、URL 导入条目 url 保持远程地址（兼容 setBackground 匹配与旧语义）。测试：tests/authority.mjs 重写为服务端源端场景 16/16（落盘+Range、清单跨页可见、稳定 id、缓存清理不伤源端、显式删除 404、URL 导入去重、迁移保 id、Authority 同步+Agent 注册、无 Authority 媒体全功能）；24 项 E2E 零回归。
+
+### Verification
+
+- [OK] `npm run type-check` + `npm run build`（155.3KB）
+- [OK] `npm run test:e2e` 24/24
+- [OK] `node tests/authority.mjs` 16/16（真实原生端点 + Authority mock）
+
+### Status
+
+[OK] 完成，提交推送并归档

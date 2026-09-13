@@ -1,74 +1,69 @@
 import { MediaItem, MediaType, MediaSource } from '../types';
-import { AuthorityBridge } from '../backend/AuthorityBridge';
-import { AuthorityOrigin } from '../backend/AuthorityOrigin';
-import { LocalOrigin, guessMimeType } from '../backend/LocalOrigin';
-import { MediaOrigin, MediaPutInput } from '../backend/MediaOrigin';
+import { LegacyBrowserStore, guessMimeType } from '../backend/LocalOrigin';
+import { ServerOrigin } from '../backend/ServerOrigin';
 import { RemoteImporter } from '../backend/RemoteImporter';
+import { AuthorityBridge } from '../backend/AuthorityBridge';
+import { LegacyMigration } from '../backend/LegacyMigration';
+
+const CACHE_NAME = 'st-bg-cache-v1';
+const INDEX_DB_NAME = 'st_bg_cache_index';
+const INDEX_STORE = 'entries';
+
+interface CacheIndexEntry {
+    cacheKey: string;
+    lastUsed: number;
+    size: number;
+}
 
 /**
- * Media library facade. Public API is unchanged from the pre-refactor manager; call sites
+ * Media library facade. Public API is unchanged from earlier releases; call sites
  * (index.ts, SettingsDrawer, PublicAPI, SceneManager, AudioEngine) keep working as-is.
  *
- * Storage inversion: the selected MediaOrigin is the source of truth (Authority server when
- * available, otherwise the browser). In authority mode CacheStorage acts only as an evictable
- * hot cache (L1): writes go through to the origin first, cache misses are pulled back from the
- * origin, and LRU eviction never touches server data.
+ * Storage model: the ONLY source of truth is the SillyTavern server's backgrounds/ directory
+ * (ServerOrigin, native endpoints + Range streaming). The browser keeps a pure, evictable hot
+ * cache: CacheStorage for bytes plus a tiny IndexedDB index (lastUsed/size) for LRU and usage
+ * stats. Cache maintenance never touches server files; server files are only removed by an
+ * explicit user delete.
  */
 export class CacheManager {
-    private origin: MediaOrigin;
-    private localOrigin: LocalOrigin;
-    private authorityOrigin: AuthorityOrigin | null = null;
-    private bridge: AuthorityBridge | null = null;
+    private origin: ServerOrigin;
+    private legacy: LegacyBrowserStore;
     private remoteImporter: RemoteImporter | null = null;
     private l1: Cache | null = null;
+    private indexDb: IDBDatabase | null = null;
     private objectUrls: Map<string, string> = new Map();
 
     constructor() {
-        this.localOrigin = new LocalOrigin();
-        this.origin = this.localOrigin;
+        this.origin = new ServerOrigin();
+        this.legacy = new LegacyBrowserStore();
     }
 
     public async init(bridge?: AuthorityBridge): Promise<void> {
         if ('caches' in window) {
-            this.l1 = await caches.open('st-bg-cache-v1');
+            this.l1 = await caches.open(CACHE_NAME);
         }
+        await this.openIndex();
 
         if (bridge) {
-            this.bridge = bridge;
             const caps = await bridge.detectAndInit();
-            const client = bridge.getClient();
-            if (caps.available && client) {
-                this.authorityOrigin = new AuthorityOrigin(client);
-                try {
-                    await this.authorityOrigin.init();
-                    this.origin = this.authorityOrigin;
-                    this.remoteImporter = new RemoteImporter(bridge);
-                    console.log('[ST-BgLoader] Media library source of truth: Authority backend (cloud).');
-                } catch (err) {
-                    this.authorityOrigin = null;
-                    console.warn('[ST-BgLoader] Cloud catalog unavailable, using local source of truth:', err);
-                }
+            if (caps.available && bridge.getClient()) {
+                // Enhancement layer only: settings sync, agent tools, CORS-fallback imports.
+                this.remoteImporter = new RemoteImporter(bridge);
             }
         }
 
-        if (this.origin === this.localOrigin) {
-            console.log('[ST-BgLoader] Media library source of truth: this browser (local mode).');
-        }
         await this.origin.init();
+        console.log('[ST-BgLoader] Media library source of truth: server backgrounds/ directory (browser keeps cache only).');
+        void this.migrateLegacyLibrary();
     }
 
     public isCloudBacked(): boolean {
-        return this.origin.kind === 'authority';
+        // Kept for UI compatibility: the source of truth is always the server now.
+        return true;
     }
 
-    /** Exposed for the one-time local->cloud migration and diagnostics. */
-    public getLocalOrigin(): LocalOrigin {
-        return this.localOrigin;
-    }
-
-    /** Null when the Authority backend is unavailable. */
-    public getAuthorityOrigin(): AuthorityOrigin | null {
-        return this.authorityOrigin;
+    public getLocalOrigin(): LegacyBrowserStore {
+        return this.legacy;
     }
 
     public async listMedia(): Promise<MediaItem[]> {
@@ -86,61 +81,48 @@ export class CacheManager {
         source: MediaSource,
         remoteUrl?: string
     ): Promise<MediaItem> {
-        const blob = typeof content === 'string'
+        let blob = typeof content === 'string'
             ? new Blob([content], { type: type === 'svg' ? 'image/svg+xml' : 'text/html' })
             : content;
 
-        const input: MediaPutInput = { blob, name, type, source, remoteUrl };
-        const item = await this.origin.putMedia(input);
-
-        // Backfill the hot cache so first playback is instant (empty URL stubs have no binary).
-        if (this.origin.kind === 'authority' && this.l1 && blob.size > 0) {
-            await this.l1.put(item.cacheKey, new Response(blob, {
-                headers: { 'Content-Type': item.mimeType },
-            }));
+        // URL imports without bytes: download the media so it lives on the server like
+        // everything else; fall back to a remote reference (or a server-side import when
+        // Authority can bypass CORS) only if the browser cannot reach it.
+        if (source === 'url' && blob.size === 0 && remoteUrl) {
+            blob = await this.fetchForStorage(remoteUrl).catch(() => new Blob([]));
         }
+
+        const item = await this.origin.putMedia({ blob, name, type, source, remoteUrl });
+        await this.backfillCache(item, blob);
         return item;
     }
 
     public async getMediaBlobUrl(item: MediaItem): Promise<string> {
         const existingUrl = this.objectUrls.get(item.id);
         if (existingUrl) {
-            void this.touchMedia(item.id);
+            await this.touchCache(item.cacheKey);
             return existingUrl;
         }
 
-        let blob: Blob | null = null;
-
-        // L1 hot cache (authority mode only; in local mode L1 is the origin itself).
-        if (this.origin.kind === 'authority' && this.l1) {
+        // Hot cache hit: instant playback from local bytes.
+        if (this.l1) {
             const hit = await this.l1.match(item.cacheKey);
             if (hit) {
-                blob = await hit.blob();
+                const blob = await hit.blob();
+                const blobUrl = URL.createObjectURL(blob);
+                this.objectUrls.set(item.id, blobUrl);
+                await this.touchCache(item.cacheKey);
+                return blobUrl;
             }
         }
 
-        if (!blob) {
-            blob = await this.origin.readMedia(item);
-            if (blob && this.origin.kind === 'authority' && this.l1) {
-                await this.l1.put(item.cacheKey, new Response(blob, {
-                    headers: { 'Content-Type': blob.type || item.mimeType },
-                }));
-            }
-        }
-
-        if (blob) {
-            const blobUrl = URL.createObjectURL(blob);
-            this.objectUrls.set(item.id, blobUrl);
-            void this.touchMedia(item.id);
-            return blobUrl;
-        }
-
-        // Not stored in the catalog (e.g. native background virtual items): use the original URL.
+        // Cache miss: stream directly from the server (same-origin, HTTP Range, hardware decode).
+        await this.touchCache(item.cacheKey);
         return item.url;
     }
 
-    public async touchMedia(id: string): Promise<void> {
-        await this.origin.touchMedia(id, Date.now());
+    public async touchMedia(_id: string): Promise<void> {
+        // LRU is tracked per cache entry (touchCache); the server library has no eviction.
     }
 
     public async deleteMedia(id: string): Promise<void> {
@@ -148,112 +130,60 @@ export class CacheManager {
         await this.origin.deleteMedia(id);
 
         if (item) {
+            await this.evictCacheEntry(item.cacheKey);
             if (this.objectUrls.has(id)) {
                 URL.revokeObjectURL(this.objectUrls.get(id)!);
                 this.objectUrls.delete(id);
-            }
-            if (this.origin.kind === 'authority' && this.l1) {
-                await this.l1.delete(item.cacheKey);
             }
         }
     }
 
     public async getCacheUsage(): Promise<{ usedBytes: number; itemCount: number }> {
-        const items = await this.listMedia();
-        let usedBytes = 0;
-        for (const item of items) {
-            usedBytes += item.size || 0;
-        }
-        return { usedBytes, itemCount: items.length };
+        const entries = await this.indexAll();
+        return {
+            usedBytes: entries.reduce((sum, e) => sum + (e.size || 0), 0),
+            itemCount: entries.length,
+        };
     }
 
     public async cleanLRU(maxQuotaBytes: number): Promise<void> {
-        const items = await this.listMedia();
-        let totalBytes = items.reduce((sum, item) => sum + (item.size || 0), 0);
+        const entries = await this.indexAll();
+        let totalBytes = entries.reduce((sum, e) => sum + (e.size || 0), 0);
         if (totalBytes <= maxQuotaBytes) return;
 
-        items.sort((a, b) => a.lastUsedTimestamp - b.lastUsedTimestamp);
-
-        for (const item of items) {
+        entries.sort((a, b) => a.lastUsed - b.lastUsed);
+        for (const entry of entries) {
             if (totalBytes <= maxQuotaBytes) break;
-
-            if (this.origin.kind === 'authority') {
-                // Cloud mode: evict only the local hot cache; the server copy is never deleted.
-                if (this.l1) {
-                    await this.l1.delete(item.cacheKey);
-                }
-                if (this.objectUrls.has(item.id)) {
-                    URL.revokeObjectURL(this.objectUrls.get(item.id)!);
-                    this.objectUrls.delete(item.id);
-                }
-            } else {
-                await this.origin.deleteMedia(item.id);
-            }
-            totalBytes -= item.size || 0;
+            await this.evictCacheEntry(entry.cacheKey);
+            totalBytes -= entry.size || 0;
         }
     }
 
+    /** Clears the browser cache only — server files are never touched by maintenance. */
     public async clearAll(): Promise<void> {
-        // Revoke all Blob URLs first.
         for (const url of this.objectUrls.values()) {
             URL.revokeObjectURL(url);
         }
         this.objectUrls.clear();
 
-        if (this.origin.kind === 'authority') {
-            // Cloud mode: clear catalog + binaries on the server and the local hot cache.
-            const items = await this.listMedia();
-            for (const item of items) {
-                await this.origin.deleteMedia(item.id);
-            }
-            if (this.l1 && 'caches' in window) {
-                await caches.delete('st-bg-cache-v1');
-                this.l1 = await caches.open('st-bg-cache-v1');
-            }
-            return;
+        if ('caches' in window) {
+            await caches.delete(CACHE_NAME);
+            this.l1 = await caches.open(CACHE_NAME);
         }
-
-        // Local mode: pre-refactor behavior — wipe the browser-resident library.
-        if (this.l1 && 'caches' in window) {
-            await caches.delete('st-bg-cache-v1');
-            this.l1 = await caches.open('st-bg-cache-v1');
-        }
-        await this.localOrigin.clearCatalog();
+        await this.indexClear();
     }
 
     public async preloadUrl(url: string, type?: MediaType): Promise<{ item: MediaItem; isNew: boolean }> {
         const existing = await this.origin.findByUrl(url);
         if (existing) {
-            await this.touchMedia(existing.id);
             return { item: existing, isNew: false };
         }
 
         const filename = url.split('/').pop()?.split('?')[0] || 'preloaded_media';
         const detectedType = type || this.detectMediaType(filename);
-
-        let blob: Blob | null = null;
-        try {
-            const response = await fetch(url);
-            if (!response.ok) {
-                throw new Error(`Failed to fetch media from ${url}: ${response.status} ${response.statusText}`);
-            }
-            blob = await response.blob();
-        } catch (err) {
-            // Direct fetch failed (CORS/network): fall back to a server-side import when available.
-            if (this.remoteImporter) {
-                console.warn('[ST-BgLoader] Direct fetch failed, importing through the Authority server:', err);
-                blob = await this.remoteImporter.import(url);
-            } else {
-                throw err;
-            }
-        }
-
+        const blob = await this.fetchForStorage(url);
         const item = await this.origin.putMedia({ blob, name: filename, type: detectedType, source: 'url', remoteUrl: url });
-        if (this.origin.kind === 'authority' && this.l1 && blob.size > 0) {
-            await this.l1.put(item.cacheKey, new Response(blob, {
-                headers: { 'Content-Type': item.mimeType },
-            }));
-        }
+        await this.backfillCache(item, blob);
         return { item, isNew: true };
     }
 
@@ -268,5 +198,118 @@ export class CacheManager {
 
     public getMimeType(name: string, type: MediaType): string {
         return guessMimeType(name, type);
+    }
+
+    // ---------- browser cache (L1) internals ----------
+
+    private async fetchForStorage(url: string): Promise<Blob> {
+        try {
+            return await this.origin.download(url);
+        } catch (err) {
+            if (this.remoteImporter) {
+                console.warn('[ST-BgLoader] Direct download failed, importing through the Authority server:', err);
+                return this.remoteImporter.import(url);
+            }
+            throw err;
+        }
+    }
+
+    private async backfillCache(item: MediaItem, blob: Blob): Promise<void> {
+        if (!this.l1 || blob.size === 0) return;
+        try {
+            await this.l1.put(item.cacheKey, new Response(blob, {
+                headers: { 'Content-Type': item.mimeType || blob.type },
+            }));
+            await this.indexPut({ cacheKey: item.cacheKey, lastUsed: Date.now(), size: blob.size });
+        } catch (err) {
+            console.warn('[ST-BgLoader] Cache backfill failed (playback still streams from server):', err);
+        }
+    }
+
+    private async touchCache(cacheKey: string): Promise<void> {
+        const entry = (await this.indexAll()).find(e => e.cacheKey === cacheKey);
+        if (entry) {
+            entry.lastUsed = Date.now();
+            await this.indexPut(entry);
+        }
+    }
+
+    private async evictCacheEntry(cacheKey: string): Promise<void> {
+        if (this.l1) await this.l1.delete(cacheKey);
+        await this.indexDelete(cacheKey);
+        // Object URLs stay valid until deleteMedia/init revokes them: an evicted entry may be
+        // the currently mounted background, and the blob is already resident in memory.
+    }
+
+    private async openIndex(): Promise<void> {
+        this.indexDb = await new Promise<IDBDatabase>((resolve, reject) => {
+            const request = indexedDB.open(INDEX_DB_NAME, 1);
+            request.onupgradeneeded = (event) => {
+                const db = (event.target as IDBOpenDBRequest).result;
+                if (!db.objectStoreNames.contains(INDEX_STORE)) {
+                    db.createObjectStore(INDEX_STORE, { keyPath: 'cacheKey' });
+                }
+            };
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    private async indexAll(): Promise<CacheIndexEntry[]> {
+        if (!this.indexDb) await this.openIndex();
+        return new Promise<CacheIndexEntry[]>((resolve, reject) => {
+            const tx = this.indexDb!.transaction(INDEX_STORE, 'readonly');
+            const request = tx.objectStore(INDEX_STORE).getAll();
+            request.onsuccess = () => resolve(request.result || []);
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    private async indexPut(entry: CacheIndexEntry): Promise<void> {
+        if (!this.indexDb) await this.openIndex();
+        await new Promise<void>((resolve, reject) => {
+            const tx = this.indexDb!.transaction(INDEX_STORE, 'readwrite');
+            const request = tx.objectStore(INDEX_STORE).put(entry);
+            request.onsuccess = () => resolve();
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    private async indexDelete(cacheKey: string): Promise<void> {
+        if (!this.indexDb) await this.openIndex();
+        await new Promise<void>((resolve, reject) => {
+            const tx = this.indexDb!.transaction(INDEX_STORE, 'readwrite');
+            const request = tx.objectStore(INDEX_STORE).delete(cacheKey);
+            request.onsuccess = () => resolve();
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    private async indexClear(): Promise<void> {
+        if (!this.indexDb) await this.openIndex();
+        await new Promise<void>((resolve, reject) => {
+            const tx = this.indexDb!.transaction(INDEX_STORE, 'readwrite');
+            const request = tx.objectStore(INDEX_STORE).clear();
+            request.onsuccess = () => resolve();
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    // ---------- legacy migration ----------
+
+    private async migrateLegacyLibrary(): Promise<void> {
+        try {
+            const migration = new LegacyMigration(this.legacy, this.origin);
+            await migration.runIfNeeded((progress) => {
+                console.log(`[ST-BgLoader] Legacy migration: ${progress.done}/${progress.total} (${progress.current})`);
+            });
+        } catch (err) {
+            console.warn('[ST-BgLoader] Legacy migration failed:', err);
+        }
+    }
+
+    /** Test hook: re-run the idempotent legacy migration pass (flag-gated). */
+    public async migrateLegacyForTest(): Promise<void> {
+        await this.migrateLegacyLibrary();
     }
 }

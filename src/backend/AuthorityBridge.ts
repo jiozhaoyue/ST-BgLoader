@@ -105,11 +105,9 @@ export type AuthorityDegradedReason = 'sdk-missing' | 'init-failed' | 'permissio
 
 export interface AuthorityCapabilities {
     available: boolean;
-    /** Server-backed media catalog + binaries (sql.private + storage.blob). */
-    cloudLibrary: boolean;
     /** Settings/scene cross-device sync (storage.kv). */
     sync: boolean;
-    /** Server-side HTTP import (http.fetch). */
+    /** Server-side HTTP import fallback for CORS-blocked media (http.fetch). */
     serverFetch: boolean;
     /** Agent ambient tools registration (agent.browser); gated separately by a user setting. */
     agentTools: boolean;
@@ -131,7 +129,6 @@ export class AuthorityBridge {
     private client: AuthorityClientLike | null = null;
     private caps: AuthorityCapabilities = {
         available: false,
-        cloudLibrary: false,
         sync: false,
         serverFetch: false,
         agentTools: false,
@@ -192,7 +189,6 @@ export class AuthorityBridge {
 
             this.caps = {
                 available: true,
-                cloudLibrary: true,
                 sync: true,
                 serverFetch: true,
                 agentTools: true,
@@ -214,8 +210,7 @@ export class AuthorityBridge {
     private degrade(reason: AuthorityDegradedReason, message: string): AuthorityCapabilities {
         this.caps = {
             available: false,
-            cloudLibrary: false,
-            sync: false,
+                sync: false,
             serverFetch: false,
             agentTools: false,
             degradedReason: reason,

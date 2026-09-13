@@ -17,7 +17,6 @@ import { SceneManager } from './core/SceneManager';
 import { ShortcutManager } from './core/ShortcutManager';
 import { AuthorityBridge } from './backend/AuthorityBridge';
 import { SettingsSync } from './backend/SettingsSync';
-import { LocalToCloudMigrator } from './backend/Migration';
 import { AgentBridge, AgentToolHost } from './backend/AgentBridge';
 import { WeatherOptions, WeatherType } from './types';
 
@@ -95,11 +94,10 @@ export class STBgLoaderExtension {
         // 1. Load persisted settings
         this.loadSettings();
 
-        // 2. Initialize storage (Authority cloud source of truth when available, browser otherwise)
+        // 2. Initialize storage: the server backgrounds/ directory is the source of truth
+        //    (Authority is an optional enhancement); the browser keeps an evictable cache and
+        //    any legacy browser library is migrated to the server once.
         await this.cacheManager.init(this.authorityBridge);
-        if (this.cacheManager.isCloudBacked()) {
-            this.startCloudMigration();
-        }
         this.mediaMount.init();
         this.mediaMount.applyFilters(this.settings.filters);
         this.mediaMount.setInteractive(this.settings.interactiveBackground);
@@ -304,7 +302,7 @@ export class STBgLoaderExtension {
                 }
                 await this.applyMedia(item);
             },
-        });
+        }, this.authorityBridge);
         this.settingsDrawer.render();
 
         // 10. Setup Native Background Augmenter
@@ -382,7 +380,7 @@ export class STBgLoaderExtension {
     }
 
     /** Opt-in Agent Runtime ambient tools (AI director mode); requires the cloud backend. */
-    private syncAgentTools(): void {
+    public syncAgentTools(): void {
         const caps = this.authorityBridge.getCapabilities();
         const client = this.authorityBridge.getClient();
         const want = caps.agentTools && this.settings.agentToolsEnabled && !!client;
@@ -412,21 +410,6 @@ export class STBgLoaderExtension {
             setFilters: (filters) => this.publicApi.setFilters(filters),
             applyScene: (sceneId) => this.publicApi.applyScene(sceneId),
         };
-    }
-
-    private startCloudMigration(): void {
-        const localOrigin = this.cacheManager.getLocalOrigin();
-        const cloudOrigin = this.cacheManager.getAuthorityOrigin();
-        const client = this.authorityBridge.getClient();
-        if (!localOrigin || !cloudOrigin || !client) return;
-
-        void new LocalToCloudMigrator(localOrigin, cloudOrigin, client).runIfNeeded((progress) => {
-            console.log(`[ST-BgLoader] Cloud migration: ${progress.done}/${progress.total} (${progress.current})`);
-            if (progress.done === 1 && progress.total > 0) {
-                const toastr = (window as unknown as { toastr?: { info(msg: string, title?: string): void } }).toastr;
-                toastr?.info(`开始迁移本地媒体库到云端（${progress.total} 项）...`, 'ST-BgLoader');
-            }
-        });
     }
 
     private async startSettingsSync(): Promise<void> {

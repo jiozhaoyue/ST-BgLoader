@@ -17,6 +17,7 @@ import {
     AmbientSoundType,
 } from '../types';
 import { CacheManager } from '../cache/CacheManager';
+import { AuthorityBridge } from '../backend/AuthorityBridge';
 
 export interface SettingsDrawerCallbacks {
     onSettingsChanged: (settings: BgLoaderSettings) => void;
@@ -43,11 +44,13 @@ export class SettingsDrawer {
     private settings: BgLoaderSettings;
     private cacheManager: CacheManager;
     private callbacks: SettingsDrawerCallbacks;
+    private authority: AuthorityBridge | null;
 
-    constructor(settings: BgLoaderSettings, cacheManager: CacheManager, callbacks: SettingsDrawerCallbacks) {
+    constructor(settings: BgLoaderSettings, cacheManager: CacheManager, callbacks: SettingsDrawerCallbacks, authority?: AuthorityBridge | null) {
         this.settings = settings;
         this.cacheManager = cacheManager;
         this.callbacks = callbacks;
+        this.authority = authority ?? null;
     }
 
     /** Replace the drawer's settings copy with a remotely synced one and re-render the panel. */
@@ -380,9 +383,9 @@ export class SettingsDrawer {
                         </div>
                     </div>
 
-                    <!-- Authority Cloud Storage Status -->
+                    <!-- Storage & Authority Enhancement -->
                     <div class="st-bgloader-section">
-                        <h4><i class="fa-solid fa-cloud"></i> 云端存储 (Authority Backend)</h4>
+                        <h4><i class="fa-solid fa-cloud"></i> 存储与 Authority 增强</h4>
                         <div id="st_bgloader_cloud_status" style="font-size:0.9em; line-height:1.6;">检测中...</div>
                         <label style="display:flex; align-items:center; gap:8px; font-size:0.9em; margin-top:6px;">
                             <input type="checkbox" id="st_bgloader_agent_tools_cb" />
@@ -405,22 +408,26 @@ export class SettingsDrawer {
         this.updateCloudPanel();
     }
 
-    /** Reflects the storage-inversion state: Authority cloud source of truth vs browser-local mode. */
+    /** Reflects the storage model: server source of truth + evictable browser cache + optional Authority. */
     public updateCloudPanel(): void {
         const statusEl = this.container?.querySelector('#st_bgloader_cloud_status') as HTMLElement | null;
         const agentCb = this.container?.querySelector('#st_bgloader_agent_tools_cb') as HTMLInputElement | null;
         if (!statusEl) return;
 
-        const cloud = this.cacheManager.isCloudBacked();
-        if (cloud) {
-            statusEl.innerHTML = '<span style="color:#4fae6b;">● 已连接 Authority 后端</span><br/>媒体库源端：服务器（跨设备可用，浏览器仅保留热缓存，LRU 不会删除云端数据）';
+        const storageLine = '<span style="color:#4fae6b;">● 源端：服务端 backgrounds/ 目录</span><br/>媒体存于酒馆服务端（与原生背景同位置，换浏览器/设备可见）；本浏览器仅保留可清理的缓存。';
+
+        const caps = this.authority?.getCapabilities();
+        let authorityLine: string;
+        if (caps?.available) {
+            authorityLine = '<span style="color:#4fae6b;">● Authority 增强已连接</span>：设置/场景跨端同步 ✓ · Agent 氛围工具可用 · CORS 服务端导入 ✓';
         } else {
-            statusEl.innerHTML = '<span style="color:#c9a34f;">● 本地模式</span><br/>未检测到 Authority 后端：媒体库仅存于当前浏览器（清理站点数据或更换设备将丢失）。安装 Authority 服务端插件后自动启用云存储。';
+            authorityLine = '<span style="color:#c9a34f;">● 未检测到 Authority</span>：媒体功能不受影响（源端始终在服务端），仅跨端同步与 Agent 工具不可用。';
         }
+        statusEl.innerHTML = `${storageLine}<br/>${authorityLine}`;
 
         if (agentCb) {
             agentCb.checked = !!this.settings.agentToolsEnabled;
-            agentCb.disabled = !cloud;
+            agentCb.disabled = !caps?.available;
         }
     }
 

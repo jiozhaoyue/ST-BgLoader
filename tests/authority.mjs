@@ -1,14 +1,12 @@
 /**
- * Authority cloud-path E2E scenarios.
+ * Server-origin storage + Authority enhancement E2E scenarios.
  *
- * Verifies the storage-inversion behavior against an in-page mock of the Authority SDK
- * (window.STAuthority.AuthoritySDK): write-through to the cloud origin, L1 hot-cache
- * pull-through, LRU that never evicts server data, one-time local->cloud migration with
- * preserved ids, cross-device settings sync, and graceful degradation without the SDK.
- *
- * When a real Authority SDK extension is installed, the mock steps aside and the same
- * assertions run against the real backend. Skips (exit 0) when the test instance is
- * unreachable, mirroring the design's "cloud tests skip without Authority" rule.
+ * Media scenarios run against the REAL SillyTavern native endpoints of the test instance:
+ * uploads must land in the server's backgrounds/ directory (same place as native backgrounds),
+ * be served with HTTP Range, survive browser-cache clearing, and be visible from a fresh page
+ * (manifest + native listing). Authority scenarios (settings sync, agent tool registration)
+ * use an in-page mock SDK when no real Authority extension is installed; the mock steps aside
+ * automatically when the real one is present. Skips (exit 0) when the instance is unreachable.
  */
 import puppeteer from 'puppeteer-core';
 
@@ -36,62 +34,12 @@ function ok(name, condition, detail = '') {
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
-/** Injected before page scripts on cloud pages; no-op if a real SDK is present. */
+/** Injected before page scripts on Authority-enhanced pages; no-op if a real SDK is present. */
 function injectAuthorityMock() {
     if (window.STAuthority) return; // real SDK wins
-    const blobStore = new Map();
     const kvStore = new Map();
-    const rows = [];
-    let blobSeq = 1;
-    window.__authMockState = { blobStore, kvStore, rows };
-
-    const COLS = ['id', 'blob_id', 'name', 'type', 'source', 'remote_url', 'size', 'mime_type',
-        'added_timestamp', 'last_used_timestamp', 'has_audio'];
-    const migrations = new Set();
-
-    const sql = {
-        async migrate(input) {
-            const applied = [];
-            const skipped = [];
-            for (const m of input.migrations) {
-                if (migrations.has(m.id)) skipped.push(m.id);
-                else { migrations.add(m.id); applied.push(m.id); }
-            }
-            return { applied, skipped, latestId: applied[applied.length - 1] ?? null };
-        },
-        async query(input) {
-            const s = input.statement.replace(/\s+/g, ' ');
-            let result = rows.slice();
-            if (/WHERE id = \?/.test(s)) result = result.filter(r => r.id === input.params[0]);
-            else if (/WHERE remote_url = \?/.test(s)) result = result.filter(r => r.remote_url === input.params[0]);
-            if (/ORDER BY last_used_timestamp DESC/.test(s)) {
-                result.sort((a, b) => (b.last_used_timestamp || 0) - (a.last_used_timestamp || 0));
-            }
-            return { kind: 'query', columns: COLS, rows: result, rowCount: result.length };
-        },
-        async exec(input) {
-            const s = input.statement.replace(/\s+/g, ' ');
-            const p = input.params || [];
-            if (s.startsWith('INSERT INTO media_items')) {
-                const row = {};
-                COLS.forEach((c, i) => { row[c] = p[i]; });
-                rows.push(row);
-                return { kind: 'exec', rowsAffected: 1 };
-            }
-            if (s.startsWith('UPDATE media_items SET last_used_timestamp')) {
-                const r = rows.find(x => x.id === p[1]);
-                if (r) r.last_used_timestamp = p[0];
-                return { kind: 'exec', rowsAffected: r ? 1 : 0 };
-            }
-            if (s.startsWith('DELETE FROM media_items')) {
-                const i = rows.findIndex(x => x.id === p[0]);
-                if (i >= 0) rows.splice(i, 1);
-                return { kind: 'exec', rowsAffected: i >= 0 ? 1 : 0 };
-            }
-            return { kind: 'exec', rowsAffected: 0 };
-        },
-    };
-
+    const calls = { registerTools: 0 };
+    window.__authMockState = { kvStore, calls };
     const client = {
         storage: {
             kv: {
@@ -100,30 +48,24 @@ function injectAuthorityMock() {
                 delete: async k => { kvStore.delete(k); },
                 list: async () => Object.fromEntries(kvStore.entries()),
             },
-            blob: {
-                put: async (inp) => {
-                    const id = 'blob_' + (blobSeq++);
-                    const record = { id, name: inp.name, contentType: inp.contentType || '', size: inp.content.length, updatedAt: new Date().toISOString() };
-                    blobStore.set(id, { record, content: inp.content });
-                    return record;
+        },
+        http: { fetch: async () => ({ url: '', hostname: '', status: 404, ok: false, headers: {}, body: '', bodyEncoding: 'base64', contentType: '' }) },
+        jobs: { create: async () => ({ id: 'job_mock' }) },
+        events: { subscribe: async () => ({ close() { } }) },
+        agent: {
+            browser: {
+                registerTools: async (request) => {
+                    calls.registerTools += 1;
+                    window.__authMockLastRegistration = request;
+                    return { browserInstanceId: request.browserInstanceId, registrationId: 'reg_mock_1', leaseExpiresAt: new Date(Date.now() + 60000).toISOString(), tools: [] };
                 },
-                get: async (id) => {
-                    const e = blobStore.get(id);
-                    if (!e) throw new Error('blob not found: ' + id);
-                    return { record: e.record, content: e.content, encoding: 'base64' };
-                },
-                delete: async (id) => { blobStore.delete(id); },
-                list: async () => [...blobStore.values()].map(e => e.record),
+                claim: async () => ({ sessionId: null, invocation: null }),
+                submitResult: async () => ({}),
             },
         },
-        sql,
-        http: { fetch: async () => ({ url: '', hostname: '', status: 404, ok: false, headers: {}, body: '', bodyEncoding: 'base64', contentType: '' }) },
-        jobs: { create: async () => ({ id: 'job_mock' }), get: async () => ({ id: 'job_mock' }), list: async () => [], cancel: async () => ({ id: 'job_mock' }) },
-        events: { subscribe: async () => ({ close() { } }) },
-        getSession: () => ({ user: 'default-user', extension: 'third-party/ST-BgLoader', mock: true }),
+        getSession: () => ({ user: 'default-user', mock: true }),
         getCapabilities: () => ({ mock: true }),
     };
-
     window.STAuthority = {
         AuthoritySDK: {
             init: async (cfg) => {
@@ -134,16 +76,58 @@ function injectAuthorityMock() {
     };
 }
 
-async function openPage(browser, { mock }) {
+/** Seeds the LEGACY browser library (old IndexedDB schema) so migration has something to move. */
+function seedLegacyLibrary() {
+    const seed = async () => {
+        const db = await new Promise((resolve, reject) => {
+            const req = indexedDB.open('st_bg_loader_db', 1);
+            req.onupgradeneeded = (event) => {
+                const d = event.target.result;
+                if (!d.objectStoreNames.contains('media_items')) {
+                    const store = d.createObjectStore('media_items', { keyPath: 'id' });
+                    store.createIndex('type', 'type', { unique: false });
+                    store.createIndex('lastUsedTimestamp', 'lastUsedTimestamp', { unique: false });
+                }
+            };
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => reject(req.error);
+        });
+        const item = {
+            id: 'bg_legacy_seed_1',
+            name: 'legacy-seed.html',
+            type: 'html',
+            source: 'local',
+            url: '/st-bg-cache/legacy/legacy-seed.html',
+            cacheKey: '/st-bg-cache/legacy/legacy-seed.html',
+            size: 4,
+            mimeType: 'text/html',
+            addedTimestamp: Date.now(),
+            lastUsedTimestamp: Date.now(),
+            hasAudio: false,
+        };
+        await new Promise((resolve, reject) => {
+            const tx = db.transaction('media_items', 'readwrite');
+            tx.objectStore('media_items').put(item);
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
+        });
+        const cache = await caches.open('st-bg-cache-v1');
+        await cache.put(item.cacheKey, new Response(new Blob(['seed'], { type: 'text/html' }), { headers: { 'Content-Type': 'text/html' } }));
+    };
+    void seed();
+}
+
+async function openPage(browser, { mock = false, seedLegacy = false } = {}) {
     const page = await browser.newPage();
     if (mock) await page.evaluateOnNewDocument(injectAuthorityMock);
+    if (seedLegacy) await page.evaluateOnNewDocument(seedLegacyLibrary);
     await page.goto(TARGET_URL, { waitUntil: 'domcontentloaded', timeout: 30000 });
     await page.waitForFunction(() => window.STBgLoader && window.STBgLoader.isInitialized, { timeout: 35000 });
     return page;
 }
 
 async function main() {
-    console.log('🚀 Authority cloud-path scenarios on', TARGET_URL);
+    console.log('🚀 Server-origin storage scenarios on', TARGET_URL);
     const browser = await puppeteer.launch({
         executablePath: CHROME_PATH,
         headless: 'new',
@@ -151,153 +135,173 @@ async function main() {
     });
 
     try {
-        // ============ Scenario 1: degradation without the SDK ============
+        // ============ S1: upload lands on the server, cataloged, cross-page visible ============
+        let uploadedId = '';
         {
-            const page = await openPage(browser, { mock: false });
-            const state = await page.evaluate(() => ({
-                cloud: window.STBgLoader.getCacheManager().isCloudBacked(),
-                caps: window.STBgLoader.getAuthorityBridge().getCapabilities(),
-            }));
-            ok('S1 degradation: local mode without SDK', state.cloud === false && state.caps.available === false, `reason=${state.caps.degradedReason}`);
-            await page.close();
-        }
-
-        // ============ Scenario 2: pre-existing local library (migration source) ============
-        const localIds = [];
-        {
-            const page = await openPage(browser, { mock: false });
-            localIds.push(...(await page.evaluate(async () => {
+            const page = await openPage(browser);
+            const upload = await page.evaluate(async () => {
                 const ext = window.STBgLoader;
-                const a = await ext.cacheManager.saveMedia('<html><body style="background:#111">local-a</body></html>', 'migrate-a.html', 'html', 'local');
-                const b = await ext.cacheManager.saveMedia('<html><body style="background:#222">local-b</body></html>', 'migrate-b.html', 'html', 'local');
-                ext.settings.activeMediaId = a.id;
-                ext.saveSettings();
-                return [a.id, b.id];
-            })));
+                const item = await ext.cacheManager.saveMedia(
+                    '<!DOCTYPE html><html><body style="background:#456">server-origin-test</body></html>',
+                    'stbg-origin-test.html', 'html', 'local');
+                return { id: item.id, url: item.url, name: item.name };
+            });
+            uploadedId = upload.id;
+            ok('S1.1 upload returns server URL', upload.url.startsWith('backgrounds/'), upload.url);
+
+            const served = await page.evaluate(async (url) => {
+                const r = await fetch(url);
+                return { status: r.status, type: r.headers.get('content-type'), range: r.headers.get('accept-ranges'), body: (await r.text()).includes('server-origin-test') };
+            }, upload.url);
+            ok('S1.2 file served from server with Range', served.status === 200 && served.body && served.range === 'bytes', `${served.status} ${served.type}`);
+
+            const manifest = await page.evaluate(async () => {
+                const r = await fetch(`/backgrounds/st-bg-loader-manifest.json?t=${Date.now()}`, { cache: 'no-store' });
+                if (!r.ok) return null;
+                return r.json();
+            });
+            ok('S1.3 manifest catalogs the entry', !!manifest && manifest.items.some(i => i.id === uploadedId));
+
+            const roundTrip = await page.evaluate(async (id) => {
+                const item = await window.STBgLoader.cacheManager.getMedia(id);
+                return !!item && item.id === id;
+            }, uploadedId);
+            ok('S1.4 stable id round-trip', roundTrip);
+
+            // Cross-page visibility: a fresh page sees the same library entry
+            const page2 = await openPage(browser);
+            const visible = await page2.evaluate(async (id) => {
+                const item = await window.STBgLoader.cacheManager.getMedia(id);
+                return !!item;
+            }, uploadedId);
+            ok('S1.5 library visible from a fresh page', visible);
+            await page2.close();
             await page.close();
         }
 
-        // ============ Scenario 3: cloud mode with mock SDK ============
+        // ============ S2: browser cache is evictable without touching the server ============
+        {
+            const page = await openPage(browser);
+            const cacheState = await page.evaluate(async (id) => {
+                const ext = window.STBgLoader;
+                const item = await ext.cacheManager.getMedia(id);
+                await ext.cacheManager.clearAll();          // cache maintenance
+                await ext.cacheManager.cleanLRU(1);         // aggressive LRU
+                const usage = await ext.cacheManager.getCacheUsage();
+                const r = await fetch(item.url);
+                return { usageCount: usage.itemCount, serverStatus: r.status, body: (await r.text()).includes('server-origin-test') };
+            }, uploadedId);
+            ok('S2.1 clear/LRU touch only the cache', cacheState.usageCount === 0, `cache entries=${cacheState.usageCount}`);
+            ok('S2.2 server file survives cache maintenance', cacheState.serverStatus === 200 && cacheState.body);
+            await page.close();
+        }
+
+        // ============ S3: explicit delete removes the server file ============
+        {
+            const page = await openPage(browser);
+            const deleted = await page.evaluate(async (id) => {
+                const ext = window.STBgLoader;
+                const item = await ext.cacheManager.getMedia(id);
+                const url = item.url;
+                await ext.cacheManager.deleteMedia(id);
+                const r = await fetch(url);
+                const manifest = await (await fetch(`/backgrounds/st-bg-loader-manifest.json?t=${Date.now()}`, { cache: 'no-store' })).json();
+                return { status: r.status, inManifest: manifest.items.some(i => i.id === id) };
+            }, uploadedId);
+            ok('S3.1 explicit delete removes server file', deleted.status === 404);
+            ok('S3.2 manifest entry removed', !deleted.inManifest);
+            await page.close();
+        }
+
+        // ============ S4: URL import downloads + dedupes, without stubs ============
+        {
+            const page = await openPage(browser);
+            const urlImport = await page.evaluate(async () => {
+                const api = window.stBgLoader;
+                const testUrl = window.location.origin + '/favicon.ico';
+                const first = (await api.preloadMedia([testUrl], { concurrency: 1 }))[0];
+                const second = (await api.preloadMedia(testUrl))[0];
+                const list = await api.getMediaList();
+                return { firstSuccess: first?.success, secondCached: second?.cached, found: list.some(i => i.url === testUrl) };
+            });
+            ok('S4.1 URL import stored server-side + dedupe', urlImport.firstSuccess && urlImport.secondCached && urlImport.found,
+                JSON.stringify(urlImport));
+            await page.close();
+        }
+
+        // ============ S5: legacy browser library migrates once, ids preserved ============
+        {
+            localStorage_flag_recovery: {
+                const page = await openPage(browser, { seedLegacy: true });
+                await page.evaluate(() => localStorage.removeItem('st_bgloader_legacy_migrated_v2'));
+                await page.evaluate(async () => {
+                    // Re-run the migration explicitly for determinism (init may have raced the seed).
+                    const ext = window.STBgLoader;
+                    await ext.cacheManager.migrateLegacyForTest?.();
+                });
+                const migrated = await page.evaluate(async () => {
+                    for (let i = 0; i < 20; i++) {
+                        const item = await window.STBgLoader.cacheManager.getMedia('bg_legacy_seed_1');
+                        if (item) {
+                            const r = await fetch(item.url);
+                            return { found: true, status: r.status };
+                        }
+                        await new Promise(res => setTimeout(res, 250));
+                    }
+                    return { found: false };
+                });
+                ok('S5.1 legacy item migrated with id preserved', migrated.found && migrated.status === 200, JSON.stringify(migrated));
+                await page.close();
+            }
+        }
+
+        // ============ S6: Authority enhancement (mock): settings sync + agent tools ============
         {
             const page = await openPage(browser, { mock: true });
+            const caps = await page.evaluate(() => window.STBgLoader.getAuthorityBridge().getCapabilities());
+            ok('S6.1 Authority enhancement detected', caps.available === true && caps.sync === true && caps.agentTools === true);
 
-            // 3.1 bridge picks the cloud origin
-            const cloud = await page.evaluate(() => ({
-                isCloud: window.STBgLoader.getCacheManager().isCloudBacked(),
-                caps: window.STBgLoader.getAuthorityBridge().getCapabilities(),
-                declared: !!window.__authMockInitConfig,
-            }));
-            ok('S3.1 bridge activates cloud origin', cloud.isCloud === true && cloud.caps.cloudLibrary === true && cloud.declared);
-
-            // 3.2 migration uploaded the pre-existing local library with ids preserved
-            let migrated = { rows: 0, ids: [] };
-            for (let i = 0; i < 20; i++) {
-                migrated = await page.evaluate(ids => ({
-                    rows: window.__authMockState.rows.length,
-                    ids: window.__authMockState.rows.map(r => r.id),
-                }), localIds);
-                if (localIds.every(id => migrated.ids.includes(id))) break;
-                await sleep(500);
-            }
-            ok('S3.2 local->cloud migration preserved ids', localIds.every(id => migrated.ids.includes(id)), `rows=${migrated.rows}`);
-            const activeRestored = await page.evaluate(id => !!window.STBgLoader.settings.activeMediaId, localIds[0]);
-
-            // 3.3 saveMedia writes through to the cloud origin
-            const put = await page.evaluate(async () => {
-                const ext = window.STBgLoader;
-                const item = await ext.cacheManager.saveMedia('<html><body style="background:#333">cloud-upload</body></html>', 'cloud-upload.html', 'html', 'local');
-                return {
-                    id: item.id,
-                    catalogRows: window.__authMockState.rows.length,
-                    blobs: window.__authMockState.blobStore.size,
-                    l1: await (await caches.open('st-bg-cache-v1')).match(item.cacheKey).then(r => !!r),
-                };
-            });
-            ok('S3.3 write-through to cloud origin', put.catalogRows >= 3 && put.blobs >= 3, `rows=${put.catalogRows} blobs=${put.blobs}`);
-            ok('S3.3b L1 hot cache backfilled on save', put.l1 === true);
-
-            // 3.4 clearing L1 keeps the source; playback re-pulls from the origin
-            const repull = await page.evaluate(async () => {
-                const ext = window.STBgLoader;
-                const items = await ext.cacheManager.listMedia();
-                const item = items.find(i => i.name === 'cloud-upload.html');
-                const cache = await caches.open('st-bg-cache-v1');
-                await cache.delete(item.cacheKey);
-                const gone = !(await cache.match(item.cacheKey));
-                const url = await ext.cacheManager.getMediaBlobUrl(item);
-                const back = !!(await cache.match(item.cacheKey));
-                return { gone, url: url.startsWith('blob:'), back };
-            });
-            ok('S3.4 cache wipe -> origin pull-through re-fills L1', repull.gone && repull.url && repull.back);
-
-            // 3.5 LRU evicts only L1; cloud catalog never loses data
-            const lru = await page.evaluate(async () => {
-                const ext = window.STBgLoader;
-                await ext.cacheManager.cleanLRU(1);
-                const catalog = await ext.cacheManager.listMedia();
-                const cache = await caches.open('st-bg-cache-v1');
-                let l1Entries = 0;
-                for (const item of catalog) {
-                    if (await cache.match(item.cacheKey)) l1Entries += 1;
-                }
-                return { catalogCount: catalog.length, l1Entries };
-            });
-            ok('S3.5 LRU evicts L1 only, source preserved', lru.catalogCount >= 3 && lru.l1Entries === 0, `catalog=${lru.catalogCount} l1=${lru.l1Entries}`);
-
-            // 3.6 settings sync: push to cloud mirror
-            await page.evaluate(() => {
-                window.STBgLoader.getSettings().volume = 0.42;
+            const pushed = await page.evaluate(async () => {
+                window.STBgLoader.getSettings().volume = 0.33;
                 window.STBgLoader.saveSettings();
+                for (let i = 0; i < 10; i++) {
+                    await new Promise(r => setTimeout(r, 500));
+                    const payload = window.__authMockState.kvStore.get('settings:data');
+                    if (payload?.settings?.volume === 0.33) return true;
+                }
+                return false;
             });
-            let mirror = { rev: 0, volume: null };
-            for (let i = 0; i < 10; i++) {
-                await sleep(500);
-                mirror = await page.evaluate(() => {
-                    const kv = window.__authMockState.kvStore;
-                    const payload = kv.get('settings:data');
-                    return { rev: kv.get('settings:rev') || 0, volume: payload?.settings?.volume ?? null };
-                });
-                if (mirror.volume === 0.42) break;
-            }
-            ok('S3.6 settings pushed to cloud mirror', mirror.volume === 0.42, `rev=${mirror.rev}`);
+            ok('S6.2 settings mirrored to Authority KV', pushed);
 
-            // 3.7 settings sync: remote change applied within the poll window
-            await page.evaluate(() => {
-                const kv = window.__authMockState.kvStore;
-                const payload = kv.get('settings:data');
-                payload.revision += 7;
-                payload.fingerprint = 'remote-device-simulation';
-                payload.settings.volume = 0.11;
-                kv.set('settings:data', payload);
-                kv.set('settings:rev', payload.revision);
+            const agentOn = await page.evaluate(async () => {
+                const ext = window.STBgLoader;
+                ext.getSettings().agentToolsEnabled = true;
+                ext.saveSettings();
+                ext.syncAgentTools();
+                for (let i = 0; i < 10; i++) {
+                    await new Promise(r => setTimeout(r, 300));
+                    if (window.__authMockState.calls.registerTools > 0) return true;
+                }
+                return false;
             });
-            let remoteVolume = null;
-            for (let i = 0; i < 16; i++) {
-                await sleep(1000);
-                remoteVolume = await page.evaluate(() => window.STBgLoader.getSettings().volume);
-                if (remoteVolume === 0.11) break;
-            }
-            ok('S3.7 remote settings change converges to local session', remoteVolume === 0.11, `volume=${remoteVolume}`);
-
-            ok('S3.8 active background reference survived migration', activeRestored === true);
-
-            // 3.9 cloud status panel reflects the cloud source of truth
-            const panel = await page.evaluate(() => {
-                const status = document.querySelector('#st_bgloader_cloud_status');
-                const cb = document.querySelector('#st_bgloader_agent_tools_cb');
-                return {
-                    hasStatus: !!status,
-                    cloudText: (status?.textContent || '').includes('Authority'),
-                    agentCbPresent: !!cb,
-                    agentCbEnabled: cb ? !cb.disabled : false,
-                };
-            });
-            ok('S3.9 cloud panel reflects cloud backend', panel.hasStatus && panel.cloudText && panel.agentCbPresent && panel.agentCbEnabled);
+            ok('S6.3 agent tools registered on enable (opt-in)', agentOn, `calls=${await page.evaluate(() => window.__authMockState.calls.registerTools)}`);
             await page.close();
         }
 
-        // ============ Summary ============
-        console.log(`\n📊 Authority scenarios: ${passed} passed, ${failed} failed`);
+        // ============ S7: degradation without Authority keeps media fully working ============
+        {
+            const page = await openPage(browser);
+            const caps = await page.evaluate(() => window.STBgLoader.getAuthorityBridge().getCapabilities());
+            const media = await page.evaluate(async () => {
+                const items = await window.STBgLoader.cacheManager.listMedia();
+                return { count: items.length, cloud: window.STBgLoader.cacheManager.isCloudBacked() };
+            });
+            ok('S7.1 no Authority: enhancement off', caps.available === false && caps.sync === false, `reason=${caps.degradedReason}`);
+            ok('S7.2 no Authority: media library fully functional', media.cloud === true && media.count > 0, `items=${media.count}`);
+            await page.close();
+        }
+
+        console.log(`\n📊 Server-origin scenarios: ${passed} passed, ${failed} failed`);
         process.exit(failed > 0 ? 1 : 0);
     } finally {
         await browser.close();
@@ -307,9 +311,9 @@ async function main() {
 main().catch(err => {
     // Unreachable instance = environment without a running SillyTavern: skip, not fail.
     if (/ERR_|ECONNREFUSED|net::ERR|Timeout|timeout/i.test(err.message)) {
-        console.warn('⏭️ Test instance unreachable, skipping Authority scenarios:', err.message);
+        console.warn('⏭️ Test instance unreachable, skipping server-origin scenarios:', err.message);
         process.exit(0);
     }
-    console.error('💥 Authority scenarios crashed:', err.message);
+    console.error('💥 Server-origin scenarios crashed:', err.message);
     process.exit(1);
 });

@@ -13,12 +13,12 @@ export interface MediaPutInput {
 /**
  * Source-of-truth storage backend for the media catalog and its binaries.
  *
- * - `local`: browser CacheStorage (binaries) + IndexedDB (catalog). Data lives and dies with this browser profile.
- * - `authority`: Authority server plugin. `storage.blob` holds binaries, `sql.private` holds the catalog.
- *   The browser only keeps an evictable hot cache (L1) managed by CacheManager.
+ * - `server`: the SillyTavern server's own backgrounds/ directory (native endpoints + static
+ *   Range streaming). Always available; this is the source of truth.
+ * - `local`/`authority`: historical kinds kept for typing compatibility of legacy readers.
  */
 export interface MediaOrigin {
-    readonly kind: 'authority' | 'local';
+    readonly kind: 'server' | 'authority' | 'local';
     init(): Promise<void>;
     listCatalog(): Promise<MediaItem[]>;
     getCatalogItem(id: string): Promise<MediaItem | null>;
