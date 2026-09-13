@@ -82,9 +82,8 @@ export class AudioVisualizer {
             if (this.ctx) {
                 this.ctx.clearRect(0, 0, this.width, this.height);
             }
-            if (this.mediaContainerEl) {
-                this.mediaContainerEl.style.filter = '';
-            }
+            // Note: never touch the container's CSS filter here — that channel belongs to the
+            // user's visual presets (MediaMount.applyFilters); pulse mode only writes transform.
         } else {
             if (this.currentOptions.mode === 'spectrum') {
                 this.canvas.style.display = 'block';

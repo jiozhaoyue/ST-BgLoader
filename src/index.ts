@@ -18,6 +18,8 @@ import { ShortcutManager } from './core/ShortcutManager';
 import { AuthorityBridge } from './backend/AuthorityBridge';
 import { SettingsSync } from './backend/SettingsSync';
 import { LocalToCloudMigrator } from './backend/Migration';
+import { AgentBridge, AgentToolHost } from './backend/AgentBridge';
+import { WeatherOptions, WeatherType } from './types';
 
 const SETTINGS_KEY = 'st_bgloader_settings';
 
@@ -40,6 +42,7 @@ export class STBgLoaderExtension {
     private shortcutManager: ShortcutManager;
     private authorityBridge: AuthorityBridge = new AuthorityBridge();
     private settingsSync: SettingsSync | null = null;
+    private agentBridge: AgentBridge | null = null;
     public publicApi: PublicAPI;
 
     constructor() {
@@ -329,6 +332,7 @@ export class STBgLoaderExtension {
 
         // 11.5 Cross-device settings sync (Authority cloud mirror; no-op in local mode)
         await this.startSettingsSync();
+        this.syncAgentTools();
 
         // 12. Hook into SillyTavern EventSource
         this.hookSillyTavernEvents();
@@ -374,6 +378,40 @@ export class STBgLoaderExtension {
         this.shortcutManager.setEnabled(this.settings.shortcutsEnabled);
         this.triggerManager.setRules(this.settings.triggerRules || []);
         this.sceneManager.setUserScenes(this.settings.scenes || {});
+        this.syncAgentTools();
+    }
+
+    /** Opt-in Agent Runtime ambient tools (AI director mode); requires the cloud backend. */
+    private syncAgentTools(): void {
+        const caps = this.authorityBridge.getCapabilities();
+        const client = this.authorityBridge.getClient();
+        const want = caps.agentTools && this.settings.agentToolsEnabled && !!client;
+
+        if (want && !this.agentBridge && client) {
+            this.agentBridge = new AgentBridge(client, this.buildAgentHost());
+            this.agentBridge.start();
+            console.log('[ST-BgLoader] Agent ambient tools enabled.');
+        } else if (!want && this.agentBridge) {
+            this.agentBridge.stop();
+            this.agentBridge = null;
+            console.log('[ST-BgLoader] Agent ambient tools disabled.');
+        }
+    }
+
+    private buildAgentHost(): AgentToolHost {
+        return {
+            setBackground: (target) => this.publicApi.setBackground(target),
+            playBGM: (url) => this.publicApi.playBGM(url),
+            setWeather: (type, density) => {
+                this.publicApi.setWeather(
+                    type as WeatherType,
+                    density ? { density: density as WeatherOptions['density'] } : undefined,
+                );
+            },
+            applyPreset: (presetId) => this.publicApi.applyPreset(presetId),
+            setFilters: (filters) => this.publicApi.setFilters(filters),
+            applyScene: (sceneId) => this.publicApi.applyScene(sceneId),
+        };
     }
 
     private startCloudMigration(): void {

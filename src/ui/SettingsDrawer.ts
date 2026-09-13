@@ -380,6 +380,16 @@ export class SettingsDrawer {
                         </div>
                     </div>
 
+                    <!-- Authority Cloud Storage Status -->
+                    <div class="st-bgloader-section">
+                        <h4><i class="fa-solid fa-cloud"></i> 云端存储 (Authority Backend)</h4>
+                        <div id="st_bgloader_cloud_status" style="font-size:0.9em; line-height:1.6;">检测中...</div>
+                        <label style="display:flex; align-items:center; gap:8px; font-size:0.9em; margin-top:6px;">
+                            <input type="checkbox" id="st_bgloader_agent_tools_cb" />
+                            允许 Authority Agent 调度氛围工具（AI 导演模式）
+                        </label>
+                    </div>
+
                 </div>
             </div>
         `;
@@ -392,6 +402,26 @@ export class SettingsDrawer {
         this.refreshMediaGrid();
         this.refreshTriggerList();
         this.updateCacheStats();
+        this.updateCloudPanel();
+    }
+
+    /** Reflects the storage-inversion state: Authority cloud source of truth vs browser-local mode. */
+    public updateCloudPanel(): void {
+        const statusEl = this.container?.querySelector('#st_bgloader_cloud_status') as HTMLElement | null;
+        const agentCb = this.container?.querySelector('#st_bgloader_agent_tools_cb') as HTMLInputElement | null;
+        if (!statusEl) return;
+
+        const cloud = this.cacheManager.isCloudBacked();
+        if (cloud) {
+            statusEl.innerHTML = '<span style="color:#4fae6b;">● 已连接 Authority 后端</span><br/>媒体库源端：服务器（跨设备可用，浏览器仅保留热缓存，LRU 不会删除云端数据）';
+        } else {
+            statusEl.innerHTML = '<span style="color:#c9a34f;">● 本地模式</span><br/>未检测到 Authority 后端：媒体库仅存于当前浏览器（清理站点数据或更换设备将丢失）。安装 Authority 服务端插件后自动启用云存储。';
+        }
+
+        if (agentCb) {
+            agentCb.checked = !!this.settings.agentToolsEnabled;
+            agentCb.disabled = !cloud;
+        }
     }
 
     private populateScenes(): void {
@@ -747,6 +777,13 @@ export class SettingsDrawer {
         interCb?.addEventListener('change', () => {
             this.settings.interactiveBackground = interCb.checked;
             this.callbacks.onInteractiveChanged(interCb.checked);
+            this.callbacks.onSettingsChanged(this.settings);
+        });
+
+        // Authority Agent ambient tools toggle (opt-in, requires the cloud backend)
+        const agentCb = this.container.querySelector('#st_bgloader_agent_tools_cb') as HTMLInputElement;
+        agentCb?.addEventListener('change', () => {
+            this.settings.agentToolsEnabled = agentCb.checked;
             this.callbacks.onSettingsChanged(this.settings);
         });
 

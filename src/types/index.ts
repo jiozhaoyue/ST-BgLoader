@@ -175,6 +175,9 @@ export interface BgLoaderSettings {
 
     // Keyboard Shortcuts
     shortcutsEnabled: boolean;
+
+    // Authority backend (opt-in): register ambient tools into the Agent Runtime
+    agentToolsEnabled: boolean;
 }
 
 export type AmbientSoundType = 'off' | 'rain' | 'fire' | 'wind';
@@ -304,4 +307,5 @@ export const DEFAULT_SETTINGS: BgLoaderSettings = {
     },
     scenes: {},
     shortcutsEnabled: true,
+    agentToolsEnabled: false,
 };

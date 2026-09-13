@@ -74,7 +74,7 @@ const E = {
     frostedChat: !0,
     isBuiltin: !0
   }
-}, P = {
+}, B = {
   enabled: !0,
   activeMediaId: null,
   volume: 0.8,
@@ -128,11 +128,12 @@ const E = {
     opacity: 75
   },
   scenes: {},
-  shortcutsEnabled: !0
-}, at = "extension:third-party/ST-BgLoader", j = "st_bgloader_cloud_notice_v1";
+  shortcutsEnabled: !0,
+  agentToolsEnabled: !1
+}, rt = "extension:third-party/ST-BgLoader", X = "st_bgloader_cloud_notice_v1";
 class T {
   static EXTENSION_ID = "third-party/ST-BgLoader";
-  static CHANNEL = at;
+  static CHANNEL = rt;
   client = null;
   caps = {
     available: !1,
@@ -211,38 +212,38 @@ class T {
   notifyOnce(t, e) {
     console.info(`[ST-BgLoader] ${e} (${t})`);
     try {
-      if (localStorage.getItem(j)) return;
-      localStorage.setItem(j, (/* @__PURE__ */ new Date()).toISOString());
+      if (localStorage.getItem(X)) return;
+      localStorage.setItem(X, (/* @__PURE__ */ new Date()).toISOString());
       const i = window.toastr;
       i?.info(e, "ST-BgLoader");
     } catch {
     }
   }
 }
-const X = 32768;
-function nt(c) {
+const K = 32768;
+function ot(c) {
   let t = "";
-  for (let e = 0; e < c.length; e += X)
-    t += String.fromCharCode(...c.subarray(e, e + X));
+  for (let e = 0; e < c.length; e += K)
+    t += String.fromCharCode(...c.subarray(e, e + K));
   return btoa(t);
 }
-function st(c) {
+function nt(c) {
   const t = atob(c), e = new ArrayBuffer(t.length), i = new Uint8Array(e);
   for (let s = 0; s < t.length; s++)
     i[s] = t.charCodeAt(s);
   return i;
 }
-const rt = "st_bg_loader_db", ot = 1, y = "media_items";
-class lt {
+const lt = "st_bg_loader_db", ct = 1, f = "media_items";
+class ht {
   kind = "local";
   db = null;
   async init() {
     this.db || (this.db = await new Promise((t, e) => {
-      const i = indexedDB.open(rt, ot);
+      const i = indexedDB.open(lt, ct);
       i.onupgradeneeded = (s) => {
         const a = s.target.result;
-        if (!a.objectStoreNames.contains(y)) {
-          const r = a.createObjectStore(y, { keyPath: "id" });
+        if (!a.objectStoreNames.contains(f)) {
+          const r = a.createObjectStore(f, { keyPath: "id" });
           r.createIndex("type", "type", { unique: !1 }), r.createIndex("lastUsedTimestamp", "lastUsedTimestamp", { unique: !1 });
         }
       }, i.onsuccess = () => t(i.result), i.onerror = () => e(i.error);
@@ -250,13 +251,13 @@ class lt {
   }
   async listCatalog() {
     return this.db || await this.init(), new Promise((t, e) => {
-      const s = this.db.transaction(y, "readonly").objectStore(y).getAll();
+      const s = this.db.transaction(f, "readonly").objectStore(f).getAll();
       s.onsuccess = () => t(s.result || []), s.onerror = () => e(s.error);
     });
   }
   async getCatalogItem(t) {
     return this.db || await this.init(), new Promise((e, i) => {
-      const a = this.db.transaction(y, "readonly").objectStore(y).get(t);
+      const a = this.db.transaction(f, "readonly").objectStore(f).get(t);
       a.onsuccess = () => e(a.result || null), a.onerror = () => i(a.error);
     });
   }
@@ -281,7 +282,7 @@ class lt {
     const e = await this.getCatalogItem(t);
     if (!e) return;
     await (await caches.open(M)).delete(e.cacheKey), await new Promise((s, a) => {
-      const n = this.db.transaction(y, "readwrite").objectStore(y).delete(t);
+      const n = this.db.transaction(f, "readwrite").objectStore(f).delete(t);
       n.onsuccess = () => s(), n.onerror = () => a(n.error);
     });
   }
@@ -314,7 +315,7 @@ class lt {
   }
   async clearCatalog() {
     this.db || await this.init(), await new Promise((t, e) => {
-      const s = this.db.transaction(y, "readwrite").objectStore(y).clear();
+      const s = this.db.transaction(f, "readwrite").objectStore(f).clear();
       s.onsuccess = () => t(), s.onerror = () => e(s.error);
     });
   }
@@ -327,7 +328,7 @@ class lt {
   }
   async putCatalogRow(t) {
     await new Promise((e, i) => {
-      const a = this.db.transaction(y, "readwrite").objectStore(y).put(t);
+      const a = this.db.transaction(f, "readwrite").objectStore(f).put(t);
       a.onsuccess = () => e(), a.onerror = () => i(a.error);
     });
   }
@@ -365,7 +366,7 @@ function z(c, t) {
   }
 }
 const v = "default";
-class ct {
+class dt {
   constructor(t) {
     this.client = t;
   }
@@ -407,7 +408,7 @@ class ct {
       statement: `SELECT id, blob_id, name, type, source, remote_url, size, mime_type,
                         added_timestamp, last_used_timestamp, has_audio
                         FROM media_items ORDER BY last_used_timestamp DESC`
-    })).rows.map((e) => B(e));
+    })).rows.map((e) => P(e));
   }
   async getCatalogItem(t) {
     const e = await this.client.sql.query({
@@ -417,7 +418,7 @@ class ct {
                         FROM media_items WHERE id = ?`,
       params: [t]
     });
-    return e.rows.length > 0 ? B(e.rows[0]) : null;
+    return e.rows.length > 0 ? P(e.rows[0]) : null;
   }
   async putMedia(t) {
     const e = t.id ?? "bg_" + Date.now() + "_" + Math.random().toString(36).substring(2, 9), i = t.blob.type || z(t.name, t.type), s = t.source === "url" && t.blob.size === 0;
@@ -425,8 +426,8 @@ class ct {
     if (!s) {
       const o = new Uint8Array(await t.blob.arrayBuffer());
       r = o.byteLength, a = (await this.client.storage.blob.put({
-        name: `media/${e}/${ht(t.name)}`,
-        content: nt(o),
+        name: `media/${e}/${ut(t.name)}`,
+        content: ot(o),
         encoding: "base64",
         contentType: i
       })).id;
@@ -467,7 +468,7 @@ class ct {
   async deleteMedia(t) {
     const e = await this.getCatalogItem(t);
     if (!e) return;
-    const i = K(e.cacheKey);
+    const i = Y(e.cacheKey);
     i && await this.client.storage.blob.delete(i), await this.client.sql.exec({
       database: v,
       statement: "DELETE FROM media_items WHERE id = ?",
@@ -477,9 +478,9 @@ class ct {
   async readMedia(t) {
     const e = await this.getCatalogItem(t.id);
     if (!e) return null;
-    const i = K(e.cacheKey);
+    const i = Y(e.cacheKey);
     if (!i) return null;
-    const s = await this.client.storage.blob.get(i), a = st(s.content);
+    const s = await this.client.storage.blob.get(i), a = nt(s.content);
     return new Blob([a], { type: s.record.contentType || e.mimeType });
   }
   async touchMedia(t, e) {
@@ -501,13 +502,13 @@ class ct {
                         FROM media_items WHERE remote_url = ?`,
       params: [t]
     });
-    return e.rows.length > 0 ? B(e.rows[0]) : null;
+    return e.rows.length > 0 ? P(e.rows[0]) : null;
   }
 }
-function ht(c) {
+function ut(c) {
   return (c || "media").replace(/[^a-zA-Z0-9._-]/g, "_");
 }
-function K(c) {
+function Y(c) {
   if (!c.startsWith("/st-bg-cache/")) return null;
   const t = c.slice(13);
   return !t || t.startsWith("url/") ? null : t;
@@ -515,7 +516,7 @@ function K(c) {
 function x(c, t = 0) {
   return typeof c == "number" ? c : Number(c ?? t) || t;
 }
-function B(c) {
+function P(c) {
   const t = typeof c.remote_url == "string" ? c.remote_url : null, e = typeof c.blob_id == "string" ? c.blob_id : "";
   return {
     id: String(c.id),
@@ -531,12 +532,12 @@ function B(c) {
     hasAudio: x(c.has_audio) === 1
   };
 }
-class dt {
+class gt {
   constructor(t) {
     this.bridge = t;
   }
   async import(t) {
-    const e = ut(t);
+    const e = pt(t);
     if (!e)
       throw new Error(`Cannot import from invalid URL: ${t}`);
     if (!await this.bridge.ensureHttpAllowed(e))
@@ -547,18 +548,18 @@ class dt {
     const s = await i.http.fetch({ url: t, method: "GET" });
     if (!s.ok)
       throw new Error(`Server fetch failed with HTTP ${s.status} for ${t}`);
-    const a = st(s.body);
+    const a = nt(s.body);
     return new Blob([a], { type: s.contentType || "application/octet-stream" });
   }
 }
-function ut(c) {
+function pt(c) {
   try {
     return new URL(c).hostname;
   } catch {
     return null;
   }
 }
-class gt {
+class mt {
   origin;
   localOrigin;
   authorityOrigin = null;
@@ -567,16 +568,16 @@ class gt {
   l1 = null;
   objectUrls = /* @__PURE__ */ new Map();
   constructor() {
-    this.localOrigin = new lt(), this.origin = this.localOrigin;
+    this.localOrigin = new ht(), this.origin = this.localOrigin;
   }
   async init(t) {
     if ("caches" in window && (this.l1 = await caches.open("st-bg-cache-v1")), t) {
       this.bridge = t;
       const e = await t.detectAndInit(), i = t.getClient();
       if (e.available && i) {
-        this.authorityOrigin = new ct(i);
+        this.authorityOrigin = new dt(i);
         try {
-          await this.authorityOrigin.init(), this.origin = this.authorityOrigin, this.remoteImporter = new dt(t), console.log("[ST-BgLoader] Media library source of truth: Authority backend (cloud).");
+          await this.authorityOrigin.init(), this.origin = this.authorityOrigin, this.remoteImporter = new gt(t), console.log("[ST-BgLoader] Media library source of truth: Authority backend (cloud).");
         } catch (s) {
           this.authorityOrigin = null, console.warn("[ST-BgLoader] Cloud catalog unavailable, using local source of truth:", s);
         }
@@ -691,7 +692,7 @@ class gt {
     return z(t, e);
   }
 }
-class pt {
+class yt {
   audioElement = null;
   attachedVideo = null;
   volume = 0.8;
@@ -883,7 +884,7 @@ class pt {
     }), this.audioContext = null), this.attachedVideo = null, this.playlist = [];
   }
 }
-class Y {
+class J {
   videoElement = null;
   container;
   audioEngine;
@@ -929,7 +930,7 @@ class Y {
     this.videoElement && (this.audioEngine.attachVideo(null), this.videoElement.pause(), this.videoElement.removeAttribute("src"), this.videoElement.load(), this.videoElement.remove(), this.videoElement = null);
   }
 }
-class J {
+class Q {
   iframeElement = null;
   container;
   constructor(t) {
@@ -951,7 +952,7 @@ class J {
     this.iframeElement && (this.iframeElement.srcdoc = "", this.iframeElement.src = "about:blank", this.iframeElement.remove(), this.iframeElement = null);
   }
 }
-class Q {
+class Z {
   imageElement = null;
   container;
   constructor(t) {
@@ -989,7 +990,7 @@ class Q {
     this.imageElement && (this.imageElement.remove(), this.imageElement = null);
   }
 }
-class mt {
+class ft {
   hostEl = null;
   containerEl = null;
   layerA = null;
@@ -1033,7 +1034,7 @@ class mt {
     if (!this.hostEl) return;
     window.getComputedStyle(this.hostEl).position === "static" && (this.hostEl.style.position = "relative");
     let e = this.hostEl.querySelector(".st-bg-media-container");
-    e ? (this.layerA = e.querySelector(".st-bg-layer-a"), this.layerB = e.querySelector(".st-bg-layer-b")) : (e = document.createElement("div"), e.className = "st-bg-media-container", e.style.position = "absolute", e.style.top = "0", e.style.left = "0", e.style.width = "100%", e.style.height = "100%", e.style.overflow = "hidden", e.style.zIndex = "0", e.style.pointerEvents = "none", this.layerA = document.createElement("div"), this.layerA.className = "st-bg-layer st-bg-layer-a", this.setupLayerStyle(this.layerA), this.layerB = document.createElement("div"), this.layerB.className = "st-bg-layer st-bg-layer-b", this.setupLayerStyle(this.layerB), e.appendChild(this.layerA), e.appendChild(this.layerB), this.hostEl.appendChild(e)), this.containerEl = e, this.videoRendererA = new Y(this.layerA, this.audioEngine), this.videoRendererB = new Y(this.layerB, this.audioEngine), this.iframeRendererA = new J(this.layerA), this.iframeRendererB = new J(this.layerB), this.imageRendererA = new Q(this.layerA), this.imageRendererB = new Q(this.layerB), this.observer = new MutationObserver(() => this.syncFitting()), this.observer.observe(this.hostEl, { attributes: !0, attributeFilter: ["class"] }), this.syncFitting();
+    e ? (this.layerA = e.querySelector(".st-bg-layer-a"), this.layerB = e.querySelector(".st-bg-layer-b")) : (e = document.createElement("div"), e.className = "st-bg-media-container", e.style.position = "absolute", e.style.top = "0", e.style.left = "0", e.style.width = "100%", e.style.height = "100%", e.style.overflow = "hidden", e.style.zIndex = "0", e.style.pointerEvents = "none", this.layerA = document.createElement("div"), this.layerA.className = "st-bg-layer st-bg-layer-a", this.setupLayerStyle(this.layerA), this.layerB = document.createElement("div"), this.layerB.className = "st-bg-layer st-bg-layer-b", this.setupLayerStyle(this.layerB), e.appendChild(this.layerA), e.appendChild(this.layerB), this.hostEl.appendChild(e)), this.containerEl = e, this.videoRendererA = new J(this.layerA, this.audioEngine), this.videoRendererB = new J(this.layerB, this.audioEngine), this.iframeRendererA = new Q(this.layerA), this.iframeRendererB = new Q(this.layerB), this.imageRendererA = new Z(this.layerA), this.imageRendererB = new Z(this.layerB), this.observer = new MutationObserver(() => this.syncFitting()), this.observer.observe(this.hostEl, { attributes: !0, attributeFilter: ["class"] }), this.syncFitting();
   }
   setupLayerStyle(t) {
     t.style.position = "absolute", t.style.top = "0", t.style.left = "0", t.style.width = "100%", t.style.height = "100%", t.style.opacity = "0", t.style.transition = `all ${this.transitionDurationMs}ms cubic-bezier(0.4, 0, 0.2, 1)`, t.style.pointerEvents = "none";
@@ -1056,8 +1057,8 @@ class mt {
     if (!this.containerEl || !this.layerA || !this.layerB) return;
     if (this.crossfadeTimer !== null) {
       clearTimeout(this.crossfadeTimer), this.crossfadeTimer = null;
-      const p = this.activeLayer === "A" ? this.videoRendererB : this.videoRendererA, f = this.activeLayer === "A" ? this.iframeRendererB : this.iframeRendererA, b = this.activeLayer === "A" ? this.imageRendererB : this.imageRendererA;
-      p.destroy(), f.destroy(), b.destroy();
+      const p = this.activeLayer === "A" ? this.videoRendererB : this.videoRendererA, y = this.activeLayer === "A" ? this.iframeRendererB : this.iframeRendererA, b = this.activeLayer === "A" ? this.imageRendererB : this.imageRendererA;
+      p.destroy(), y.destroy(), b.destroy();
       const m = this.activeLayer === "A" ? this.layerB : this.layerA;
       m && (m.style.opacity = "0", m.style.transform = "none", m.style.filter = "none");
     }
@@ -1084,15 +1085,15 @@ class mt {
     const g = this.transitionType;
     g === "zoom_fade" ? (s.style.transform = "scale(1.06)", s.style.opacity = "0", s.offsetHeight, s.style.transform = "scale(1)", s.style.opacity = "1", a.style.transform = "scale(0.96)", a.style.opacity = "0") : g === "blur_fade" ? (s.style.filter = "blur(10px)", s.style.opacity = "0", s.offsetHeight, s.style.filter = "blur(0px)", s.style.opacity = "1", a.style.filter = "blur(10px)", a.style.opacity = "0") : g === "slide_left" ? (s.style.transform = "translate3d(100%, 0, 0)", s.style.opacity = "1", s.offsetHeight, s.style.transform = "translate3d(0, 0, 0)", a.style.transform = "translate3d(-100%, 0, 0)", a.style.opacity = "0") : g === "slide_right" ? (s.style.transform = "translate3d(-100%, 0, 0)", s.style.opacity = "1", s.offsetHeight, s.style.transform = "translate3d(0, 0, 0)", a.style.transform = "translate3d(100%, 0, 0)", a.style.opacity = "0") : (s.style.transform = "none", s.style.filter = "none", s.style.opacity = "1", a.style.transform = "none", a.style.filter = "none", a.style.opacity = "0"), this.activeLayer = i, this.crossfadeTimer = window.setTimeout(() => {
       this.crossfadeTimer = null;
-      const p = this.activeLayer === "A" ? this.videoRendererB : this.videoRendererA, f = this.activeLayer === "A" ? this.iframeRendererB : this.iframeRendererA, b = this.activeLayer === "A" ? this.imageRendererB : this.imageRendererA;
-      p.destroy(), f.destroy(), b.destroy(), a.style.transform = "none", a.style.filter = "none";
+      const p = this.activeLayer === "A" ? this.videoRendererB : this.videoRendererA, y = this.activeLayer === "A" ? this.iframeRendererB : this.iframeRendererA, b = this.activeLayer === "A" ? this.imageRendererB : this.imageRendererA;
+      p.destroy(), y.destroy(), b.destroy(), a.style.transform = "none", a.style.filter = "none";
     }, h + 50);
   }
   clear() {
     this.crossfadeTimer !== null && (clearTimeout(this.crossfadeTimer), this.crossfadeTimer = null), this.layerA && (this.layerA.style.opacity = "0", this.layerA.style.transform = "none", this.layerA.style.filter = "none"), this.layerB && (this.layerB.style.opacity = "0", this.layerB.style.transform = "none", this.layerB.style.filter = "none"), this.videoRendererA?.destroy(), this.videoRendererB?.destroy(), this.iframeRendererA?.destroy(), this.iframeRendererB?.destroy(), this.imageRendererA?.destroy(), this.imageRendererB?.destroy();
   }
 }
-class ft {
+class bt {
   container = null;
   settings;
   cacheManager;
@@ -1419,9 +1420,26 @@ class ft {
                         </div>
                     </div>
 
+                    <!-- Authority Cloud Storage Status -->
+                    <div class="st-bgloader-section">
+                        <h4><i class="fa-solid fa-cloud"></i> 云端存储 (Authority Backend)</h4>
+                        <div id="st_bgloader_cloud_status" style="font-size:0.9em; line-height:1.6;">检测中...</div>
+                        <label style="display:flex; align-items:center; gap:8px; font-size:0.9em; margin-top:6px;">
+                            <input type="checkbox" id="st_bgloader_agent_tools_cb" />
+                            允许 Authority Agent 调度氛围工具（AI 导演模式）
+                        </label>
+                    </div>
+
                 </div>
             </div>
-        `, t.appendChild(i), this.container = i, this.bindEvents(), this.populatePresets(), this.populateScenes(), this.refreshMediaGrid(), this.refreshTriggerList(), this.updateCacheStats();
+        `, t.appendChild(i), this.container = i, this.bindEvents(), this.populatePresets(), this.populateScenes(), this.refreshMediaGrid(), this.refreshTriggerList(), this.updateCacheStats(), this.updateCloudPanel();
+  }
+  /** Reflects the storage-inversion state: Authority cloud source of truth vs browser-local mode. */
+  updateCloudPanel() {
+    const t = this.container?.querySelector("#st_bgloader_cloud_status"), e = this.container?.querySelector("#st_bgloader_agent_tools_cb");
+    if (!t) return;
+    const i = this.cacheManager.isCloudBacked();
+    i ? t.innerHTML = '<span style="color:#4fae6b;">● 已连接 Authority 后端</span><br/>媒体库源端：服务器（跨设备可用，浏览器仅保留热缓存，LRU 不会删除云端数据）' : t.innerHTML = '<span style="color:#c9a34f;">● 本地模式</span><br/>未检测到 Authority 后端：媒体库仅存于当前浏览器（清理站点数据或更换设备将丢失）。安装 Authority 服务端插件后自动启用云存储。', e && (e.checked = !!this.settings.agentToolsEnabled, e.disabled = !i);
   }
   populateScenes() {
     const t = this.container?.querySelector("#st_scene_select");
@@ -1517,10 +1535,10 @@ class ft {
         alert("Cannot delete built-in presets.");
     });
     const h = (l, u, S, _) => {
-      const G = this.container.querySelector(l), W = this.container.querySelector(u);
-      G?.addEventListener("input", () => {
-        const H = Number(G.value);
-        W && (W.textContent = `${H}${S}`), _(H), this.callbacks.onSettingsChanged(this.settings);
+      const W = this.container.querySelector(l), H = this.container.querySelector(u);
+      W?.addEventListener("input", () => {
+        const j = Number(W.value);
+        H && (H.textContent = `${j}${S}`), _(j), this.callbacks.onSettingsChanged(this.settings);
       });
     };
     h("#st_filter_blur", "#st_filter_blur_val", "px", (l) => this.settings.filters.blur = l), h("#st_filter_brightness", "#st_filter_brightness_val", "%", (l) => this.settings.filters.brightness = l), h("#st_filter_opacity", "#st_filter_opacity_val", "%", (l) => this.settings.filters.opacity = l), h("#st_filter_saturate", "#st_filter_saturate_val", "%", (l) => this.settings.filters.saturate = l);
@@ -1536,9 +1554,9 @@ class ft {
     }), h("#st_weather_opacity", "#st_weather_opacity_val", "%", (l) => {
       this.settings.weather.opacity = l / 100, this.callbacks.onWeatherChanged?.(this.settings.weather);
     });
-    const f = this.container.querySelector("#st_visualizer_mode");
-    f?.addEventListener("change", () => {
-      this.settings.visualizer.mode = f.value, this.callbacks.onVisualizerChanged?.(this.settings.visualizer), this.callbacks.onSettingsChanged(this.settings);
+    const y = this.container.querySelector("#st_visualizer_mode");
+    y?.addEventListener("change", () => {
+      this.settings.visualizer.mode = y.value, this.callbacks.onVisualizerChanged?.(this.settings.visualizer), this.callbacks.onSettingsChanged(this.settings);
     }), h("#st_visualizer_sens", "#st_visualizer_sens_val", "x", (l) => {
       this.settings.visualizer.sensitivity = l / 10, this.callbacks.onVisualizerChanged?.(this.settings.visualizer);
     });
@@ -1568,13 +1586,13 @@ class ft {
     }), h("#st_transition_dur", "#st_transition_dur_val", "ms", (l) => {
       this.settings.transitionDurationMs = l, this.callbacks.onTransitionChanged?.(this.settings.transitionEffect, this.settings.transitionDurationMs);
     }), h("#st_audio_volume", "#st_audio_volume_val", "%", (l) => this.settings.volume = l / 100);
-    const U = this.container.querySelector("#st_playback_mode");
-    U?.addEventListener("change", () => {
-      this.settings.playbackMode = U.value, this.callbacks.onPlaybackModeChanged(this.settings.playbackMode), this.callbacks.onSettingsChanged(this.settings);
-    });
-    const q = this.container.querySelector("#st_audio_mute");
+    const q = this.container.querySelector("#st_playback_mode");
     q?.addEventListener("change", () => {
-      this.settings.muted = q.checked, this.callbacks.onSettingsChanged(this.settings);
+      this.settings.playbackMode = q.value, this.callbacks.onPlaybackModeChanged(this.settings.playbackMode), this.callbacks.onSettingsChanged(this.settings);
+    });
+    const U = this.container.querySelector("#st_audio_mute");
+    U?.addEventListener("change", () => {
+      this.settings.muted = U.checked, this.callbacks.onSettingsChanged(this.settings);
     });
     const A = this.container.querySelector("#st_audio_muffle");
     A?.addEventListener("change", () => {
@@ -1591,6 +1609,10 @@ class ft {
     const L = this.container.querySelector("#st_bg_interactive");
     L?.addEventListener("change", () => {
       this.settings.interactiveBackground = L.checked, this.callbacks.onInteractiveChanged(L.checked), this.callbacks.onSettingsChanged(this.settings);
+    });
+    const G = this.container.querySelector("#st_bgloader_agent_tools_cb");
+    G?.addEventListener("change", () => {
+      this.settings.agentToolsEnabled = G.checked, this.callbacks.onSettingsChanged(this.settings);
     });
     const I = this.container.querySelector("#st_mini_player_toggle");
     I?.addEventListener("change", () => {
@@ -1715,7 +1737,7 @@ class ft {
     return ["mp4", "webm", "mov", "m4v", "ogv"].includes(i) || e.startsWith("video/") ? "video" : ["mp3", "wav", "ogg", "flac", "aac", "m4a"].includes(i) || e.startsWith("audio/") ? "audio" : i === "html" || i === "htm" ? "html" : i === "svg" ? "svg" : "image";
   }
 }
-class yt {
+class vt {
   observer = null;
   onNativeMediaSelect;
   constructor(t) {
@@ -1753,7 +1775,7 @@ class yt {
     this.observer && (this.observer.disconnect(), this.observer = null);
   }
 }
-class bt {
+class wt {
   container = null;
   audioEngine;
   isVisible = !0;
@@ -1843,7 +1865,7 @@ class bt {
     this.hideTimer !== null && (clearTimeout(this.hideTimer), this.hideTimer = null), this.container && (this.container.remove(), this.container = null);
   }
 }
-class vt {
+class St {
   ext;
   eventListeners = /* @__PURE__ */ new Map();
   constructor(t) {
@@ -2138,7 +2160,7 @@ class vt {
     return ["mp4", "webm", "mov", "m4v", "ogv"].includes(e) ? "video" : ["mp3", "wav", "ogg", "flac", "aac", "m4a"].includes(e) ? "audio" : e === "html" || e === "htm" ? "html" : e === "svg" ? "svg" : "image";
   }
 }
-class wt {
+class _t {
   canvas;
   ctx = null;
   parentEl = null;
@@ -2313,7 +2335,7 @@ class wt {
     this.stop(), window.removeEventListener("resize", this.onWindowResize), this.resizeObserver && (this.resizeObserver.disconnect(), this.resizeObserver = null), this.canvas.parentElement && this.canvas.parentElement.removeChild(this.canvas), this.particles = [], this.ripples = [];
   }
 }
-class St {
+class Et {
   canvas;
   ctx = null;
   parentEl = null;
@@ -2350,7 +2372,7 @@ class St {
       this.dataArray = null;
   }
   setOptions(t) {
-    this.currentOptions = { ...t }, this.currentOptions.mode === "off" ? (this.stop(), this.canvas.style.display = "none", this.ctx && this.ctx.clearRect(0, 0, this.width, this.height), this.mediaContainerEl && (this.mediaContainerEl.style.filter = "")) : (this.currentOptions.mode === "spectrum" ? this.canvas.style.display = "block" : this.canvas.style.display = "none", this.start());
+    this.currentOptions = { ...t }, this.currentOptions.mode === "off" ? (this.stop(), this.canvas.style.display = "none", this.ctx && this.ctx.clearRect(0, 0, this.width, this.height)) : (this.currentOptions.mode === "spectrum" ? this.canvas.style.display = "block" : this.canvas.style.display = "none", this.start());
   }
   start() {
     if (this.animFrameId !== null) return;
@@ -2391,8 +2413,8 @@ class St {
           g.addColorStop(0, `${n}22`), g.addColorStop(0.7, `${n}aa`), g.addColorStop(1, `${n}ff`), i.fillStyle = g;
           const p = this.height - h;
           i.beginPath();
-          const f = Math.min(a / 2, 3);
-          i.roundRect(r, p, a - 1.5, h, [f, f, 0, 0]), i.fill();
+          const y = Math.min(a / 2, 3);
+          i.roundRect(r, p, a - 1.5, h, [y, y, 0, 0]), i.fill();
         }
         if (r += a, r > this.width) break;
       }
@@ -2402,7 +2424,7 @@ class St {
     this.stop(), window.removeEventListener("resize", this.onResize), this.canvas.parentElement && this.canvas.parentElement.removeChild(this.canvas), this.mediaContainerEl && (this.mediaContainerEl.style.transform = "", this.mediaContainerEl.style.transition = "");
   }
 }
-class _t {
+class Mt {
   targetEl = null;
   options = {
     enabled: !1,
@@ -2455,7 +2477,7 @@ class _t {
     this.disable(), this.targetEl = null;
   }
 }
-class Et {
+class xt {
   rules = [];
   onTriggerCallback;
   eventSourceUnlisteners = [];
@@ -2538,7 +2560,7 @@ class Et {
     this.unbindEvents(), this.rules = [], this.onTriggerCallback = void 0;
   }
 }
-class Mt {
+class Ct {
   ctx = null;
   gainNode = null;
   activeSource = null;
@@ -2606,8 +2628,8 @@ class Mt {
     }
     const p = t.createBufferSource();
     p.buffer = i, p.loop = !0;
-    const f = t.createBiquadFilter();
-    f.type = "lowpass", f.frequency.value = 1200, p.connect(f), f.connect(this.gainNode), p.start(0), this.activeSource = p;
+    const y = t.createBiquadFilter();
+    y.type = "lowpass", y.frequency.value = 1200, p.connect(y), y.connect(this.gainNode), p.start(0), this.activeSource = p;
   }
   /**
    * Synthesize Fire: Low rumble pink noise + stochastic crackle bursts
@@ -2641,7 +2663,7 @@ class Mt {
     }), this.ctx = null), this.gainNode = null;
   }
 }
-class xt {
+class Tt {
   styleEl = null;
   options = {
     enabled: !1,
@@ -2684,7 +2706,7 @@ class xt {
     document.body.classList.remove("st-bgloader-frosted-active"), this.styleEl && this.styleEl.parentElement && (this.styleEl.parentElement.removeChild(this.styleEl), this.styleEl = null);
   }
 }
-class Z {
+class tt {
   userScenes = {};
   onApplySceneCallback;
   constructor(t = {}, e) {
@@ -2719,7 +2741,7 @@ class Z {
     return e ? (console.log(`[ST-BgLoader SceneManager] Applying scene: "${e.name}"`), this.onApplySceneCallback?.(e), !0) : (console.warn(`[ST-BgLoader SceneManager] Scene "${t}" not found.`), !1);
   }
 }
-class tt {
+class et {
   isEnabled = !0;
   actions;
   constructor(t = {}) {
@@ -2741,8 +2763,8 @@ class tt {
     window.removeEventListener("keydown", this.onKeyDown);
   }
 }
-const et = "settings:rev", it = "settings:data", Ct = 2e3, Tt = 1e4;
-class kt {
+const it = "settings:rev", st = "settings:data", kt = 2e3, At = 1e4;
+class Lt {
   constructor(t, e) {
     this.client = t, this.onRemoteSettings = e;
   }
@@ -2769,7 +2791,7 @@ class kt {
       } catch (t) {
         console.warn("[ST-BgLoader] Failed to read cloud settings mirror:", t);
       }
-      this.pollTimer = window.setInterval(() => void this.pollOnce(), Tt);
+      this.pollTimer = window.setInterval(() => void this.pollOnce(), At);
     }
   }
   stop() {
@@ -2778,11 +2800,11 @@ class kt {
   schedulePush(t) {
     !this.running || this.applyingRemote || (this.pushTimer !== null && window.clearTimeout(this.pushTimer), this.pushTimer = window.setTimeout(() => {
       this.pushTimer = null, this.push(t);
-    }, Ct));
+    }, kt));
   }
   async push(t) {
     try {
-      const e = JSON.stringify(t), i = await At(e);
+      const e = JSON.stringify(t), i = await It(e);
       if (i === this.lastPushedFingerprint) return;
       const s = this.localRevision + 1, a = {
         revision: s,
@@ -2790,7 +2812,7 @@ class kt {
         updatedAt: Date.now(),
         settings: t
       };
-      await this.client.storage.kv.set(it, a), await this.client.storage.kv.set(et, s), this.localRevision = s, this.lastPushedFingerprint = i;
+      await this.client.storage.kv.set(st, a), await this.client.storage.kv.set(it, s), this.localRevision = s, this.lastPushedFingerprint = i;
     } catch (e) {
       console.warn("[ST-BgLoader] Failed to push settings to cloud mirror:", e);
     }
@@ -2798,7 +2820,7 @@ class kt {
   async pollOnce() {
     if (!this.applyingRemote)
       try {
-        const t = await this.client.storage.kv.get(et);
+        const t = await this.client.storage.kv.get(it);
         if ((typeof t == "number" ? t : 0) <= this.localRevision) return;
         const i = await this.readPayload();
         if (!i || i.revision <= this.localRevision) return;
@@ -2818,13 +2840,13 @@ class kt {
       }
   }
   async readPayload() {
-    const t = await this.client.storage.kv.get(it);
+    const t = await this.client.storage.kv.get(st);
     if (!t || typeof t != "object") return null;
     const e = t;
     return typeof e.revision != "number" || !e.settings || typeof e.fingerprint != "string" ? null : e;
   }
 }
-async function At(c) {
+async function It(c) {
   try {
     if (crypto?.subtle) {
       const e = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(c));
@@ -2838,7 +2860,7 @@ async function At(c) {
   return "djb2:" + (t >>> 0).toString(16);
 }
 const O = "migration:local-to-cloud:v1";
-class Lt {
+class Rt {
   constructor(t, e, i) {
     this.local = t, this.cloud = e, this.client = i;
   }
@@ -2883,10 +2905,199 @@ class Lt {
     }
   }
 }
+const at = 3e4, Bt = 2e3, Pt = [
+  {
+    id: "stbg_set_background",
+    title: "设置背景媒体",
+    description: "Switch the chat background to a media library id, scene asset, or remote URL.",
+    inputSchema: {
+      type: "object",
+      properties: { target: { type: "string", description: "Media id, name, or URL" } },
+      required: ["target"]
+    }
+  },
+  {
+    id: "stbg_apply_scene",
+    title: "应用氛围场景",
+    description: "Apply a saved audiovisual scene snapshot (background, BGM, weather, filters).",
+    inputSchema: {
+      type: "object",
+      properties: { sceneId: { type: "string" } },
+      required: ["sceneId"]
+    }
+  },
+  {
+    id: "stbg_set_weather",
+    title: "设置天气粒子",
+    description: "Set the atmospheric weather FX (rain, snow, sakura, cyber_motes, scanlines, off).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        type: { type: "string", enum: ["off", "rain", "snow", "sakura", "cyber_motes", "scanlines"] },
+        density: { type: "string", enum: ["low", "medium", "high"] }
+      },
+      required: ["type"]
+    }
+  },
+  {
+    id: "stbg_play_bgm",
+    title: "播放背景音乐",
+    description: "Play a BGM track from a media library id or URL.",
+    inputSchema: {
+      type: "object",
+      properties: { url: { type: "string" } },
+      required: ["url"]
+    }
+  },
+  {
+    id: "stbg_apply_preset",
+    title: "应用滤镜预设",
+    description: "Apply a visual filter preset id (default, cinema_dark, cyberpunk, ...).",
+    inputSchema: {
+      type: "object",
+      properties: { presetId: { type: "string" } },
+      required: ["presetId"]
+    }
+  },
+  {
+    id: "stbg_set_filters",
+    title: "设置视觉滤镜",
+    description: "Set visual filter values directly (blur px, brightness %, opacity %, saturate %).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        blur: { type: "number" },
+        brightness: { type: "number" },
+        opacity: { type: "number" },
+        saturate: { type: "number" }
+      }
+    }
+  }
+];
+class Ot {
+  constructor(t, e) {
+    this.client = t, this.host = e;
+  }
+  timer = null;
+  registerTimer = null;
+  running = !1;
+  pendingSubmit = null;
+  claimSeq = 0;
+  start() {
+    this.running || (this.running = !0, this.register(), this.claimLoop(), this.registerTimer = window.setInterval(() => void this.register(), at));
+  }
+  stop() {
+    this.running = !1, this.timer !== null && window.clearTimeout(this.timer), this.registerTimer !== null && window.clearInterval(this.registerTimer), this.timer = null, this.registerTimer = null;
+  }
+  agentApi() {
+    return this.client.agent?.browser ?? null;
+  }
+  async register() {
+    if (this.running)
+      try {
+        const t = this.agentApi();
+        if (!t) return;
+        await t.registerTools({
+          browserInstanceId: "st-bgloader-main",
+          leaseDurationMs: at * 2,
+          tools: Pt.map((e) => ({
+            id: e.id,
+            title: e.title,
+            description: e.description,
+            inputSchema: e.inputSchema,
+            riskLevel: "low",
+            approvalPolicy: "never",
+            mutatesWorkspace: !1
+          }))
+        }), console.log("[ST-BgLoader] Agent ambient tools registered.");
+      } catch (t) {
+        console.warn("[ST-BgLoader] Agent tool registration failed (will retry):", t);
+      }
+  }
+  claimLoop() {
+    this.running && (this.timer = window.setTimeout(() => {
+      this.claimOnce().finally(() => this.claimLoop());
+    }, Bt));
+  }
+  async claimOnce() {
+    const t = this.agentApi();
+    if (!(!t || !this.running))
+      try {
+        this.pendingSubmit && (await this.reportResult(this.pendingSubmit.claimId, this.pendingSubmit.invocation, "completed", void 0), this.pendingSubmit = null);
+        const e = `stbg-claim-${Date.now()}-${this.claimSeq++}`, s = (await t.claim({ browserInstanceId: "st-bgloader-main", claimId: e })).invocation;
+        if (!s) return;
+        let a, r;
+        try {
+          a = await this.execute(s.toolId, s.arguments);
+        } catch (n) {
+          r = n instanceof Error ? n.message : String(n);
+        }
+        if (r) {
+          await t.submitResult({
+            runId: s.runId,
+            callId: s.callId,
+            claimId: e,
+            browserInstanceId: "st-bgloader-main",
+            status: "failed",
+            error: r
+          });
+          return;
+        }
+        try {
+          await t.submitResult({
+            runId: s.runId,
+            callId: s.callId,
+            claimId: e,
+            browserInstanceId: "st-bgloader-main",
+            status: "completed",
+            result: a
+          });
+        } catch {
+          this.pendingSubmit = { claimId: e, invocation: { runId: s.runId, callId: s.callId } };
+        }
+      } catch {
+      }
+  }
+  async reportResult(t, e, i, s) {
+    const a = this.agentApi();
+    a && await a.submitResult({
+      runId: e.runId,
+      callId: e.callId,
+      claimId: t,
+      browserInstanceId: "st-bgloader-main",
+      status: i,
+      error: s
+    });
+  }
+  async execute(t, e) {
+    const i = e ?? {};
+    switch (t) {
+      case "stbg_set_background":
+        return await this.host.setBackground(String(i.target ?? "")), { ok: !0 };
+      case "stbg_apply_scene":
+        return { ok: this.host.applyScene(String(i.sceneId ?? "")) };
+      case "stbg_set_weather":
+        return this.host.setWeather(String(i.type ?? "off"), i.density ? String(i.density) : void 0), { ok: !0 };
+      case "stbg_play_bgm":
+        return await this.host.playBGM(String(i.url ?? "")), { ok: !0 };
+      case "stbg_apply_preset":
+        return this.host.applyPreset(String(i.presetId ?? "default")), { ok: !0 };
+      case "stbg_set_filters":
+        return this.host.setFilters({
+          blur: typeof i.blur == "number" ? i.blur : void 0,
+          brightness: typeof i.brightness == "number" ? i.brightness : void 0,
+          opacity: typeof i.opacity == "number" ? i.opacity : void 0,
+          saturate: typeof i.saturate == "number" ? i.saturate : void 0
+        }), { ok: !0 };
+      default:
+        throw new Error(`Unknown tool: ${t}`);
+    }
+  }
+}
 const F = "st_bgloader_settings";
-class It {
+class Ft {
   isInitialized = !1;
-  settings = { ...P };
+  settings = { ...B };
   cacheManager;
   audioEngine;
   mediaMount;
@@ -2903,9 +3114,10 @@ class It {
   shortcutManager;
   authorityBridge = new T();
   settingsSync = null;
+  agentBridge = null;
   publicApi;
   constructor() {
-    this.cacheManager = new gt(), this.audioEngine = new pt(), this.mediaMount = new mt(this.audioEngine), this.atmosphereFX = new wt(), this.audioVisualizer = new St(), this.parallaxController = new _t(), this.triggerManager = new Et(), this.ambientSoundGenerator = new Mt(), this.frostedGlassController = new xt(), this.sceneManager = new Z(), this.shortcutManager = new tt(), this.publicApi = new vt(this);
+    this.cacheManager = new mt(), this.audioEngine = new yt(), this.mediaMount = new ft(this.audioEngine), this.atmosphereFX = new _t(), this.audioVisualizer = new Et(), this.parallaxController = new Mt(), this.triggerManager = new xt(), this.ambientSoundGenerator = new Ct(), this.frostedGlassController = new Tt(), this.sceneManager = new tt(), this.shortcutManager = new et(), this.publicApi = new St(this);
   }
   getCacheManager() {
     return this.cacheManager;
@@ -2965,7 +3177,7 @@ class It {
       this.audioVisualizer.setAnalyser(n);
     };
     const s = (await this.cacheManager.listMedia()).filter((n) => n.type === "audio");
-    this.audioEngine.setPlaylist(s), this.miniPlayer = new bt(this.audioEngine), this.miniPlayer.render(this.settings.showMiniPlayer, this.settings.capsuleOnPlayOnly);
+    this.audioEngine.setPlaylist(s), this.miniPlayer = new wt(this.audioEngine), this.miniPlayer.render(this.settings.showMiniPlayer, this.settings.capsuleOnPlayOnly);
     const a = this.audioEngine.onTrackChange;
     this.audioEngine.onTrackChange = (n) => {
       a?.(n), this.publicApi.emit("track-change", n);
@@ -2975,13 +3187,13 @@ class It {
       r?.(n), this.publicApi.emit("play-state-change", n);
     }, this.triggerManager.setRules(this.settings.triggerRules || []), this.triggerManager.setTriggerCallback(async (n, o) => {
       console.log(`[ST-BgLoader] Executing trigger rule: "${o.name}"`), n.mediaIdOrUrl && await this.publicApi.setBackground(n.mediaIdOrUrl), n.bgmUrl && await this.publicApi.playBGM(n.bgmUrl), n.weather && this.publicApi.setWeather(n.weather), n.preset && this.publicApi.applyPreset(n.preset), n.filters && this.publicApi.setFilters(n.filters);
-    }), this.sceneManager = new Z(this.settings.scenes || {}, async (n) => {
+    }), this.sceneManager = new tt(this.settings.scenes || {}, async (n) => {
       if (n.mediaId) {
         const o = await this.cacheManager.getMedia(n.mediaId);
         o && await this.applyMedia(o);
       } else n.mediaUrl && await this.publicApi.setBackground(n.mediaUrl);
       n.bgmUrl && await this.publicApi.playBGM(n.bgmUrl), n.presetId && this.publicApi.applyPreset(n.presetId), n.filters && this.publicApi.setFilters(n.filters), n.weather && this.publicApi.setWeather(n.weather), n.visualizer && this.publicApi.setVisualizer(n.visualizer), n.parallax && this.publicApi.setParallax(n.parallax.enabled, n.parallax.intensity), n.ambientSound && this.publicApi.setAmbientSound(n.ambientSound), typeof n.frostedChat == "boolean" && this.publicApi.setFrostedChat(n.frostedChat);
-    }), this.shortcutManager = new tt({
+    }), this.shortcutManager = new et({
       onToggleBackground: () => {
         const n = this.mediaMount.getContainerElement();
         n && (n.style.display = n.style.display === "none" ? "block" : "none");
@@ -3000,7 +3212,7 @@ class It {
         const n = this.settings.frostedChat.enabled;
         this.publicApi.setFrostedChat(!n);
       }
-    }), this.shortcutManager.setEnabled(this.settings.shortcutsEnabled), this.settingsDrawer = new ft(this.settings, this.cacheManager, {
+    }), this.shortcutManager.setEnabled(this.settings.shortcutsEnabled), this.settingsDrawer = new bt(this.settings, this.cacheManager, {
       onSettingsChanged: (n) => {
         this.settings = n, this.saveSettings(), this.applySettingsToSubsystems();
       },
@@ -3053,7 +3265,7 @@ class It {
         }
         await this.applyMedia(n);
       }
-    }), this.settingsDrawer.render(), this.nativeAugmenter = new yt(async (n, o, d) => {
+    }), this.settingsDrawer.render(), this.nativeAugmenter = new vt(async (n, o, d) => {
       const h = {
         id: "native_" + d,
         name: d,
@@ -3069,7 +3281,7 @@ class It {
       await this.applyMedia(h);
     }), this.nativeAugmenter.start(), document.addEventListener("visibilitychange", () => {
       this.audioEngine.handleVisibilityChange(document.hidden, this.settings.pauseOnBlur);
-    }), await this.startSettingsSync(), this.hookSillyTavernEvents(), this.settings.activeMediaId) {
+    }), await this.startSettingsSync(), this.syncAgentTools(), this.hookSillyTavernEvents(), this.settings.activeMediaId) {
       const n = await this.cacheManager.getMedia(this.settings.activeMediaId);
       n && await this.applyMedia(n);
     }
@@ -3081,17 +3293,37 @@ class It {
     await this.mediaMount.mountMedia(t, e), this.settingsDrawer && (this.settingsDrawer.refreshMediaGrid(), this.settingsDrawer.updateCacheStats());
   }
   applySettingsToSubsystems() {
-    this.mediaMount.applyFilters(this.settings.filters), this.mediaMount.setInteractive(this.settings.interactiveBackground), this.mediaMount.setTransition(this.settings.transitionEffect, this.settings.transitionDurationMs), this.audioEngine.setVolume(this.settings.volume), this.audioEngine.setMuted(this.settings.muted), this.audioEngine.setMuffled(this.settings.muffleBGM), this.audioEngine.setPlaybackMode(this.settings.playbackMode), this.atmosphereFX.setWeather(this.settings.weather), this.audioVisualizer.setOptions(this.settings.visualizer), this.parallaxController.setOptions(this.settings.parallax), this.ambientSoundGenerator.setSound(this.settings.ambientSound), this.frostedGlassController.setOptions(this.settings.frostedChat), this.shortcutManager.setEnabled(this.settings.shortcutsEnabled), this.triggerManager.setRules(this.settings.triggerRules || []), this.sceneManager.setUserScenes(this.settings.scenes || {});
+    this.mediaMount.applyFilters(this.settings.filters), this.mediaMount.setInteractive(this.settings.interactiveBackground), this.mediaMount.setTransition(this.settings.transitionEffect, this.settings.transitionDurationMs), this.audioEngine.setVolume(this.settings.volume), this.audioEngine.setMuted(this.settings.muted), this.audioEngine.setMuffled(this.settings.muffleBGM), this.audioEngine.setPlaybackMode(this.settings.playbackMode), this.atmosphereFX.setWeather(this.settings.weather), this.audioVisualizer.setOptions(this.settings.visualizer), this.parallaxController.setOptions(this.settings.parallax), this.ambientSoundGenerator.setSound(this.settings.ambientSound), this.frostedGlassController.setOptions(this.settings.frostedChat), this.shortcutManager.setEnabled(this.settings.shortcutsEnabled), this.triggerManager.setRules(this.settings.triggerRules || []), this.sceneManager.setUserScenes(this.settings.scenes || {}), this.syncAgentTools();
+  }
+  /** Opt-in Agent Runtime ambient tools (AI director mode); requires the cloud backend. */
+  syncAgentTools() {
+    const t = this.authorityBridge.getCapabilities(), e = this.authorityBridge.getClient(), i = t.agentTools && this.settings.agentToolsEnabled && !!e;
+    i && !this.agentBridge && e ? (this.agentBridge = new Ot(e, this.buildAgentHost()), this.agentBridge.start(), console.log("[ST-BgLoader] Agent ambient tools enabled.")) : !i && this.agentBridge && (this.agentBridge.stop(), this.agentBridge = null, console.log("[ST-BgLoader] Agent ambient tools disabled."));
+  }
+  buildAgentHost() {
+    return {
+      setBackground: (t) => this.publicApi.setBackground(t),
+      playBGM: (t) => this.publicApi.playBGM(t),
+      setWeather: (t, e) => {
+        this.publicApi.setWeather(
+          t,
+          e ? { density: e } : void 0
+        );
+      },
+      applyPreset: (t) => this.publicApi.applyPreset(t),
+      setFilters: (t) => this.publicApi.setFilters(t),
+      applyScene: (t) => this.publicApi.applyScene(t)
+    };
   }
   startCloudMigration() {
     const t = this.cacheManager.getLocalOrigin(), e = this.cacheManager.getAuthorityOrigin(), i = this.authorityBridge.getClient();
-    !t || !e || !i || new Lt(t, e, i).runIfNeeded((s) => {
+    !t || !e || !i || new Rt(t, e, i).runIfNeeded((s) => {
       console.log(`[ST-BgLoader] Cloud migration: ${s.done}/${s.total} (${s.current})`), s.done === 1 && s.total > 0 && window.toastr?.info(`开始迁移本地媒体库到云端（${s.total} 项）...`, "ST-BgLoader");
     });
   }
   async startSettingsSync() {
     const t = this.authorityBridge.getClient();
-    t && (this.settingsSync = new kt(t, (e) => {
+    t && (this.settingsSync = new Lt(t, (e) => {
       this.settings = e;
       try {
         localStorage.setItem(F, JSON.stringify(this.settings));
@@ -3120,9 +3352,9 @@ class It {
   loadSettings() {
     try {
       const t = localStorage.getItem(F);
-      t && (this.settings = { ...P, ...JSON.parse(t) });
+      t && (this.settings = { ...B, ...JSON.parse(t) });
     } catch (t) {
-      console.error("[ST-BgLoader] Failed to parse saved settings:", t), this.settings = { ...P };
+      console.error("[ST-BgLoader] Failed to parse saved settings:", t), this.settings = { ...B };
     }
   }
   saveSettings() {
@@ -3134,10 +3366,10 @@ class It {
     this.settingsSync?.schedulePush(this.settings);
   }
 }
-const k = new It();
+const k = new Ft();
 document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", () => k.init()) : k.init();
 window.STBgLoader = k;
 window.stBgLoader = k.getAPI();
 export {
-  It as STBgLoaderExtension
+  Ft as STBgLoaderExtension
 };

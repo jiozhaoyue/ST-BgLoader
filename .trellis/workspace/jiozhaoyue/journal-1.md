@@ -286,3 +286,25 @@ Added procedural WebAudio ambient soundscape synthesizer, frosted glass transpar
 ### Status
 
 [OK] 实现完成已推送，E2E 回归待测试实例可用后执行
+
+## Session 10: E2E 零回归验证 + 云路径场景 + Phase F/G 收尾
+<!-- trellis-session: v=2 fp=authority-e2e-phasefg-20260913 -->
+
+**Date**: 2026-09-13
+**Task**: 09-13-authority-integration
+**Branch**: `master`
+
+### Summary
+
+启动 Dev/Luker 测试实例（HTTPS:8003，junction 指向本仓库）完成验证。首轮 E2E 第 7 项失败，通过三发 Puppeteer 探针定位根因：AudioVisualizer.setOptions('off') 无条件清空容器 style.filter —— 既有潜伏 bug（visualizer 从未写过 filter，pulse 只写 transform），被新增的 applySettingsToSubsystems（远端同步需要调 setOptions）暴露为回归。修复：删除越权清空。随后 24/24 E2E 全绿。新增 tests/authority.mjs：注入 mock AuthoritySDK（页面级 Map + 迷你 SQL 引擎）验证存储倒置全语义，11/11 通过 —— 降级本地模式、桥接激活云源端、本地→云迁移保留 id、写穿源端、L1 回填、清缓存后回拉、LRU 仅逐 L1、设置推送镜像、远端变更收敛、activeMediaId 存活、云端面板渲染；第二轮隐式验证迁移幂等。Phase F：AgentBridge 经 agent.browser 注册 6 个低风险氛围工具（背景/场景/天气/BGM/预设/滤镜），claim 循环 + 幂等 submitResult，设置项 agentToolsEnabled 默认关闭。Phase G：SettingsDrawer 新增「云端存储」状态面板与 Agent 开关。tsc + build 全绿（155.2KB）。
+
+### Verification
+
+- [OK] `npm run type-check` + `npm run build` 通过
+- [OK] `npm run test:e2e` 24/24（HTTPS 测试实例 https://127.0.0.1:8003）
+- [OK] `node tests/authority.mjs` 11/11 云路径场景
+- 备注：实例未安装 Authority 服务端（写入实例目录违反隔离规范），云路径经 mock SDK 验证；真 Authority 就位后同一套断言自动切换真后端
+
+### Status
+
+[OK] 全部完成，提交推送并归档任务
