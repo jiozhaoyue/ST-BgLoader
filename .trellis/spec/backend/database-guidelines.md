@@ -35,10 +35,18 @@ one you are touching before writing code.
 
 ## Layer 3: settings
 
-- Single `BgLoaderSettings` object in `localStorage` key `st_bgloader_settings`
-  (`src/index.ts`), merged over `DEFAULT_SETTINGS` with a spread on load.
-- Optional cloud mirror via Authority KV with revision + fingerprint (see
-  `src/backend/SettingsSync.ts`).
+- The durable copy is the server document `backgrounds/st-bg-loader-settings.json`
+  (`src/backend/ServerSettings.ts`: `{ version, revision, updatedTimestamp, settings }`),
+  written through the same native upload endpoint as the manifest via the
+  `readServerJson`/`writeServerJson` helpers in `src/backend/ServerOrigin.ts`.
+- `localStorage` key `st_bgloader_settings` (+ `st_bgloader_settings_rev` for the
+  revision) is the fast cache and degraded fallback; writes are immediate, server
+  writes are debounced (800ms) and serialized with latest-payload-wins.
+- Init reconciliation (`reconcileSettings` in `src/index.ts`): higher revision wins,
+  server wins ties; a local copy with no server document is uploaded (first-run
+  migration). Missing/unparsable server doc degrades to localStorage-only with a warn.
+- Optional additional mirror via Authority KV with its own revision + fingerprint
+  (see `src/backend/SettingsSync.ts`).
 
 ---
 

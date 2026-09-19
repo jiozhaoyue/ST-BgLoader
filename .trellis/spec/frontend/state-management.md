@@ -12,8 +12,11 @@ private settings: BgLoaderSettings = { ...DEFAULT_SETTINGS };
 ```
 
 - Type + defaults in `src/types/index.ts` (`BgLoaderSettings`, `DEFAULT_SETTINGS`).
-- Persisted as JSON in `localStorage` key `st_bgloader_settings`; loading merges a
-  stored partial over `DEFAULT_SETTINGS` with a spread, so new fields default cleanly.
+- Persisted as JSON in `localStorage` key `st_bgloader_settings` (fast cache) and as the
+  durable server document `st-bg-loader-settings.json` (see
+  backend/database-guidelines.md); loading merges a stored partial over
+  `DEFAULT_SETTINGS` with a spread, then reconciles against the server copy by revision,
+  so new fields default cleanly and settings survive browser-cache clears.
 - Writes go through `saveSettings()`; every mutation path ends in
   `applySettingsToSubsystems()` (the fan-out — see hook-guidelines.md).
 - `settings.activeMediaId` is the mounted media pointer; every `applyMedia` updates it

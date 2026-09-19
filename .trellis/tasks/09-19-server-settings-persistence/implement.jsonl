@@ -1,0 +1,2 @@
+{"file": ".trellis/spec/backend/database-guidelines.md", "reason": "persistence layers the settings doc joins"}
+{"file": ".trellis/spec/backend/error-handling.md", "reason": "bounded waits + two-tier error rules"}

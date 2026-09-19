@@ -84,6 +84,32 @@ async function openPage(browser, { mock = false } = {}) {
     return page;
 }
 
+/** Fresh page whose localStorage is seeded before extension scripts run (migration test). */
+async function openPageWithSeededLocalSettings(browser, settingsJson, revision, volumeOverride) {
+    const page = await browser.newPage();
+    await page.evaluateOnNewDocument((snapshot, rev, vol) => {
+        const parsed = JSON.parse(snapshot);
+        parsed.volume = vol;
+        localStorage.setItem('st_bgloader_settings', JSON.stringify(parsed));
+        localStorage.setItem('st_bgloader_settings_rev', String(rev));
+    }, settingsJson, revision, volumeOverride);
+    await page.goto(TARGET_URL, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await page.waitForFunction(() => window.STBgLoader && window.STBgLoader.isInitialized, { timeout: 35000 });
+    return page;
+}
+
+/** Fresh page whose localStorage is wiped before extension scripts run (restore test). */
+async function openPageWithClearedLocalSettings(browser) {
+    const page = await browser.newPage();
+    await page.evaluateOnNewDocument(() => {
+        localStorage.removeItem('st_bgloader_settings');
+        localStorage.removeItem('st_bgloader_settings_rev');
+    });
+    await page.goto(TARGET_URL, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await page.waitForFunction(() => window.STBgLoader && window.STBgLoader.isInitialized, { timeout: 35000 });
+    return page;
+}
+
 async function main() {
     console.log('🚀 Server-origin storage scenarios on', TARGET_URL);
     const browser = await puppeteer.launch({
@@ -231,6 +257,69 @@ async function main() {
             ok('S6.1 no Authority: enhancement off', caps.available === false && caps.sync === false, `reason=${caps.degradedReason}`);
             ok('S6.2 no Authority: media library fully functional', media.count > 0, `items=${media.count}`);
             await page.close();
+        }
+
+        // ============ S7: settings are server-persisted (fully backend-stored) ============
+        {
+            // Capture the pre-test marker so cleanup can restore the instance settings.
+            const page1 = await openPage(browser);
+            const originalVolume = await page1.evaluate(() => window.STBgLoader.getSettings().volume);
+            const settingsSnapshot = await page1.evaluate(() => JSON.stringify(window.STBgLoader.getSettings()));
+
+            // S7.1 migration: a local-only settings copy is uploaded when the server
+            // document does not exist (first run on a backend).
+            await page1.evaluate(async () => {
+                const headers = window.SillyTavern.getContext().getRequestHeaders({ omitContentType: true });
+                await fetch('/api/backgrounds/delete', {
+                    method: 'POST',
+                    headers: { ...headers, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ bg: 'st-bg-loader-settings.json' }),
+                });
+            });
+            const page2 = await openPageWithSeededLocalSettings(browser, settingsSnapshot, 50, 0.33);
+            const migrated = await page2.evaluate(async () => {
+                const ext = window.STBgLoader;
+                await ext.getServerSettings().flush();
+                const r = await fetch(`/backgrounds/st-bg-loader-settings.json?t=${Date.now()}`, { cache: 'no-store' });
+                if (!r.ok) return { ok: false };
+                const doc = await r.json();
+                return { ok: doc.settings && doc.settings.volume === 0.33, revision: doc.revision };
+            });
+            ok('S7.1 local-only settings migrated to the server', migrated.ok === true, `revision=${migrated.revision}`);
+
+            // S7.2 live write round-trip: a settings change reaches the server document.
+            const roundTrip = await page2.evaluate(async () => {
+                const ext = window.STBgLoader;
+                ext.getSettings().volume = 0.42;
+                ext.saveSettings();
+                await ext.getServerSettings().flush();
+                const r = await fetch(`/backgrounds/st-bg-loader-settings.json?t=${Date.now()}`, { cache: 'no-store' });
+                if (!r.ok) return { ok: false };
+                const doc = await r.json();
+                return { ok: doc.settings && doc.settings.volume === 0.42, revision: doc.revision };
+            });
+            ok('S7.2 settings change round-trips to the server', roundTrip.ok === true, `revision=${roundTrip.revision}`);
+
+            // S7.3 fresh-page restore: with localStorage wiped, settings come from the server.
+            const page3 = await openPageWithClearedLocalSettings(browser);
+            const restored = await page3.evaluate(() => {
+                const volume = window.STBgLoader.getSettings().volume;
+                const recached = !!localStorage.getItem('st_bgloader_settings');
+                return { volume, recached };
+            });
+            ok('S7.3 fresh page restores settings from the server', restored.volume === 0.42 && restored.recached,
+                `volume=${restored.volume} recached=${restored.recached}`);
+
+            // Cleanup: restore the pre-test settings on the server document.
+            await page3.evaluate(async (vol) => {
+                const ext = window.STBgLoader;
+                ext.getSettings().volume = vol;
+                ext.saveSettings();
+                await ext.getServerSettings().flush();
+            }, originalVolume);
+            await page3.close();
+            await page2.close();
+            await page1.close();
         }
 
         console.log(`\n📊 Server-origin scenarios: ${passed} passed, ${failed} failed`);

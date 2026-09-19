@@ -25,6 +25,42 @@ export function mediaUrl(filename: string): string {
     return `backgrounds/${encodeURIComponent(filename)}`;
 }
 
+function serverCsrfHeaders(): Record<string, string> {
+    try {
+        const st = (window as unknown as { SillyTavern?: { getContext?: () => { getRequestHeaders?: (o?: { omitContentType?: boolean }) => Record<string, string> } } }).SillyTavern;
+        const headers = st?.getContext?.().getRequestHeaders?.({ omitContentType: true });
+        return headers ? { ...headers } : {};
+    } catch {
+        return {};
+    }
+}
+
+/**
+ * Reads a non-media JSON document from backgrounds/ (manifest, settings). Returns null
+ * when the file is missing or unparsable — callers treat that as "first run".
+ */
+export async function readServerJson(filename: string): Promise<Record<string, unknown> | null> {
+    try {
+        const response = await fetch(`${mediaUrl(filename)}?t=${Date.now()}`, { cache: 'no-store' });
+        if (!response.ok) return null;
+        return JSON.parse(await response.text()) as Record<string, unknown>;
+    } catch (err) {
+        console.warn(`[ST-BgLoader] Server document "${filename}" is missing or unreadable:`, err);
+        return null;
+    }
+}
+
+/** Overwrites a non-media JSON document in backgrounds/ via the native upload endpoint. */
+export async function writeServerJson(filename: string, data: unknown): Promise<void> {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const form = new FormData();
+    form.append('avatar', new File([blob], filename, { type: 'application/json' }));
+    const response = await fetch('/api/backgrounds/upload', { method: 'POST', headers: serverCsrfHeaders(), body: form });
+    if (!response.ok) {
+        throw new Error(`Server upload failed for "${filename}": HTTP ${response.status}`);
+    }
+}
+
 export interface MediaPutInput {
     blob: Blob;
     name: string;
@@ -72,7 +108,7 @@ export class ServerOrigin {
         try {
             const response = await fetch('/api/backgrounds/all', {
                 method: 'POST',
-                headers: { ...this.csrfHeaders(), 'Content-Type': 'application/json' },
+                headers: { ...serverCsrfHeaders(), 'Content-Type': 'application/json' },
                 body: '{}',
             });
             if (response.ok) {
@@ -180,7 +216,7 @@ export class ServerOrigin {
 
         const response = await fetch('/api/backgrounds/delete', {
             method: 'POST',
-            headers: { ...this.csrfHeaders(), 'Content-Type': 'application/json' },
+            headers: { ...serverCsrfHeaders(), 'Content-Type': 'application/json' },
             body: JSON.stringify({ bg: filename }),
         });
         if (!response.ok) {
@@ -236,7 +272,7 @@ export class ServerOrigin {
 
         const form = new FormData();
         form.append('avatar', new File([blob], filename, { type: mimeType }));
-        const response = await fetch('/api/backgrounds/upload', { method: 'POST', headers: this.csrfHeaders(), body: form });
+        const response = await fetch('/api/backgrounds/upload', { method: 'POST', headers: serverCsrfHeaders(), body: form });
         if (!response.ok) {
             throw new Error(`Server upload failed: HTTP ${response.status}`);
         }
@@ -248,7 +284,7 @@ export class ServerOrigin {
         try {
             const response = await fetch('/api/backgrounds/all', {
                 method: 'POST',
-                headers: { ...this.csrfHeaders(), 'Content-Type': 'application/json' },
+                headers: { ...serverCsrfHeaders(), 'Content-Type': 'application/json' },
                 body: '{}',
             });
             if (response.ok) {
@@ -265,7 +301,7 @@ export class ServerOrigin {
         try {
             const form = new FormData();
             form.append('avatar', new File([blob], MANIFEST_NAME, { type: 'application/json' }));
-            const response = await fetch('/api/backgrounds/upload', { method: 'POST', headers: this.csrfHeaders(), body: form });
+            const response = await fetch('/api/backgrounds/upload', { method: 'POST', headers: serverCsrfHeaders(), body: form });
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}`);
             }
@@ -295,16 +331,6 @@ export class ServerOrigin {
             lastUsedTimestamp: entry.lastUsedTimestamp,
             hasAudio: entry.hasAudio,
         };
-    }
-
-    private csrfHeaders(): Record<string, string> {
-        try {
-            const st = (window as unknown as { SillyTavern?: { getContext?: () => { getRequestHeaders?: (o?: { omitContentType?: boolean }) => Record<string, string> } } }).SillyTavern;
-            const headers = st?.getContext?.().getRequestHeaders?.({ omitContentType: true });
-            return headers ? { ...headers } : {};
-        } catch {
-            return {};
-        }
     }
 }
 

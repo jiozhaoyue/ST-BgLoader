@@ -17,14 +17,18 @@ import { SceneManager } from './core/SceneManager';
 import { ShortcutManager } from './core/ShortcutManager';
 import { AuthorityBridge } from './backend/AuthorityBridge';
 import { SettingsSync } from './backend/SettingsSync';
+import { ServerSettings } from './backend/ServerSettings';
 import { AgentBridge, AgentToolHost } from './backend/AgentBridge';
 import { WeatherOptions, WeatherType } from './types';
 
 const SETTINGS_KEY = 'st_bgloader_settings';
+const SETTINGS_REV_KEY = 'st_bgloader_settings_rev';
 
 export class STBgLoaderExtension {
     public isInitialized: boolean = false;
     private settings: BgLoaderSettings = { ...DEFAULT_SETTINGS };
+    private settingsRevision: number = 0;
+    private serverSettings: ServerSettings = new ServerSettings();
     private cacheManager: CacheManager;
     private audioEngine: AudioEngine;
     private mediaMount: MediaMount;
@@ -73,6 +77,7 @@ export class STBgLoaderExtension {
     public getSceneManager(): SceneManager { return this.sceneManager; }
     public getShortcutManager(): ShortcutManager { return this.shortcutManager; }
     public getAuthorityBridge(): AuthorityBridge { return this.authorityBridge; }
+    public getServerSettings(): ServerSettings { return this.serverSettings; }
     public getAPI(): PublicAPI { return this.publicApi; }
 
     public clearActiveBackground(): void {
@@ -91,8 +96,9 @@ export class STBgLoaderExtension {
     public async init(): Promise<void> {
         console.log('[ST-BgLoader] Initializing Rich Media Background Plugin...');
 
-        // 1. Load persisted settings
-        this.loadSettings();
+        // 1. Load persisted settings, reconciled against the server copy (higher revision
+        //    wins; the server is the durable copy and localStorage the fast cache).
+        await this.reconcileSettings();
 
         // 2. Initialize storage: the server backgrounds/ directory is the source of truth
         //    (Authority is an optional enhancement); the browser keeps an evictable cache.
@@ -460,18 +466,48 @@ export class STBgLoaderExtension {
             if (raw) {
                 this.settings = { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
             }
+            this.settingsRevision = parseInt(localStorage.getItem(SETTINGS_REV_KEY) || '0', 10) || 0;
         } catch (e) {
             console.error('[ST-BgLoader] Failed to parse saved settings:', e);
             this.settings = { ...DEFAULT_SETTINGS };
+            this.settingsRevision = 0;
+        }
+    }
+
+    /**
+     * Merges the localStorage cache with the server settings document before any
+     * subsystem is configured: the copy with the higher revision wins (server wins
+     * ties). A local copy with no server document yet is uploaded (first-run migration).
+     */
+    private async reconcileSettings(): Promise<void> {
+        this.loadSettings();
+        try {
+            const doc = await this.serverSettings.load();
+            if (doc && doc.revision >= this.settingsRevision) {
+                this.settings = { ...DEFAULT_SETTINGS, ...doc.settings };
+                this.settingsRevision = doc.revision;
+                this.persistLocalSettings();
+            } else if (this.settingsRevision > 0) {
+                this.serverSettings.scheduleSave(this.settings, this.settingsRevision);
+            }
+        } catch (err) {
+            console.warn('[ST-BgLoader] Server settings unavailable, using local settings:', err);
+        }
+    }
+
+    private persistLocalSettings(): void {
+        try {
+            localStorage.setItem(SETTINGS_KEY, JSON.stringify(this.settings));
+            localStorage.setItem(SETTINGS_REV_KEY, String(this.settingsRevision));
+        } catch (e) {
+            console.error('[ST-BgLoader] Failed to save settings:', e);
         }
     }
 
     public saveSettings(): void {
-        try {
-            localStorage.setItem(SETTINGS_KEY, JSON.stringify(this.settings));
-        } catch (e) {
-            console.error('[ST-BgLoader] Failed to save settings:', e);
-        }
+        this.settingsRevision += 1;
+        this.persistLocalSettings();
+        this.serverSettings.scheduleSave(this.settings, this.settingsRevision);
         this.settingsSync?.schedulePush(this.settings);
     }
 }

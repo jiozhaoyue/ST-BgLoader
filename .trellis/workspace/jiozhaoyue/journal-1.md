@@ -372,4 +372,26 @@ Added procedural WebAudio ambient soundscape synthesizer, frosted glass transpar
 
 [OK] 完成并推送；bootstrap 任务三项验收全部达成
 
+## Session 14: 设置全存后端（server-native settings persistence）
+<!-- trellis-session: v=2 fp=server-settings-persistence-20260919 -->
+
+**Date**: 2026-09-19
+**Task**: 09-19-server-settings-persistence
+**Branch**: `master`
+
+### Summary
+
+持久化审计发现最后一块浏览器本地状态：设置对象（场景/聊天绑定/触发规则/预设/全部偏好）此前只存 localStorage，Authority 缺失时清浏览器缓存即全部丢失。补齐"全存后端"：新增 `src/backend/ServerSettings.ts`，完整设置文档（version/revision/updatedTimestamp/settings）落盘服务器 `backgrounds/st-bg-loader-settings.json`，复用原生 upload 端点（ServerOrigin 抽出通用 `readServerJson`/`writeServerJson` + 独立 `serverCsrfHeaders`）；localStorage 降级为快缓存。写入路径：saveSettings 即时本地 + 800ms 尾沿去抖、单飞串行、最新载荷胜出（activeMediaId 每次切背景都变，不刷服务器）；init 时 `reconcileSettings` 按 revision 收敛（高者胜、平局服务器胜），本地有而服务器无时自动上传（存量用户首跑迁移）。Authority SettingsSync 镜像不受影响。测试：authority 套件新增 S7.1 本地→服务器迁移（删服务器文档+预置 localStorage rev50）、S7.2 实时写往返、S7.3 清空 localStorage 后全新页面从服务器恢复，18/18×2（重跑验证幂等）；E2E 24/24、stress 4/4×2（异步时序有改动）、tsc+build 绿（156.30KB）。套件清理恢复原设置，服务器文档保留为正式持久副本。
+
+### Verification
+
+- [OK] `npm run type-check` + `npm run build`（156.30KB）
+- [OK] `node tests/authority.mjs` 18/18 ×2（新增 S7.1-S7.3）
+- [OK] `npm run test:e2e` 24/24 零回归
+- [OK] `node tests/stress.mjs` 4/4 ×2 零回归
+
+### Status
+
+[OK] 完成，提交推送并归档
+
 
