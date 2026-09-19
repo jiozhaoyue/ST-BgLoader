@@ -1,59 +1,48 @@
 # Component Guidelines
 
-> How components are built in this project.
+> How UI pieces ("components") are built in this framework-free project.
+
+There is no React/Vue. A "component" is a class that owns a DOM subtree and exposes
+imperative methods. Follow the established shape.
 
 ---
 
-## Overview
+## The subsystem class shape
 
-<!--
-Document your project's component conventions here.
+```ts
+export class VideoRenderer {
+    private videoElement: HTMLVideoElement | null = null;
+    constructor(container: HTMLElement, audioEngine: AudioEngine) { ... }  // deps injected
+    public async render(url: string, fitting: string): Promise<HTMLVideoElement> { ... }
+    public destroy(): void { ... }   // ALWAYS provide destroy; remove nodes + release
+}
+```
 
-Questions to answer:
-- What component patterns do you use?
-- How are props defined?
-- How do you handle composition?
-- What accessibility standards apply?
--->
-
-(To be filled by the team)
-
----
-
-## Component Structure
-
-<!-- Standard structure of a component file -->
-
-(To be filled by the team)
+- Constructor injection of dependencies; no service locator, no globals.
+- Every class that creates DOM implements `destroy()` that removes its nodes and
+  releases attached resources (`MediaMount.mountMedia` calls destroy on all three
+  renderers of a layer before rendering; `MediaMount.clear()` destroys everything).
+- `render()` methods return a promise of the created element and MUST settle
+  unconditionally (see backend/error-handling.md bounded-wait rule).
 
 ---
 
-## Props Conventions
+## Double-buffered layers
 
-<!-- How props should be defined and typed -->
-
-(To be filled by the team)
-
----
-
-## Styling Patterns
-
-<!-- How styles are applied (CSS modules, styled-components, Tailwind, etc.) -->
-
-(To be filled by the team)
+Background media mounts into layer A/B (`MediaMount`, `src/core/MediaMount.ts`): the new
+item renders on the inactive layer, a crossfade transition runs, and a timer destroys the
+old layer after `dur + 50` ms. A pending crossfade is cancelled by finalizing the
+previous state immediately at the top of `mountMedia`. Preserve this pattern for any new
+media type; do not mount outside the layer system.
 
 ---
 
-## Accessibility
+## Panels
 
-<!-- A11y requirements and patterns -->
-
-(To be filled by the team)
-
----
-
-## Common Mistakes
-
-<!-- Component-related mistakes your team has made -->
-
-(To be filled by the team)
+- `SettingsDrawer` builds its DOM programmatically and is the only large UI surface
+  (storage status panel, cloud toggle, per-feature controls). Apply remote settings via
+  `applyRemoteSettings()`, refresh grids via `refreshMediaGrid()`.
+- Overlays (`AtmosphereFX`, `AudioVisualizer`, `FrostedGlassController`) receive options
+  via `setOptions(...)` — never reach into another subsystem's DOM.
+- `setOptions` implementations must not clear styles they do not own (a visualizer
+  once wiped `style.filter` set by the filter engine — caught by the E2E suite).

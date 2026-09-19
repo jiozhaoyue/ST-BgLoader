@@ -352,3 +352,24 @@ Added procedural WebAudio ambient soundscape synthesizer, frosted glass transpar
 
 [OK] 修复完成已推送；后续方向（规范引导任务/测试自动化基建）待用户选择
 
+## Session 13: bootstrap-guidelines 规范填充（backend + frontend 全部 11 篇）
+<!-- trellis-session: v=2 fp=spec-bootstrap-fill-20260919 -->
+
+**Date**: 2026-09-19
+**Task**: 00-bootstrap-guidelines
+**Branch**: `master`
+
+### Summary
+
+基于真实代码填充 `.trellis/spec/` 全部待填文件（backend 5 + frontend 6，索引状态更新，PRD 勾选完成）。关键定调：本项目无框架无 ORM，"backend" 层 = `src/backend/` 服务端集成 + 三层持久化（服务器 backgrounds/ 目录与清单 JSON 为唯一源端、浏览器 CacheStorage+IDB 纯缓存、localStorage 设置）；"frontend" 层 = 子系统类约定（构造注入、destroy 契约、A/B 双缓冲）、设置扇出 + 事件总线（代替 hooks）、严格 TS + 中央类型模块 + 受限 as any 边界。本日 Session 12 的有界等待教训已写入 error-handling/component 规范（渲染 promise 必须无条件 settle）。
+
+### Verification
+
+- [OK] 11 篇规范全部基于真实路径与实测数据（日志级别分布、cast 计数、测试门禁）
+- [OK] spec 为文档变更，无代码影响；索引状态列与 PRD 勾选同步更新
+
+### Status
+
+[OK] 完成并推送；bootstrap 任务三项验收全部达成
+
+

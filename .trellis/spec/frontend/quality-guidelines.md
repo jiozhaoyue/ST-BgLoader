@@ -1,51 +1,53 @@
 # Quality Guidelines
 
-> Code quality standards for frontend development.
+> Code quality standards for frontend/UI development.
 
 ---
 
-## Overview
+## Gates (same as backend quality-guidelines.md)
 
-<!--
-Document your project's quality standards here.
+```bash
+npm run type-check && npm run build
+TEST_TARGET_URL=https://127.0.0.1:8003 npm run test:e2e   # 24 checks
+node tests/authority.mjs                                   # 15 scenarios
+node tests/stress.mjs                                      # 4 scenarios
+```
 
-Questions to answer:
-- What patterns are forbidden?
-- What linting rules do you enforce?
-- What are your testing requirements?
-- What code review standards apply?
--->
-
-(To be filled by the team)
-
----
-
-## Forbidden Patterns
-
-<!-- Patterns that should never be used and why -->
-
-(To be filled by the team)
+The E2E suite is the UI regression bar: it drives the real settings drawer, renderer
+mounts, visualizer, frosted glass, scenes, triggers, ambient sound, weather cycling and
+the PublicAPI surface against the running test instance. A UI change is not done until
+all 24 pass.
 
 ---
 
-## Required Patterns
+## UI code standards
 
-<!-- Patterns that must always be used -->
-
-(To be filled by the team)
+- All styles in `src/ui/style.css`; DOM elements use the `st-bg-` class prefix. No
+  inline `<style>` injection except where the frosted-glass controller deliberately
+  manages CSS custom properties.
+- Overlays sit inside `#bg1` with `pointer-events: none` unless interactive
+  (`MediaMount.setInteractive` toggles it) — keep click-through semantics.
+- Transitions rely on layer opacity/transform/filter managed exclusively by
+  `MediaMount` — never clear or overwrite those properties from another subsystem
+  (past regression: the visualizer wiped `style.filter`).
+- `destroy()` completeness: every node created is removed; every timer/listener is
+  cleared; every object URL is revoked (`CacheManager` audits revocation in stress
+  test 4).
 
 ---
 
-## Testing Requirements
+## Async/UI responsiveness
 
-<!-- What level of testing is expected -->
-
-(To be filled by the team)
+- No synchronous long work on the main thread (large blobs go through
+  `CacheStorage`/streaming, not base64 in JS).
+- Every awaited event has a bounded fallback (bounded-wait rule, see
+  backend/error-handling.md) — UI state must never depend on a promise that may never
+  settle.
 
 ---
 
-## Code Review Checklist
+## Accessibility (current reality)
 
-<!-- What reviewers should check -->
-
-(To be filled by the team)
+- The settings drawer is keyboard-reachable through SillyTavern's UI; media overlays are
+  decorative and `aria-hidden` semantics are not yet systematically applied. Do not make
+  this worse; improve when touching the drawer anyway.

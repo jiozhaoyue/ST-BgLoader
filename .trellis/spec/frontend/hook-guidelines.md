@@ -1,51 +1,48 @@
 # Hook Guidelines
 
-> How hooks are used in this project.
+> This project has no React (no hooks). Read this for the equivalent conventions.
+
+The plugin is vanilla TypeScript. Do not import a framework. The roles hooks play in
+React apps are covered by two mechanisms here.
 
 ---
 
-## Overview
+## 1. Settings fan-out instead of effects
 
-<!--
-Document your project's hook conventions here.
+When settings change, the plugin core re-applies the whole configuration to every
+subsystem through one function (`src/index.ts`):
 
-Questions to answer:
-- What custom hooks do you have?
-- How do you handle data fetching?
-- What are the naming conventions?
-- How do you share stateful logic?
--->
+```ts
+private applySettingsToSubsystems(): void {
+    this.mediaMount.applyFilters(this.settings.filters);
+    this.audioVisualizer.setOptions(this.settings.visualizer);
+    this.frostedGlassController.setOptions(this.settings.frostedChat);
+    this.triggerManager.setRules(this.settings.triggerRules || []);
+    this.syncAgentTools();
+    // ...one line per subsystem
+}
+```
 
-(To be filled by the team)
-
----
-
-## Custom Hook Patterns
-
-<!-- How to create and structure custom hooks -->
-
-(To be filled by the team)
+Convention: a subsystem exposes `setOptions(<its slice>)` / `apply*` methods and stays
+stateless w.r.t. persistence. Add your subsystem here and in `BgLoaderSettings`
+(`src/types/index.ts`) + `DEFAULT_SETTINGS`.
 
 ---
 
-## Data Fetching
+## 2. Event bus instead of context/callbacks
 
-<!-- How data fetching is handled (React Query, SWR, etc.) -->
-
-(To be filled by the team)
-
----
-
-## Naming Conventions
-
-<!-- Hook naming rules (use*, etc.) -->
-
-(To be filled by the team)
+`PublicAPI` (`src/api/PublicAPI.ts`) implements `on/off/emit` with listener-level error
+isolation. Use it for cross-module notifications (`media-change`, `preload-progress`,
+`settings-sync`) instead of ad-hoc callbacks — it is also the user scripting surface,
+so events are contract.
 
 ---
 
-## Common Mistakes
+## Async lifecycle rules (the "hook rules" that matter here)
 
-<!-- Hook-related mistakes your team has made -->
-
-(To be filled by the team)
+- Mount/render promises must settle unconditionally (bounded waits — see
+  backend/error-handling.md).
+- Timers and listeners added by a subsystem are removed in `destroy()`
+  (`crossfadeTimer`, interaction listeners).
+- Polling loops (`SettingsSync` revision poll) store their timer handle and clear it on
+  stop.

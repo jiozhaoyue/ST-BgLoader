@@ -1,51 +1,50 @@
 # State Management
 
-> How state is managed in this project.
+> Where state lives and how it flows in this project.
 
 ---
 
-## Overview
+## The one source: `settings` on the plugin core
 
-<!--
-Document your project's state management conventions here.
+```ts
+// src/index.ts
+private settings: BgLoaderSettings = { ...DEFAULT_SETTINGS };
+```
 
-Questions to answer:
-- What state management solution do you use?
-- How is local vs global state decided?
-- How do you handle server state?
-- What are the patterns for derived state?
--->
-
-(To be filled by the team)
-
----
-
-## State Categories
-
-<!-- Local state, global state, server state, URL state -->
-
-(To be filled by the team)
+- Type + defaults in `src/types/index.ts` (`BgLoaderSettings`, `DEFAULT_SETTINGS`).
+- Persisted as JSON in `localStorage` key `st_bgloader_settings`; loading merges a
+  stored partial over `DEFAULT_SETTINGS` with a spread, so new fields default cleanly.
+- Writes go through `saveSettings()`; every mutation path ends in
+  `applySettingsToSubsystems()` (the fan-out — see hook-guidelines.md).
+- `settings.activeMediaId` is the mounted media pointer; every `applyMedia` updates it
+  first, so a page reload restores the last background.
 
 ---
 
-## When to Use Global State
+## Derived/runtime state per subsystem
 
-<!-- Criteria for promoting state to global -->
-
-(To be filled by the team)
-
----
-
-## Server State
-
-<!-- How server data is cached and synchronized -->
-
-(To be filled by the team)
+Subsystems hold only runtime state (active layer, fade timers, audio context) and are
+reconfigured from settings. They never persist anything themselves.
 
 ---
 
-## Common Mistakes
+## Cloud mirror (optional Authority)
 
-<!-- State management mistakes your team has made -->
+`src/backend/SettingsSync.ts` mirrors settings into Authority KV:
 
-(To be filled by the team)
+- Every payload carries `revision` (monotonic) + `fingerprint` (content hash).
+- Pushes are debounced; a fingerprint check prevents echo loops (do not re-apply a
+  settings payload identical to the last one applied).
+- Remote wins only when its revision is newer; convergence is via a cheap revision
+  poll (no SSE assumption).
+- On remote apply: settings are replaced, persisted to localStorage (quota errors are
+  tolerated — cloud stays authoritative), and `applyRemoteSettings` refreshes the UI.
+
+---
+
+## Media library state
+
+The library itself is NOT in settings: it is the server manifest + native listing
+(see backend/database-guidelines.md). `CacheManager.listMedia()` is always re-read,
+never cached in settings. Chat-scoped bindings live in `settings.chatBindings[chatId]`
+and re-apply on SillyTavern's `CHAT_CHANGED` event.
