@@ -1,6 +1,10 @@
+// onload/onerror cover normal loads, but a stalled host fires neither; settle anyway.
+const RENDER_SETTLE_TIMEOUT_MS = 15000;
+
 export class ImageRenderer {
     private imageElement: HTMLImageElement | null = null;
     private container: HTMLElement;
+    private pendingSettle: (() => void) | null = null;
 
     constructor(container: HTMLElement) {
         this.container = container;
@@ -28,13 +32,24 @@ export class ImageRenderer {
         this.imageElement = img;
 
         return new Promise<HTMLImageElement>((resolve) => {
+            let settled = false;
+            const settle = () => {
+                if (settled) return;
+                settled = true;
+                window.clearTimeout(fallback);
+                this.pendingSettle = null;
+                resolve(img);
+            };
+            const fallback = window.setTimeout(settle, RENDER_SETTLE_TIMEOUT_MS);
+            this.pendingSettle = settle;
+
             img.onload = () => {
                 img.style.opacity = '1';
-                resolve(img);
+                settle();
             };
             img.onerror = () => {
                 console.error('[ST-BgLoader] Failed to load background image:', url);
-                resolve(img);
+                settle();
             };
         });
     }
@@ -59,6 +74,7 @@ export class ImageRenderer {
 
     public destroy(): void {
         if (this.imageElement) {
+            this.pendingSettle?.();
             this.imageElement.remove();
             this.imageElement = null;
         }

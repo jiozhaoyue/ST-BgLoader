@@ -1,5 +1,8 @@
 import { MediaItem, PlaybackMode } from '../types';
 
+// play() stays pending on a stalled host until the media stack times out; bound the wait.
+const PLAY_SETTLE_TIMEOUT_MS = 10000;
+
 export class AudioEngine {
     private audioElement: HTMLAudioElement | null = null;
     private attachedVideo: HTMLVideoElement | null = null;
@@ -132,7 +135,12 @@ export class AudioEngine {
         try {
             this.initWebAudio();
             this.resumeAudioContext();
-            await this.audioElement.play();
+            await Promise.race([
+                this.audioElement.play().catch((err) => {
+                    console.warn('[ST-BgLoader AudioEngine] Autoplay was prevented by browser policy:', err);
+                }),
+                new Promise((resolve) => window.setTimeout(resolve, PLAY_SETTLE_TIMEOUT_MS)),
+            ]);
             this.onTrackChange?.(item);
         } catch (err) {
             console.warn('[ST-BgLoader AudioEngine] Autoplay was prevented by browser policy:', err);
@@ -298,7 +306,13 @@ export class AudioEngine {
         try {
             this.initWebAudio();
             this.resumeAudioContext();
-            await this.audioElement.play();
+            // play() stays pending on a stalled host until the media stack times out; bound it.
+            await Promise.race([
+                this.audioElement.play().catch((err) => {
+                    console.warn('[ST-BgLoader AudioEngine] Autoplay was prevented by browser policy:', err);
+                }),
+                new Promise((resolve) => window.setTimeout(resolve, PLAY_SETTLE_TIMEOUT_MS)),
+            ]);
         } catch (err) {
             console.warn('[ST-BgLoader AudioEngine] Autoplay was prevented by browser policy:', err);
         }

@@ -329,3 +329,26 @@ Added procedural WebAudio ambient soundscape synthesizer, frosted glass transpar
 ### Status
 
 [OK] 完成，提交推送并归档
+
+## Session 12: 自动化迭代测试改进 —— 修复挂载链无界等待（stress T3 挂死）
+<!-- trellis-session: v=2 fp=bounded-wait-hardening-20260919 -->
+
+**Date**: 2026-09-19
+**Task**: 无活跃任务（/goal 驱动的迭代测试改进循环）
+**Branch**: `master`
+
+### Summary
+
+启动 Dev/Luker 测试实例（HTTPS:8003，junction 指向本仓库）建立全量基线：E2E 24/24 绿、authority 场景 15/15 绿、stress 套件测试 3（Malformed & 0-byte Media Resilience）页面求值 180s 协议超时挂死（09-05 旧架构曾全绿，存储倒置重构后未复跑暴露）。四发 Puppeteer 探针逐级收敛（隔离步骤→上下文复刻→精确复现→逐类型定位）：确认 IframeRenderer.render 只等 iframe.onload、无任何错误/超时兜底——快速连续切换中 iframe 在 load 前被 destroy 则 promise 永久悬置（Image/Video 均有 onerror 兜底，唯 iframe 缺失）；且全部渲染器事件等待与 AudioEngine.play()、外部 URL 下载均为无界等待，慢/黑洞主机可挂起数分钟。修复（有界等待加固）：Iframe/Video/Image 三个渲染器统一 settle 模式（事件 + destroy 即时结算 + 超时兜底 8s/15s/15s，destroy 触发 pendingSettle 消除快速切换僵尸 promise）；AudioEngine 两处 play() 10s 竞速兜底（带 catch 防迟到拒绝）；ServerOrigin.download 对跨源 URL 加 AbortSignal.timeout(60s)，同源 backgrounds/ 路由不受影响。挂死运行泄漏的 corrupted_zero_byte.mp4 经插件 API 清除，探针脚本用后即删。
+
+### Verification
+
+- [OK] `npm run type-check` + `npm run build`（152.96KB）
+- [OK] `node tests/stress.mjs` 4/4 ×3 连续轮次（修复前测试 3 挂死）
+- [OK] `npm run test:e2e` 24/24 零回归
+- [OK] `node tests/authority.mjs` 15/15 零回归
+
+### Status
+
+[OK] 修复完成已推送；后续方向（规范引导任务/测试自动化基建）待用户选择
+

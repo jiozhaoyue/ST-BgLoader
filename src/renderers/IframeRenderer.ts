@@ -1,6 +1,11 @@
+// An iframe removed before its load completes (rapid switching) or pointed at a stalled
+// host never fires onload; every render must settle anyway or the mount chain hangs.
+const RENDER_SETTLE_TIMEOUT_MS = 8000;
+
 export class IframeRenderer {
     private iframeElement: HTMLIFrameElement | null = null;
     private container: HTMLElement;
+    private pendingSettle: (() => void) | null = null;
 
     constructor(container: HTMLElement) {
         this.container = container;
@@ -26,9 +31,20 @@ export class IframeRenderer {
         this.iframeElement = iframe;
 
         return new Promise<HTMLIFrameElement>((resolve) => {
+            let settled = false;
+            const settle = () => {
+                if (settled) return;
+                settled = true;
+                window.clearTimeout(fallback);
+                this.pendingSettle = null;
+                resolve(iframe);
+            };
+            const fallback = window.setTimeout(settle, RENDER_SETTLE_TIMEOUT_MS);
+            this.pendingSettle = settle;
+
             iframe.onload = () => {
                 iframe.style.opacity = '1';
-                resolve(iframe);
+                settle();
             };
 
             if (isUrl) {
@@ -48,6 +64,7 @@ export class IframeRenderer {
 
     public destroy(): void {
         if (this.iframeElement) {
+            this.pendingSettle?.();
             this.iframeElement.srcdoc = '';
             this.iframeElement.src = 'about:blank';
             this.iframeElement.remove();

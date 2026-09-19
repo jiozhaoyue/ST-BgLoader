@@ -33,6 +33,10 @@ export interface MediaPutInput {
     remoteUrl?: string;
 }
 
+// Same-origin media (the backgrounds/ static route) is trusted and fast; external hosts can
+// stall indefinitely (blackholed DNS/connect), so their download is bounded.
+const EXTERNAL_DOWNLOAD_TIMEOUT_MS = 60000;
+
 /**
  * The only media source of truth: the SillyTavern server's own `backgrounds/` user directory,
  * exactly where the native background picker stores files (native upload/delete endpoints and
@@ -205,7 +209,15 @@ export class ServerOrigin {
 
     /** Fetches the raw bytes of a URL (direct first; used before storing server-side). */
     public async download(url: string): Promise<Blob> {
-        const response = await fetch(url);
+        let absoluteUrl: URL | null = null;
+        try {
+            absoluteUrl = new URL(url, window.location.href);
+        } catch { /* treated as relative */ }
+        const isExternal = !!absoluteUrl && absoluteUrl.origin !== window.location.origin;
+
+        const response = await fetch(url, isExternal
+            ? { signal: AbortSignal.timeout(EXTERNAL_DOWNLOAD_TIMEOUT_MS) }
+            : undefined);
         if (!response.ok) {
             throw new Error(`Failed to fetch media from ${url}: ${response.status} ${response.statusText}`);
         }

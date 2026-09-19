@@ -1,9 +1,14 @@
 import { AudioEngine } from '../audio/AudioEngine';
 
+// canplay/error cover normal loads, but a stalled host fires neither for minutes;
+// the render promise must settle so the mount chain and tests cannot hang.
+const RENDER_SETTLE_TIMEOUT_MS = 15000;
+
 export class VideoRenderer {
     private videoElement: HTMLVideoElement | null = null;
     private container: HTMLElement;
     private audioEngine: AudioEngine;
+    private pendingSettle: (() => void) | null = null;
 
     constructor(container: HTMLElement, audioEngine: AudioEngine) {
         this.container = container;
@@ -41,8 +46,19 @@ export class VideoRenderer {
         this.audioEngine.attachVideo(video);
 
         return new Promise<HTMLVideoElement>((resolve) => {
-            const onCanPlay = async () => {
+            let settled = false;
+            const settle = () => {
+                if (settled) return;
+                settled = true;
+                window.clearTimeout(fallback);
+                this.pendingSettle = null;
                 video.removeEventListener('canplay', onCanPlay);
+                resolve(video);
+            };
+            const fallback = window.setTimeout(settle, RENDER_SETTLE_TIMEOUT_MS);
+            this.pendingSettle = settle;
+
+            const onCanPlay = async () => {
                 try {
                     await video.play();
                 } catch (e) {
@@ -52,13 +68,13 @@ export class VideoRenderer {
                     video.play().catch((err) => console.error('[ST-BgLoader] Video playback error:', err));
                 }
                 video.style.opacity = '1';
-                resolve(video);
+                settle();
             };
 
             video.addEventListener('canplay', onCanPlay);
             video.addEventListener('error', (e) => {
                 console.error('[ST-BgLoader] Error loading video:', e);
-                resolve(video);
+                settle();
             });
         });
     }
@@ -83,6 +99,7 @@ export class VideoRenderer {
 
     public destroy(): void {
         if (this.videoElement) {
+            this.pendingSettle?.();
             this.audioEngine.attachVideo(null);
             this.videoElement.pause();
             this.videoElement.removeAttribute('src');
