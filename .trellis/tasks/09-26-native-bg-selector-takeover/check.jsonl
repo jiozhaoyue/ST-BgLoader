@@ -1,0 +1,2 @@
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "接管未越界修改宿主状态、未造成双写者核查"}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "回归门禁、CSS 门禁与降级路径核查"}

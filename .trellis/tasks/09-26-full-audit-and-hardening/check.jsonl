@@ -1,0 +1,3 @@
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "回归门禁与 UI 标准核查（含未越界核对）"}
+{"file": ".trellis/spec/backend/error-handling.md", "reason": "修复未削弱降级/有界等待契约核查"}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "D3 合并未引入新的重复或耦合核查"}

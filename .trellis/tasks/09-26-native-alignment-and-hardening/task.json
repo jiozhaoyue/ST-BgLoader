@@ -1,0 +1,31 @@
+{
+  "id": "native-alignment-and-hardening",
+  "name": "native-alignment-and-hardening",
+  "title": "原生对齐与健壮性加固（UI 修复 · 全面体检 · 原生背景接管 · 全量文档）",
+  "description": "父任务：本轮用户请求的四个独立可交付物集合。1) 折叠 bug 修复 + 去溢光按钮特效 + 全面贴合酒馆原生风格；2) 全仓体检、健壮性增强与冗余功能裁剪候选清单（裁剪需用户逐项拍板）；3) 接管 ST 原生背景选择器的可行性调研与实施；4) 现有全部功能补齐文档。子任务独立验收，父任务负责跨子任务验收与最终集成复核。",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "jiozhaoyue",
+  "assignee": "jiozhaoyue",
+  "createdAt": "2026-09-26",
+  "completedAt": null,
+  "branch": "master",
+  "base_branch": "master",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "09-26-native-style-and-fold-fix",
+    "09-26-full-audit-and-hardening",
+    "09-26-native-bg-selector-takeover",
+    "09-26-feature-documentation"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}

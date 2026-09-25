@@ -1,0 +1,2 @@
+{"file": ".trellis/spec/guides/index.md", "reason": "新增文档纳入体系且索引无死链核查"}
+{"file": ".trellis/spec/backend/directory-structure.md", "reason": "存储与后端面描述的准确性核查（D1 过期表述）"}

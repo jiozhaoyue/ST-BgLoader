@@ -1,0 +1,2 @@
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "父任务集成复核：回归门禁与 UI 标准"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "跨子任务集成复核：三层接缝是否被破坏"}

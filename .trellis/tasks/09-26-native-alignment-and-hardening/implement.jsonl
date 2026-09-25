@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "懒创建/幂等挂载/destroy 契约——子任务 3 新增控制器与子任务 1 面板重建必须遵守的挂载纪律"}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "UI 代码标准与三套件门禁——所有子任务的回归验收依据"}
+{"file": ".trellis/spec/frontend/state-management.md", "reason": "设置扇出与事件总线——新增 nativeTakeover 字段的接线纪律"}
+{"file": ".trellis/spec/backend/database-guidelines.md", "reason": "三层持久化边界——子任务 2/3 不得越过服务器源端语义"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "跨层数据流——原生宿主 ↔ 扩展 ↔ 服务端三层接缝的复核基准"}

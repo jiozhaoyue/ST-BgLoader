@@ -1,0 +1,6 @@
+{"file": ".trellis/spec/backend/error-handling.md", "reason": "有界等待与静默降级契约——A1/A2 修复与性能项不得破坏降级路径"}
+{"file": ".trellis/spec/backend/database-guidelines.md", "reason": "三层持久化边界——activeMediaId 语义修正（A2）不得越过服务器源端"}
+{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "幂等挂载与 destroy 契约——MediaMount 可见性状态与 objectURL 生命周期的判定基准"}
+{"file": ".trellis/spec/frontend/state-management.md", "reason": "设置扇出 + 事件总线——半接线字段（B1–B5）与该字段接线纪律的依据"}
+{"file": ".trellis/spec/frontend/type-safety.md", "reason": "类型真源收敛——D1 天气类型三处真源合并的依据"}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "重复逻辑识别——D3 播放逻辑合并的判定方法"}

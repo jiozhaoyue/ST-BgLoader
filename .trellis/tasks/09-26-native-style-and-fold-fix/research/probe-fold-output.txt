@@ -1,0 +1,84 @@
+⏳ 打开 https://127.0.0.1:8003
+
+── A. 结构与静态断言 ──
+✅ 面板已渲染 — ""
+✅ 内容区含 13 个分区 — 实际 13
+✅ 分区间距由 CSS margin 承担（替代 flex gap） — marginBottom=12px
+✅ 扩展未在内容区上写行内 display — inlineDisplay=(none)
+✅ 初始为折叠态 — display=none
+✅ 初始 height 无残留 — height=(auto)
+
+── B. 扩展面板连续开合 5 轮 ──
+✅ 第 1 轮 → 展开 — display=block
+✅ 第 1 轮展开后图标为展开态（up） — inline-drawer-icon fa-solid interactable up fa-circle-chevron-up
+✅ 第 1 轮 → 折叠（核心断言） — display=none
+✅ 第 1 轮折叠后图标为折叠态（down） — inline-drawer-icon fa-solid interactable down fa-circle-chevron-down
+✅ 第 1 轮折叠后 height 无残留 — height=(auto)
+✅ 第 2 轮 → 展开 — display=block
+✅ 第 2 轮展开后图标为展开态（up） — inline-drawer-icon fa-solid interactable up fa-circle-chevron-up
+✅ 第 2 轮 → 折叠（核心断言） — display=none
+✅ 第 2 轮折叠后图标为折叠态（down） — inline-drawer-icon fa-solid interactable down fa-circle-chevron-down
+✅ 第 2 轮折叠后 height 无残留 — height=(auto)
+✅ 第 3 轮 → 展开 — display=block
+✅ 第 3 轮展开后图标为展开态（up） — inline-drawer-icon fa-solid interactable up fa-circle-chevron-up
+✅ 第 3 轮 → 折叠（核心断言） — display=none
+✅ 第 3 轮折叠后图标为折叠态（down） — inline-drawer-icon fa-solid interactable down fa-circle-chevron-down
+✅ 第 3 轮折叠后 height 无残留 — height=(auto)
+✅ 第 4 轮 → 展开 — display=block
+✅ 第 4 轮展开后图标为展开态（up） — inline-drawer-icon fa-solid interactable up fa-circle-chevron-up
+✅ 第 4 轮 → 折叠（核心断言） — display=none
+✅ 第 4 轮折叠后图标为折叠态（down） — inline-drawer-icon fa-solid interactable down fa-circle-chevron-down
+✅ 第 4 轮折叠后 height 无残留 — height=(auto)
+✅ 第 5 轮 → 展开 — display=block
+✅ 第 5 轮展开后图标为展开态（up） — inline-drawer-icon fa-solid interactable up fa-circle-chevron-up
+✅ 第 5 轮 → 折叠（核心断言） — display=none
+✅ 第 5 轮折叠后图标为折叠态（down） — inline-drawer-icon fa-solid interactable down fa-circle-chevron-down
+✅ 第 5 轮折叠后 height 无残留 — height=(auto)
+   扩展面板序列: block → none → block → none → block → none → block → none → block → none
+✅ 5 轮后回到初始态 — initial=none final=none
+✅ 序列严格交替（无卡死/无弹回） — block,none,block,none,block,none,block,none,block,none
+
+── C. 与同页面原生抽屉的等价性基线 ──
+   原生抽屉 display 序列: block → none → block → none → block → none
+✅ 原生抽屉初始折叠 — display=none
+✅ 原生抽屉序列严格交替 — block,none,block,none,block,none
+✅ 扩展与原生行为一致（同序列模式） — native=[block,none,block,none,block,none] ext=[block,none,block,none,block,none]
+   图标态对比: {"ext":"down","native":"down"}
+✅ 图标态语义与原生一致 — ext=down native=down
+
+── D. 去溢光断言 ──
+   box-shadow: {".st-bgloader-media-card.active":"not-in-DOM",".st-bg-mini-capsule":"none",".st-bg-mini-btn":"none"}
+✅ .st-bg-mini-capsule 无投影 — boxShadow=none
+✅ .st-bg-mini-btn 无投影 — boxShadow=none
+
+── E. 功能未受损 ──
+   运行时状态: {"initialized":true,"container":true,"layers":true,"api":true,"miniPlayer":true}
+✅ 媒体挂载与双缓冲完好
+✅ 公共 API 完好
+✅ 迷你播放器已渲染
+
+── F. 错误归因 ──
+   JS 异常: [
+  {
+    "msg": "Unexpected reserved word",
+    "stack": "SyntaxError: Unexpected reserved word"
+  },
+  {
+    "msg": "$(...) is not a function",
+    "stack": "TypeError: $(...) is not a function ⏎     at <anonymous> (blob:https://127.0.0.1:8003/338d775f-135d-46ad-857e-7d5a3072c44b:407:17)"
+  },
+  {
+    "msg": "Identifier 'SPresetSettings' has already been declared",
+    "stack": "SyntaxError: Identifier 'SPresetSettings' has already been declared"
+  }
+]
+   HTTP 错误: [
+  "404 https://127.0.0.1:8003/api/plugins/server-plugin-manager/probe",
+  "404 https://127.0.0.1:8003/api/plugins/command-exec/sandbox/get",
+  "409 https://127.0.0.1:8003/api/settings/patch",
+  "FAILED https://files.catbox.moe/wmv5bd.mp4 (net::ERR_ABORTED)"
+]
+✅ 本扩展自身无错误
+   （宿主/其它扩展的错误 7 条，已隔离，不计入回归）
+
+🎉 全部通过

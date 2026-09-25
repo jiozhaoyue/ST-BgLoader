@@ -1,0 +1,3 @@
+{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "挂载/重建/destroy 契约——render() 整块重建面板的合法性边界"}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "UI 代码标准（转义/共享工具/内联样式判据）与 CSS 裸选择器门禁"}
+{"file": ".trellis/spec/frontend/state-management.md", "reason": "设置扇出与重渲染路径——折叠态在远端同步/导入三条路径下的正确性依据"}
