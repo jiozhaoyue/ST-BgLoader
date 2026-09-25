@@ -58,7 +58,18 @@ export class IframeRenderer {
 
     public postMessage(message: unknown): void {
         if (this.iframeElement && this.iframeElement.contentWindow) {
-            this.iframeElement.contentWindow.postMessage(message, '*');
+            // Trust boundary: the sandbox combination (allow-scripts + allow-same-origin) is
+            // accepted for the user's OWN same-origin media; for remote-URL iframes the
+            // wildcard target would let the frame receive messages from anywhere — target
+            // the frame's actual origin instead (inline srcdoc content is same-origin).
+            let targetOrigin = window.location.origin;
+            try {
+                const src = new URL(this.iframeElement.src, window.location.href);
+                if (src.protocol === 'http:' || src.protocol === 'https:') {
+                    targetOrigin = src.origin;
+                }
+            } catch { /* keep same-origin fallback */ }
+            this.iframeElement.contentWindow.postMessage(message, targetOrigin);
         }
     }
 

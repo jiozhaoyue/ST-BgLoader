@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "懒创建/幂等挂载/destroy 契约——P3-3 懒创建与 P3-13 订阅制改造的判定基准"}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "UI 代码标准（转义/共享工具/去抖）与三套件门禁——P3-10 签名守卫与验证命令依据"}
+{"file": ".trellis/spec/backend/database-guidelines.md", "reason": "三层持久化边界——P3-6/P3-11 改动不得越过服务器源端语义"}
+{"file": ".trellis/spec/backend/error-handling.md", "reason": "有界等待与降级契约——观察者上限与冲突回调不得破坏降级路径"}
+{"file": ".trellis/spec/frontend/state-management.md", "reason": "设置扇出 + 事件总线——P3-1 深合并与 P3-11 冲突收敛接线依据"}

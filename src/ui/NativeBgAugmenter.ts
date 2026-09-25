@@ -16,15 +16,18 @@ export class NativeBgAugmenter {
             this.observer = new MutationObserver(() => this.augmentThumbnails(menuContent as HTMLElement));
             this.observer.observe(menuContent, { childList: true, subtree: true });
         } else {
-            // Wait for drawer to be created
+            // Wait for drawer to be created — but give up eventually: in a non-host page
+            // the node never appears and the observer would query on every mutation.
             const bodyObserver = new MutationObserver(() => {
                 const target = document.querySelector('#bg_menu_content');
                 if (target) {
+                    window.clearTimeout(giveUp);
                     bodyObserver.disconnect();
                     this.start();
                 }
             });
             bodyObserver.observe(document.body, { childList: true, subtree: true });
+            const giveUp = window.setTimeout(() => bodyObserver.disconnect(), 30000);
         }
     }
 

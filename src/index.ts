@@ -1,5 +1,5 @@
 import './ui/style.css';
-import { BgLoaderSettings, DEFAULT_SETTINGS, MediaItem, MediaType } from './types';
+import { BgLoaderSettings, DEFAULT_SETTINGS, MediaItem, MediaType, mergeSettings } from './types';
 import { CacheManager } from './cache/CacheManager';
 import { AudioEngine } from './audio/AudioEngine';
 import { MediaMount } from './core/MediaMount';
@@ -42,7 +42,9 @@ export class STBgLoaderExtension {
     private triggerManager: TriggerManager;
     private ambientSoundGenerator: AmbientSoundGenerator;
     private frostedGlassController: FrostedGlassController;
-    private sceneManager: SceneManager;
+    // Lazy: created in init() with real configuration. Same discipline as ShortcutManager —
+    // no speculative instance that init() would replace.
+    private sceneManager: SceneManager | null = null;
     // Lazy: the constructor registers a window keydown listener, so creating a throwaway
     // instance here would leak an orphan listener when init() replaces it.
     private shortcutManager: ShortcutManager | null = null;
@@ -61,7 +63,6 @@ export class STBgLoaderExtension {
         this.triggerManager = new TriggerManager();
         this.ambientSoundGenerator = new AmbientSoundGenerator();
         this.frostedGlassController = new FrostedGlassController();
-        this.sceneManager = new SceneManager();
         this.publicApi = new PublicAPI(this);
     }
 
@@ -76,7 +77,7 @@ export class STBgLoaderExtension {
     public getTriggerManager(): TriggerManager { return this.triggerManager; }
     public getAmbientSoundGenerator(): AmbientSoundGenerator { return this.ambientSoundGenerator; }
     public getFrostedGlassController(): FrostedGlassController { return this.frostedGlassController; }
-    public getSceneManager(): SceneManager { return this.sceneManager; }
+    public getSceneManager(): SceneManager | null { return this.sceneManager; }
     public getShortcutManager(): ShortcutManager | null { return this.shortcutManager; }
     public getAuthorityBridge(): AuthorityBridge { return this.authorityBridge; }
     public getServerSettings(): ServerSettings { return this.serverSettings; }
@@ -141,18 +142,15 @@ export class STBgLoaderExtension {
         this.miniPlayer = new MiniPlayer(this.audioEngine);
         this.miniPlayer.render(this.settings.showMiniPlayer, this.settings.capsuleOnPlayOnly);
 
-        // Connect AudioEngine events to PublicAPI
-        const origTrackChange = this.audioEngine.onTrackChange;
-        this.audioEngine.onTrackChange = (item) => {
-            origTrackChange?.(item);
+        // Connect AudioEngine events to PublicAPI (multicast subscriptions — the old
+        // single-slot wrap chain broke whenever another subscriber reassigned the slot).
+        this.audioEngine.addTrackListener((item) => {
             this.publicApi.emit('track-change', item);
-        };
+        });
 
-        const origPlayChange = this.audioEngine.onPlayStateChange;
-        this.audioEngine.onPlayStateChange = (playing) => {
-            origPlayChange?.(playing);
+        this.audioEngine.addPlayStateListener((playing) => {
             this.publicApi.emit('play-state-change', playing);
-        };
+        });
 
         // 6. Setup Smart Scene Triggers
         this.triggerManager.setRules(this.settings.triggerRules || []);
@@ -330,6 +328,9 @@ export class STBgLoaderExtension {
 
         // 11.5 Cross-device settings sync (Authority cloud mirror; no-op in local mode)
         this.authorityBridge.onCapabilitiesChanged(() => this.settingsDrawer?.updateCloudPanel());
+        // Server settings document written newer by another tab/device → converge now
+        // instead of letting the pending write silently revert it (S7-style conflict).
+        this.serverSettings.onRemoteNewer = () => void this.reconcileRemoteConflict();
         await this.startSettingsSync();
         this.syncAgentTools();
 
@@ -375,7 +376,9 @@ export class STBgLoaderExtension {
         const hostEl = this.mediaMount.getHostElement();
         if (hostEl) {
             this.atmosphereFX.mount(hostEl);
-            this.audioVisualizer.mount(hostEl, containerEl);
+            // Pulse pump targets the dedicated wrapper layer, not the container the
+            // parallax controller transforms (two writers would fight).
+            this.audioVisualizer.mount(hostEl, this.mediaMount.getPumpWrapperElement() ?? containerEl);
         }
         this.parallaxController.attach(containerEl);
     }
@@ -395,7 +398,7 @@ export class STBgLoaderExtension {
         this.frostedGlassController.setOptions(this.settings.frostedChat);
         this.shortcutManager?.setEnabled(this.settings.shortcutsEnabled);
         this.triggerManager.setRules(this.settings.triggerRules || []);
-        this.sceneManager.setUserScenes(this.settings.scenes || {});
+        this.sceneManager?.setUserScenes(this.settings.scenes || {});
         this.syncAgentTools();
     }
 
@@ -451,6 +454,23 @@ export class STBgLoaderExtension {
         await this.settingsSync.start();
     }
 
+    private reconcilingRemote = false;
+
+    /** A newer server settings document was detected mid-session (another tab/device);
+     *  converge the same way the init-time reconcile does. */
+    private async reconcileRemoteConflict(): Promise<void> {
+        if (this.reconcilingRemote) return;
+        this.reconcilingRemote = true;
+        try {
+            await this.reconcileSettings();
+            this.applySettingsToSubsystems();
+            this.settingsDrawer?.applyRemoteSettings(this.settings);
+            this.publicApi.emit('settings-sync', this.settings);
+        } finally {
+            this.reconcilingRemote = false;
+        }
+    }
+
     private hookSillyTavernEvents(): void {
         const globalAny = window as any;
         if (globalAny.eventSource) {
@@ -482,7 +502,7 @@ export class STBgLoaderExtension {
         try {
             const raw = localStorage.getItem(SETTINGS_KEY);
             if (raw) {
-                this.settings = { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
+                this.settings = mergeSettings(JSON.parse(raw));
             }
             this.settingsRevision = parseInt(localStorage.getItem(SETTINGS_REV_KEY) || '0', 10) || 0;
         } catch (e) {
@@ -502,7 +522,7 @@ export class STBgLoaderExtension {
         try {
             const doc = await this.serverSettings.load();
             if (doc && doc.revision >= this.settingsRevision) {
-                this.settings = { ...DEFAULT_SETTINGS, ...doc.settings };
+                this.settings = mergeSettings(doc.settings);
                 this.settingsRevision = doc.revision;
                 this.persistLocalSettings();
             } else if (this.settingsRevision > 0) {
@@ -530,12 +550,14 @@ export class STBgLoaderExtension {
     }
 }
 
-// Auto bootstrap when script loads or DOM is ready
+// Auto bootstrap when script loads or DOM is ready — a failed init must surface as a
+// tagged error instead of an anonymous unhandled rejection.
 const instance = new STBgLoaderExtension();
+const boot = () => instance.init().catch(err => console.error('[ST-BgLoader] Initialization failed:', err));
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => instance.init());
+    document.addEventListener('DOMContentLoaded', boot);
 } else {
-    instance.init();
+    boot();
 }
 
 // Export global reference for debugging or external plugins

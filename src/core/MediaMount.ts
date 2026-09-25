@@ -4,9 +4,16 @@ import { IframeRenderer } from '../renderers/IframeRenderer';
 import { ImageRenderer } from '../renderers/ImageRenderer';
 import { AudioEngine } from '../audio/AudioEngine';
 
+/** How long DOM observers wait for a host node before giving up (non-host environments). */
+const HOST_WAIT_GIVE_UP_MS = 30000;
+
 export class MediaMount {
     private hostEl: HTMLElement | null = null;
     private containerEl: HTMLElement | null = null;
+    // Sits between the container and the A/B layers: the visualizer's pulse pump scales
+    // THIS element while parallax transforms the container — two writers, one property,
+    // would fight each other.
+    private pumpWrapperEl: HTMLElement | null = null;
     private layerA: HTMLElement | null = null;
     private layerB: HTMLElement | null = null;
     private activeLayer: 'A' | 'B' = 'A';
@@ -43,6 +50,11 @@ export class MediaMount {
         return this.containerEl;
     }
 
+    /** Pump target for the visualizer's pulse mode (see pumpWrapperEl). */
+    public getPumpWrapperElement(): HTMLElement | null {
+        return this.pumpWrapperEl;
+    }
+
     public getHostElement(): HTMLElement | null {
         return this.hostEl;
     }
@@ -53,12 +65,15 @@ export class MediaMount {
             const docObserver = new MutationObserver(() => {
                 const bg1 = document.querySelector('#bg1') as HTMLElement;
                 if (bg1) {
+                    window.clearTimeout(giveUp);
                     docObserver.disconnect();
                     this.hostEl = bg1;
                     this.setupContainer();
                 }
             });
             docObserver.observe(document.body, { childList: true, subtree: true });
+            // If #bg1 never appears (non-host environment), stop querying on every mutation.
+            const giveUp = window.setTimeout(() => docObserver.disconnect(), HOST_WAIT_GIVE_UP_MS);
             return;
         }
 
@@ -86,6 +101,15 @@ export class MediaMount {
             container.style.zIndex = '0';
             container.style.pointerEvents = 'none';
 
+            const pumpWrapper = document.createElement('div');
+            pumpWrapper.className = 'st-bg-pump-wrapper';
+            pumpWrapper.style.position = 'absolute';
+            pumpWrapper.style.top = '0';
+            pumpWrapper.style.left = '0';
+            pumpWrapper.style.width = '100%';
+            pumpWrapper.style.height = '100%';
+            pumpWrapper.style.pointerEvents = 'none';
+
             this.layerA = document.createElement('div');
             this.layerA.className = 'st-bg-layer st-bg-layer-a';
             this.setupLayerStyle(this.layerA);
@@ -94,15 +118,21 @@ export class MediaMount {
             this.layerB.className = 'st-bg-layer st-bg-layer-b';
             this.setupLayerStyle(this.layerB);
 
-            container.appendChild(this.layerA);
-            container.appendChild(this.layerB);
+            pumpWrapper.appendChild(this.layerA);
+            pumpWrapper.appendChild(this.layerB);
+            container.appendChild(pumpWrapper);
 
             this.hostEl.appendChild(container);
         } else {
+            this.pumpWrapperEl = container.querySelector('.st-bg-pump-wrapper');
             this.layerA = container.querySelector('.st-bg-layer-a');
             this.layerB = container.querySelector('.st-bg-layer-b');
         }
 
+        if (!this.pumpWrapperEl) {
+            // Legacy/existing container without the wrapper (defensive): locate via layers.
+            this.pumpWrapperEl = this.layerA?.parentElement ?? container;
+        }
         this.containerEl = container;
 
         this.videoRendererA = new VideoRenderer(this.layerA!, this.audioEngine);

@@ -29,7 +29,23 @@ const C = {
     name: "Monochrome (黑白极简)",
     filters: { blur: 0, brightness: 100, opacity: 100, saturate: 0 }
   }
-}, I = {
+};
+function O(l) {
+  return typeof l == "object" && l !== null && !Array.isArray(l);
+}
+function z(l) {
+  const e = { ...I };
+  if (!O(l)) return e;
+  const t = l, i = I, s = e;
+  for (const n of Object.keys(i)) {
+    const a = t[n];
+    if (a === void 0) continue;
+    const r = i[n];
+    s[n] = O(r) && O(a) ? { ...r, ...a } : a;
+  }
+  return e;
+}
+const A = {
   cyber_rain: {
     id: "cyber_rain",
     name: "Cyberpunk Rain (赛博雨夜)",
@@ -74,7 +90,7 @@ const C = {
     frostedChat: !0,
     isBuiltin: !0
   }
-}, k = {
+}, I = {
   enabled: !0,
   activeMediaId: null,
   volume: 0.8,
@@ -135,7 +151,7 @@ function M(l, e = "") {
   const t = l.split(".").pop()?.toLowerCase().split("?")[0] || "";
   return ["mp4", "webm", "mov", "m4v", "ogv"].includes(t) || e.startsWith("video/") ? "video" : ["mp3", "wav", "ogg", "flac", "aac", "m4a"].includes(t) || e.startsWith("audio/") ? "audio" : t === "html" || t === "htm" ? "html" : t === "svg" ? "svg" : "image";
 }
-const Q = "st-bg-loader-manifest.json", A = 1;
+const ee = "st-bg-loader-manifest.json", k = 1;
 function v(l) {
   return `backgrounds/${encodeURIComponent(l)}`;
 }
@@ -147,7 +163,7 @@ function E() {
     return {};
   }
 }
-async function ue(l) {
+async function pe(l) {
   try {
     const e = await fetch(`${v(l)}?t=${Date.now()}`, { cache: "no-store" });
     return e.ok ? JSON.parse(await e.text()) : null;
@@ -155,25 +171,29 @@ async function ue(l) {
     return console.warn(`[ST-BgLoader] Server document "${l}" is missing or unreadable:`, e), null;
   }
 }
-async function ge(l, e) {
+async function me(l, e) {
   const t = new Blob([JSON.stringify(e, null, 2)], { type: "application/json" }), i = new FormData();
   i.append("avatar", new File([t], l, { type: "application/json" }));
-  const n = await fetch("/api/backgrounds/upload", { method: "POST", headers: E(), body: i });
-  if (!n.ok)
-    throw new Error(`Server upload failed for "${l}": HTTP ${n.status}`);
+  const s = await fetch("/api/backgrounds/upload", { method: "POST", headers: E(), body: i });
+  if (!s.ok)
+    throw new Error(`Server upload failed for "${l}": HTTP ${s.status}`);
 }
-const pe = 6e4;
-class me {
-  manifest = { version: A, items: [] };
+const fe = 6e4;
+class ye {
+  manifest = { version: k, items: [] };
+  // Serializes manifest writes: manifest mutations are synchronous on this single
+  // instance, so queueing uploads guarantees the last write carries the newest state
+  // and prevents redundant parallel POSTs (two rapid putMedia calls).
+  saveQueue = Promise.resolve();
   async init() {
     try {
-      const e = await fetch(`${v(Q)}?t=${Date.now()}`, { cache: "no-store" });
+      const e = await fetch(`${v(ee)}?t=${Date.now()}`, { cache: "no-store" });
       if (e.ok) {
         const t = JSON.parse(await e.text());
-        t && Array.isArray(t.items) && (this.manifest = { version: A, items: t.items });
+        t && Array.isArray(t.items) && (this.manifest = { version: k, items: t.items });
       }
     } catch (e) {
-      console.warn("[ST-BgLoader] No server media manifest yet, starting a fresh one:", e), this.manifest = { version: A, items: [] };
+      console.warn("[ST-BgLoader] No server media manifest yet, starting a fresh one:", e), this.manifest = { version: k, items: [] };
     }
     console.log(`[ST-BgLoader] Server media library ready: ${this.manifest.items.length} cataloged entries.`);
   }
@@ -187,17 +207,17 @@ class me {
       });
       if (t.ok) {
         const i = await t.json();
-        for (const n of i.images ?? []) {
-          const s = M(n.filename);
-          e.set(n.filename, {
-            id: "native_" + n.filename,
-            name: n.filename,
-            type: s,
+        for (const s of i.images ?? []) {
+          const n = M(s.filename);
+          e.set(s.filename, {
+            id: "native_" + s.filename,
+            name: s.filename,
+            type: n,
             source: "server",
-            url: v(n.filename),
-            cacheKey: v(n.filename),
+            url: v(s.filename),
+            cacheKey: v(s.filename),
             size: 0,
-            mimeType: z(n.filename, s),
+            mimeType: U(s.filename, n),
             addedTimestamp: 0,
             lastUsedTimestamp: 0,
             hasAudio: !1
@@ -224,11 +244,11 @@ class me {
     return [...e.values()];
   }
   async getCatalogItem(e) {
-    const t = this.manifest.items.find((n) => n.id === e);
-    return t ? this.manifestToItem(t) : (await this.listCatalog()).find((n) => n.id === e) ?? null;
+    const t = this.manifest.items.find((s) => s.id === e);
+    return t ? this.manifestToItem(t) : (await this.listCatalog()).find((s) => s.id === e) ?? null;
   }
   async putMedia(e) {
-    const t = "bg_" + Date.now() + "_" + Math.random().toString(36).substring(2, 9), i = e.blob.type || z(e.name, e.type);
+    const t = "bg_" + Date.now() + "_" + Math.random().toString(36).substring(2, 9), i = e.blob.type || U(e.name, e.type);
     if (e.source === "url" && e.blob.size === 0 && e.remoteUrl) {
       const a = {
         id: t,
@@ -256,9 +276,9 @@ class me {
         hasAudio: a.hasAudio
       };
     }
-    const n = await this.uploadFile(e.name, e.blob, i), s = {
+    const s = await this.uploadFile(e.name, e.blob, i), n = {
       id: t,
-      filename: n,
+      filename: s,
       type: e.type,
       source: e.source,
       remoteUrl: e.remoteUrl ?? null,
@@ -268,26 +288,26 @@ class me {
       lastUsedTimestamp: Date.now(),
       hasAudio: e.type === "video" || e.type === "audio"
     };
-    return this.manifest.items = this.manifest.items.filter((a) => a.filename !== n), this.manifest.items.push(s), await this.saveManifest(), this.manifestToItem(s);
+    return this.manifest.items = this.manifest.items.filter((a) => a.filename !== s), this.manifest.items.push(n), await this.saveManifest(), this.manifestToItem(n);
   }
   async deleteMedia(e) {
-    let i = this.manifest.items.find((s) => s.id === e)?.filename ?? null;
+    let i = this.manifest.items.find((n) => n.id === e)?.filename ?? null;
     if (!i) {
-      const s = await this.getCatalogItem(e);
-      s?.url?.startsWith("backgrounds/") && (i = decodeURIComponent(s.url.slice(12)));
+      const n = await this.getCatalogItem(e);
+      n?.url?.startsWith("backgrounds/") && (i = decodeURIComponent(n.url.slice(12)));
     }
     if (!i) {
-      this.manifest.items = this.manifest.items.filter((s) => s.id !== e), await this.saveManifest();
+      this.manifest.items = this.manifest.items.filter((n) => n.id !== e), await this.saveManifest();
       return;
     }
-    const n = await fetch("/api/backgrounds/delete", {
+    const s = await fetch("/api/backgrounds/delete", {
       method: "POST",
       headers: { ...E(), "Content-Type": "application/json" },
       body: JSON.stringify({ bg: i })
     });
-    if (!n.ok)
-      throw new Error(`Server delete failed for "${i}": HTTP ${n.status}`);
-    this.manifest.items = this.manifest.items.filter((s) => s.id !== e && s.filename !== i), await this.saveManifest();
+    if (!s.ok)
+      throw new Error(`Server delete failed for "${i}": HTTP ${s.status}`);
+    this.manifest.items = this.manifest.items.filter((n) => n.id !== e && n.filename !== i), await this.saveManifest();
   }
   async readMedia(e) {
     if (!e.url) return null;
@@ -297,8 +317,8 @@ class me {
   async touchMedia(e, t) {
   }
   async findByUrl(e) {
-    const t = this.manifest.items.find((n) => n.remoteUrl === e || v(n.filename ?? "") === e);
-    return t ? this.manifestToItem(t) : (await this.listCatalog()).find((n) => n.url === e || n.cacheKey === e) ?? null;
+    const t = this.manifest.items.find((s) => s.remoteUrl === e || v(s.filename ?? "") === e);
+    return t ? this.manifestToItem(t) : (await this.listCatalog()).find((s) => s.url === e || s.cacheKey === e) ?? null;
   }
   /** Fetches the raw bytes of a URL (direct first; used before storing server-side). */
   async download(e) {
@@ -307,23 +327,23 @@ class me {
       t = new URL(e, window.location.href);
     } catch {
     }
-    const i = !!t && t.origin !== window.location.origin, n = await fetch(e, i ? { signal: AbortSignal.timeout(pe) } : void 0);
-    if (!n.ok)
-      throw new Error(`Failed to fetch media from ${e}: ${n.status} ${n.statusText}`);
-    return n.blob();
+    const i = !!t && t.origin !== window.location.origin, s = await fetch(e, i ? { signal: AbortSignal.timeout(fe) } : void 0);
+    if (!s.ok)
+      throw new Error(`Failed to fetch media from ${e}: ${s.status} ${s.statusText}`);
+    return s.blob();
   }
   async uploadFile(e, t, i) {
-    let n = fe(e || "media");
-    if (await this.filenameExists(n)) {
-      const r = n.lastIndexOf("."), c = r > 0 ? n.slice(0, r) : n, h = r > 0 ? n.slice(r) : "";
-      n = `${c}_${Date.now()}${h}`;
+    let s = be(e || "media");
+    if (await this.filenameExists(s)) {
+      const r = s.lastIndexOf("."), c = r > 0 ? s.slice(0, r) : s, h = r > 0 ? s.slice(r) : "";
+      s = `${c}_${Date.now()}${h}`;
     }
-    const s = new FormData();
-    s.append("avatar", new File([t], n, { type: i }));
-    const a = await fetch("/api/backgrounds/upload", { method: "POST", headers: E(), body: s });
+    const n = new FormData();
+    n.append("avatar", new File([t], s, { type: i }));
+    const a = await fetch("/api/backgrounds/upload", { method: "POST", headers: E(), body: n });
     if (!a.ok)
       throw new Error(`Server upload failed: HTTP ${a.status}`);
-    return (await a.text()).trim() || n;
+    return (await a.text()).trim() || s;
   }
   async filenameExists(e) {
     if (this.manifest.items.some((t) => t.filename === e)) return !0;
@@ -334,17 +354,21 @@ class me {
         body: "{}"
       });
       if (t.ok)
-        return ((await t.json()).images ?? []).some((n) => n.filename === e);
+        return ((await t.json()).images ?? []).some((s) => s.filename === e);
     } catch {
     }
     return !1;
   }
-  async saveManifest() {
-    this.manifest.version = A;
+  saveManifest() {
+    const e = () => this.doSaveManifest();
+    return this.saveQueue = this.saveQueue.then(e, e), this.saveQueue;
+  }
+  async doSaveManifest() {
+    this.manifest.version = k;
     const e = new Blob([JSON.stringify(this.manifest, null, 2)], { type: "application/json" });
     try {
       const t = new FormData();
-      t.append("avatar", new File([e], Q, { type: "application/json" }));
+      t.append("avatar", new File([e], ee, { type: "application/json" }));
       const i = await fetch("/api/backgrounds/upload", { method: "POST", headers: E(), body: t });
       if (!i.ok)
         throw new Error(`HTTP ${i.status}`);
@@ -369,7 +393,7 @@ class me {
     };
   }
 }
-function z(l, e) {
+function U(l, e) {
   switch (l.split(".").pop()?.toLowerCase()) {
     case "mp4":
       return "video/mp4";
@@ -400,19 +424,19 @@ function z(l, e) {
       return e === "video" ? "video/mp4" : e === "audio" ? "audio/mpeg" : e === "svg" ? "image/svg+xml" : e === "html" ? "text/html" : "image/png";
   }
 }
-function fe(l) {
+function be(l) {
   return (l || "media").replace(/[^\p{L}\p{N}._ -]/gu, "_");
 }
 const x = "st-bgloader-main";
-function de(l) {
+function ge(l) {
   if (l && typeof l == "object" && l.name === "AuthorityPermissionError") return !0;
   const e = l instanceof Error ? l.message : String(l);
   return /permission|denied|forbidden|封锁/i.test(e);
 }
-const ye = "extension:third-party/ST-BgLoader", Z = "st_bgloader_cloud_notice_v1";
+const ve = "extension:third-party/ST-BgLoader", te = "st_bgloader_cloud_notice_v1";
 class L {
   static EXTENSION_ID = "third-party/ST-BgLoader";
-  static CHANNEL = ye;
+  static CHANNEL = ve;
   client = null;
   caps = {
     available: !1,
@@ -492,7 +516,7 @@ class L {
         agentToolsState: "unknown"
       }, console.log("[ST-BgLoader] Authority backend connected:", this.client.getSession()), this.caps) : this.degrade("sdk-missing", "未检测到 Authority 后端，媒体库运行于本地模式（仅当前浏览器）");
     } catch (e) {
-      const t = e instanceof Error ? e.message : String(e), i = de(e);
+      const t = e instanceof Error ? e.message : String(e), i = ge(e);
       return console.warn("[ST-BgLoader] Authority unavailable, falling back to local mode:", t), this.client = null, this.degrade(
         i ? "permission-denied" : "init-failed",
         i ? "Authority 权限被拒绝，媒体库运行于本地模式" : "Authority 连接失败，媒体库运行于本地模式"
@@ -514,24 +538,24 @@ class L {
   notifyOnce(e, t) {
     console.info(`[ST-BgLoader] ${t} (${e})`);
     try {
-      if (localStorage.getItem(Z)) return;
-      localStorage.setItem(Z, (/* @__PURE__ */ new Date()).toISOString()), window.toastr?.info(t, "ST-BgLoader");
+      if (localStorage.getItem(te)) return;
+      localStorage.setItem(te, (/* @__PURE__ */ new Date()).toISOString()), window.toastr?.info(t, "ST-BgLoader");
     } catch {
     }
   }
 }
-function be(l) {
+function we(l) {
   const e = atob(l), t = new ArrayBuffer(e.length), i = new Uint8Array(t);
-  for (let n = 0; n < e.length; n++)
-    i[n] = e.charCodeAt(n);
+  for (let s = 0; s < e.length; s++)
+    i[s] = e.charCodeAt(s);
   return i;
 }
-class ve {
+class Se {
   constructor(e) {
     this.bridge = e;
   }
   async import(e) {
-    const t = we(e);
+    const t = _e(e);
     if (!t)
       throw new Error(`Cannot import from invalid URL: ${e}`);
     if (!await this.bridge.ensureHttpAllowed(t))
@@ -539,32 +563,32 @@ class ve {
     const i = this.bridge.getClient();
     if (!i)
       throw new Error("Authority backend unavailable");
-    const n = await i.http.fetch({ url: e, method: "GET" });
-    if (!n.ok)
-      throw new Error(`Server fetch failed with HTTP ${n.status} for ${e}`);
-    const s = be(n.body);
-    return new Blob([s], { type: n.contentType || "application/octet-stream" });
+    const s = await i.http.fetch({ url: e, method: "GET" });
+    if (!s.ok)
+      throw new Error(`Server fetch failed with HTTP ${s.status} for ${e}`);
+    const n = we(s.body);
+    return new Blob([n], { type: s.contentType || "application/octet-stream" });
   }
 }
-function we(l) {
+function _e(l) {
   try {
     return new URL(l).hostname;
   } catch {
     return null;
   }
 }
-const $ = "st-bg-cache-v1", Se = "st_bg_cache_index", b = "entries";
-class _e {
+const $ = "st-bg-cache-v1", Ee = "st_bg_cache_index", b = "entries";
+class xe {
   origin;
   remoteImporter = null;
   l1 = null;
   indexDb = null;
   objectUrls = /* @__PURE__ */ new Map();
   constructor() {
-    this.origin = new me();
+    this.origin = new ye();
   }
   async init(e) {
-    "caches" in window && (this.l1 = await caches.open($)), await this.openIndex(), e && (await e.detectAndInit()).available && e.getClient() && (this.remoteImporter = new ve(e)), await this.origin.init(), console.log("[ST-BgLoader] Media library source of truth: server backgrounds/ directory (browser keeps cache only).");
+    "caches" in window && (this.l1 = await caches.open($)), await this.openIndex(), e && (await e.detectAndInit()).available && e.getClient() && (this.remoteImporter = new Se(e)), await this.origin.init(), console.log("[ST-BgLoader] Media library source of truth: server backgrounds/ directory (browser keeps cache only).");
   }
   async listMedia() {
     return this.origin.listCatalog();
@@ -572,10 +596,10 @@ class _e {
   async getMedia(e) {
     return this.origin.getCatalogItem(e);
   }
-  async saveMedia(e, t, i, n, s) {
+  async saveMedia(e, t, i, s, n) {
     let a = typeof e == "string" ? new Blob([e], { type: i === "svg" ? "image/svg+xml" : "text/html" }) : e;
-    n === "url" && a.size === 0 && s && (a = await this.fetchForStorage(s).catch(() => new Blob([])));
-    const r = await this.origin.putMedia({ blob: a, name: t, type: i, source: n, remoteUrl: s });
+    s === "url" && a.size === 0 && n && (a = await this.fetchForStorage(n).catch(() => new Blob([])));
+    const r = await this.origin.putMedia({ blob: a, name: t, type: i, source: s, remoteUrl: n });
     return await this.backfillCache(r, a), r;
   }
   async getMediaBlobUrl(e) {
@@ -585,8 +609,8 @@ class _e {
     if (this.l1) {
       const i = await this.l1.match(e.cacheKey);
       if (i) {
-        const n = await i.blob(), s = URL.createObjectURL(n);
-        return this.objectUrls.set(e.id, s), await this.touchCache(e.cacheKey), s;
+        const s = await i.blob(), n = URL.createObjectURL(s);
+        return this.objectUrls.set(e.id, n), await this.touchCache(e.cacheKey), n;
       }
     }
     return await this.touchCache(e.cacheKey), e.url;
@@ -606,12 +630,12 @@ class _e {
   }
   async cleanLRU(e) {
     const t = await this.indexAll();
-    let i = t.reduce((n, s) => n + (s.size || 0), 0);
+    let i = t.reduce((s, n) => s + (n.size || 0), 0);
     if (!(i <= e)) {
-      t.sort((n, s) => n.lastUsed - s.lastUsed);
-      for (const n of t) {
+      t.sort((s, n) => s.lastUsed - n.lastUsed);
+      for (const s of t) {
         if (i <= e) break;
-        await this.evictCacheEntry(n.cacheKey), i -= n.size || 0;
+        await this.evictCacheEntry(s.cacheKey), i -= s.size || 0;
       }
     }
   }
@@ -625,14 +649,14 @@ class _e {
     const i = await this.origin.findByUrl(e);
     if (i)
       return { item: i, isNew: !1 };
-    const n = e.split("/").pop()?.split("?")[0] || "preloaded_media", s = t || this.detectMediaType(n), a = await this.fetchForStorage(e), r = await this.origin.putMedia({ blob: a, name: n, type: s, source: "url", remoteUrl: e });
+    const s = e.split("/").pop()?.split("?")[0] || "preloaded_media", n = t || this.detectMediaType(s), a = await this.fetchForStorage(e), r = await this.origin.putMedia({ blob: a, name: s, type: n, source: "url", remoteUrl: e });
     return await this.backfillCache(r, a), { item: r, isNew: !0 };
   }
   detectMediaType(e) {
     return M(e);
   }
   getMimeType(e, t) {
-    return z(e, t);
+    return U(e, t);
   }
   // ---------- browser cache (L1) internals ----------
   async fetchForStorage(e) {
@@ -663,40 +687,40 @@ class _e {
   }
   async openIndex() {
     this.indexDb = await new Promise((e, t) => {
-      const i = indexedDB.open(Se, 1);
-      i.onupgradeneeded = (n) => {
-        const s = n.target.result;
-        s.objectStoreNames.contains(b) || s.createObjectStore(b, { keyPath: "cacheKey" });
+      const i = indexedDB.open(Ee, 1);
+      i.onupgradeneeded = (s) => {
+        const n = s.target.result;
+        n.objectStoreNames.contains(b) || n.createObjectStore(b, { keyPath: "cacheKey" });
       }, i.onsuccess = () => e(i.result), i.onerror = () => t(i.error);
     });
   }
   async indexAll() {
     return this.indexDb || await this.openIndex(), new Promise((e, t) => {
-      const n = this.indexDb.transaction(b, "readonly").objectStore(b).getAll();
-      n.onsuccess = () => e(n.result || []), n.onerror = () => t(n.error);
+      const s = this.indexDb.transaction(b, "readonly").objectStore(b).getAll();
+      s.onsuccess = () => e(s.result || []), s.onerror = () => t(s.error);
     });
   }
   async indexPut(e) {
     this.indexDb || await this.openIndex(), await new Promise((t, i) => {
-      const s = this.indexDb.transaction(b, "readwrite").objectStore(b).put(e);
-      s.onsuccess = () => t(), s.onerror = () => i(s.error);
+      const n = this.indexDb.transaction(b, "readwrite").objectStore(b).put(e);
+      n.onsuccess = () => t(), n.onerror = () => i(n.error);
     });
   }
   async indexDelete(e) {
     this.indexDb || await this.openIndex(), await new Promise((t, i) => {
-      const s = this.indexDb.transaction(b, "readwrite").objectStore(b).delete(e);
-      s.onsuccess = () => t(), s.onerror = () => i(s.error);
+      const n = this.indexDb.transaction(b, "readwrite").objectStore(b).delete(e);
+      n.onsuccess = () => t(), n.onerror = () => i(n.error);
     });
   }
   async indexClear() {
     this.indexDb || await this.openIndex(), await new Promise((e, t) => {
-      const n = this.indexDb.transaction(b, "readwrite").objectStore(b).clear();
-      n.onsuccess = () => e(), n.onerror = () => t(n.error);
+      const s = this.indexDb.transaction(b, "readwrite").objectStore(b).clear();
+      s.onsuccess = () => e(), s.onerror = () => t(s.error);
     });
   }
 }
-const ee = 1e4;
-class Ee {
+const ie = 1e4;
+class Me {
   audioElement = null;
   attachedVideo = null;
   volume = 0.8;
@@ -715,9 +739,38 @@ class Ee {
   biquadFilter = null;
   analyserNode = null;
   isMuffled = !1;
-  onTrackChange;
-  onPlayStateChange;
+  // Multicast listeners (subscribe via addTrackListener/addPlayStateListener, both
+  // return an unsubscriber). The old single-slot onTrackChange/onPlayStateChange
+  // properties are gone: last-writer-wins silently dropped earlier subscribers.
+  trackListeners = [];
+  playStateListeners = [];
   onAnalyserReady;
+  addTrackListener(e) {
+    return this.trackListeners.push(e), () => {
+      this.trackListeners = this.trackListeners.filter((t) => t !== e);
+    };
+  }
+  addPlayStateListener(e) {
+    return this.playStateListeners.push(e), () => {
+      this.playStateListeners = this.playStateListeners.filter((t) => t !== e);
+    };
+  }
+  emitTrackChange(e) {
+    for (const t of this.trackListeners)
+      try {
+        t(e);
+      } catch (i) {
+        console.error("[ST-BgLoader AudioEngine] Track listener failed:", i);
+      }
+  }
+  emitPlayState(e) {
+    for (const t of this.playStateListeners)
+      try {
+        t(e);
+      } catch (i) {
+        console.error("[ST-BgLoader AudioEngine] Play-state listener failed:", i);
+      }
+  }
   setUrlResolver(e) {
     this.urlResolver = e;
   }
@@ -754,10 +807,10 @@ class Ee {
     return this.isMuffled;
   }
   async playMediaItem(e, t) {
-    const i = this.playlist.findIndex((s) => s.id === e.id);
-    i !== -1 ? this.currentIndex = i : (this.playlist.push(e), this.currentIndex = this.playlist.length - 1);
-    const n = t || (this.urlResolver ? await this.urlResolver(e) : e.url);
-    await this.playTrack(n, this.playbackMode === "single"), this.onTrackChange?.(e);
+    let i = this.playlist.findIndex((n) => n.id === e.id);
+    i === -1 && (i = this.playlist.findIndex((n) => n.url === e.url && n.type === e.type), i === -1 ? (this.playlist.push(e), i = this.playlist.length - 1) : this.playlist[i] = e), this.currentIndex = i;
+    const s = t || (this.urlResolver ? await this.urlResolver(e) : e.url);
+    await this.playTrack(s, this.playbackMode === "single"), this.emitTrackChange(e);
   }
   async playCurrentTrack() {
     const e = this.getCurrentTrack();
@@ -770,8 +823,8 @@ class Ee {
         this.audioElement.play().catch((i) => {
           console.warn("[ST-BgLoader AudioEngine] Autoplay was prevented by browser policy:", i);
         }),
-        new Promise((i) => window.setTimeout(i, ee))
-      ]), this.onTrackChange?.(e);
+        new Promise((i) => window.setTimeout(i, ie))
+      ]), this.emitTrackChange(e);
     } catch (i) {
       console.warn("[ST-BgLoader AudioEngine] Autoplay was prevented by browser policy:", i);
     }
@@ -780,9 +833,9 @@ class Ee {
     this.audioElement = new Audio(), this.audioElement.preload = "auto", this.audioElement.addEventListener("ended", () => {
       this.handleTrackEnded();
     }), this.audioElement.addEventListener("play", () => {
-      this.onPlayStateChange?.(!0);
+      this.emitPlayState(!0);
     }), this.audioElement.addEventListener("pause", () => {
-      this.onPlayStateChange?.(!1);
+      this.emitPlayState(!1);
     }), this.setupInteractionListener();
   }
   setupInteractionListener() {
@@ -852,7 +905,7 @@ class Ee {
           this.audioElement.play().catch((i) => {
             console.warn("[ST-BgLoader AudioEngine] Autoplay was prevented by browser policy:", i);
           }),
-          new Promise((i) => window.setTimeout(i, ee))
+          new Promise((i) => window.setTimeout(i, ie))
         ]);
       } catch (i) {
         console.warn("[ST-BgLoader AudioEngine] Autoplay was prevented by browser policy:", i);
@@ -861,13 +914,13 @@ class Ee {
   }
   fadeInVolume(e, t = 400) {
     this.clearFade();
-    const i = performance.now(), n = Math.max(0, Math.min(1, e));
+    const i = performance.now(), s = Math.max(0, Math.min(1, e));
     this.audioElement && (this.audioElement.muted = !1, this.audioElement.volume = 0), this.attachedVideo && (this.attachedVideo.muted = !1, this.attachedVideo.volume = 0);
-    const s = () => {
-      const a = performance.now() - i, r = Math.min(1, a / t), c = n * r;
-      this.audioElement && (this.audioElement.volume = c), this.attachedVideo && (this.attachedVideo.volume = c), r < 1 ? this.fadeTimer = requestAnimationFrame(s) : this.applyVolume();
+    const n = () => {
+      const a = performance.now() - i, r = Math.min(1, a / t), c = s * r;
+      this.audioElement && (this.audioElement.volume = c), this.attachedVideo && (this.attachedVideo.volume = c), r < 1 ? this.fadeTimer = requestAnimationFrame(n) : this.applyVolume();
     };
-    this.fadeTimer = requestAnimationFrame(s);
+    this.fadeTimer = requestAnimationFrame(n);
   }
   stopTrack(e = 300) {
     if (!this.audioElement || this.audioElement.paused) return;
@@ -875,11 +928,11 @@ class Ee {
       this.audioElement.pause(), this.audioElement.currentTime = 0;
       return;
     }
-    const t = this.audioElement.volume, i = performance.now(), n = () => {
-      const s = performance.now() - i, a = Math.min(1, s / e);
-      this.audioElement && (this.audioElement.volume = t * (1 - a)), a < 1 ? this.fadeTimer = requestAnimationFrame(n) : this.audioElement && (this.audioElement.pause(), this.audioElement.currentTime = 0, this.applyVolume());
+    const t = this.audioElement.volume, i = performance.now(), s = () => {
+      const n = performance.now() - i, a = Math.min(1, n / e);
+      this.audioElement && (this.audioElement.volume = t * (1 - a)), a < 1 ? this.fadeTimer = requestAnimationFrame(s) : this.audioElement && (this.audioElement.pause(), this.audioElement.currentTime = 0, this.applyVolume());
     };
-    this.clearFade(), this.fadeTimer = requestAnimationFrame(n);
+    this.clearFade(), this.fadeTimer = requestAnimationFrame(s);
   }
   handleVisibilityChange(e, t) {
     t && (e ? (this.audioElement && !this.audioElement.paused && (this.audioElement.pause(), this.isPausedForBlur = !0), this.attachedVideo && !this.attachedVideo.paused && this.attachedVideo.pause()) : (this.isPausedForBlur && this.audioElement && (this.audioElement.play().catch(() => {
@@ -898,8 +951,8 @@ class Ee {
     }), this.audioContext = null), this.attachedVideo = null, this.playlist = [];
   }
 }
-const xe = 15e3;
-class te {
+const Te = 15e3;
+class se {
   videoElement = null;
   container;
   audioEngine;
@@ -910,11 +963,11 @@ class te {
   async render(e, t = "cover") {
     this.destroy();
     const i = document.createElement("video");
-    return i.className = "st-bg-video-element", i.src = e, i.loop = !0, i.playsInline = !0, i.autoplay = !0, this.applyFitting(i, t), i.style.position = "absolute", i.style.top = "0", i.style.left = "0", i.style.width = "100%", i.style.height = "100%", i.style.pointerEvents = "none", i.style.transform = "translateZ(0)", i.style.willChange = "transform", i.style.opacity = "0", i.style.transition = "opacity 400ms ease-in-out", this.container.appendChild(i), this.videoElement = i, this.audioEngine.attachVideo(i), new Promise((n) => {
-      let s = !1;
+    return i.className = "st-bg-video-element", i.src = e, i.loop = !0, i.playsInline = !0, i.autoplay = !0, this.applyFitting(i, t), i.style.position = "absolute", i.style.top = "0", i.style.left = "0", i.style.width = "100%", i.style.height = "100%", i.style.pointerEvents = "none", i.style.transform = "translateZ(0)", i.style.willChange = "transform", i.style.opacity = "0", i.style.transition = "opacity 400ms ease-in-out", this.container.appendChild(i), this.videoElement = i, this.audioEngine.attachVideo(i), new Promise((s) => {
+      let n = !1;
       const a = () => {
-        s || (s = !0, window.clearTimeout(r), this.pendingSettle = null, i.removeEventListener("canplay", c), n(i));
-      }, r = window.setTimeout(a, xe);
+        n || (n = !0, window.clearTimeout(r), this.pendingSettle = null, i.removeEventListener("canplay", c), s(i));
+      }, r = window.setTimeout(a, Te);
       this.pendingSettle = a;
       const c = async () => {
         try {
@@ -950,8 +1003,8 @@ class te {
     this.videoElement && (this.pendingSettle?.(), this.audioEngine.attachVideo(null), this.videoElement.pause(), this.videoElement.removeAttribute("src"), this.videoElement.load(), this.videoElement.remove(), this.videoElement = null);
   }
 }
-const Me = 8e3;
-class ie {
+const Ce = 8e3;
+class ne {
   iframeElement = null;
   container;
   pendingSettle = null;
@@ -961,25 +1014,33 @@ class ie {
   async render(e, t = !1) {
     this.destroy();
     const i = document.createElement("iframe");
-    return i.className = "st-bg-iframe-element", i.setAttribute("sandbox", "allow-scripts allow-same-origin"), i.style.position = "absolute", i.style.top = "0", i.style.left = "0", i.style.width = "100%", i.style.height = "100%", i.style.border = "none", i.style.opacity = "0", i.style.pointerEvents = "auto", i.style.transition = "opacity 400ms ease-in-out", this.container.appendChild(i), this.iframeElement = i, new Promise((n) => {
-      let s = !1;
+    return i.className = "st-bg-iframe-element", i.setAttribute("sandbox", "allow-scripts allow-same-origin"), i.style.position = "absolute", i.style.top = "0", i.style.left = "0", i.style.width = "100%", i.style.height = "100%", i.style.border = "none", i.style.opacity = "0", i.style.pointerEvents = "auto", i.style.transition = "opacity 400ms ease-in-out", this.container.appendChild(i), this.iframeElement = i, new Promise((s) => {
+      let n = !1;
       const a = () => {
-        s || (s = !0, window.clearTimeout(r), this.pendingSettle = null, n(i));
-      }, r = window.setTimeout(a, Me);
+        n || (n = !0, window.clearTimeout(r), this.pendingSettle = null, s(i));
+      }, r = window.setTimeout(a, Ce);
       this.pendingSettle = a, i.onload = () => {
         i.style.opacity = "1", a();
       }, t ? i.src = e : i.srcdoc = e;
     });
   }
   postMessage(e) {
-    this.iframeElement && this.iframeElement.contentWindow && this.iframeElement.contentWindow.postMessage(e, "*");
+    if (this.iframeElement && this.iframeElement.contentWindow) {
+      let t = window.location.origin;
+      try {
+        const i = new URL(this.iframeElement.src, window.location.href);
+        (i.protocol === "http:" || i.protocol === "https:") && (t = i.origin);
+      } catch {
+      }
+      this.iframeElement.contentWindow.postMessage(e, t);
+    }
   }
   destroy() {
     this.iframeElement && (this.pendingSettle?.(), this.iframeElement.srcdoc = "", this.iframeElement.src = "about:blank", this.iframeElement.remove(), this.iframeElement = null);
   }
 }
-const Te = 15e3;
-class se {
+const ke = 15e3;
+class ae {
   imageElement = null;
   container;
   pendingSettle = null;
@@ -989,11 +1050,11 @@ class se {
   async render(e, t = "cover") {
     this.destroy();
     const i = document.createElement("img");
-    return i.className = "st-bg-image-element", i.src = e, this.applyFitting(i, t), i.style.position = "absolute", i.style.top = "0", i.style.left = "0", i.style.width = "100%", i.style.height = "100%", i.style.pointerEvents = "none", i.style.opacity = "0", i.style.transition = "opacity 400ms ease-in-out", this.container.appendChild(i), this.imageElement = i, new Promise((n) => {
-      let s = !1;
+    return i.className = "st-bg-image-element", i.src = e, this.applyFitting(i, t), i.style.position = "absolute", i.style.top = "0", i.style.left = "0", i.style.width = "100%", i.style.height = "100%", i.style.pointerEvents = "none", i.style.opacity = "0", i.style.transition = "opacity 400ms ease-in-out", this.container.appendChild(i), this.imageElement = i, new Promise((s) => {
+      let n = !1;
       const a = () => {
-        s || (s = !0, window.clearTimeout(r), this.pendingSettle = null, n(i));
-      }, r = window.setTimeout(a, Te);
+        n || (n = !0, window.clearTimeout(r), this.pendingSettle = null, s(i));
+      }, r = window.setTimeout(a, ke);
       this.pendingSettle = a, i.onload = () => {
         i.style.opacity = "1", a();
       }, i.onerror = () => {
@@ -1022,9 +1083,14 @@ class se {
     this.imageElement && (this.pendingSettle?.(), this.imageElement.remove(), this.imageElement = null);
   }
 }
-class Ce {
+const Ae = 3e4;
+class Ie {
   hostEl = null;
   containerEl = null;
+  // Sits between the container and the A/B layers: the visualizer's pulse pump scales
+  // THIS element while parallax transforms the container — two writers, one property,
+  // would fight each other.
+  pumpWrapperEl = null;
   layerA = null;
   layerB = null;
   activeLayer = "A";
@@ -1052,16 +1118,21 @@ class Ce {
   getContainerElement() {
     return this.containerEl;
   }
+  /** Pump target for the visualizer's pulse mode (see pumpWrapperEl). */
+  getPumpWrapperElement() {
+    return this.pumpWrapperEl;
+  }
   getHostElement() {
     return this.hostEl;
   }
   init() {
     if (this.hostEl = document.querySelector("#bg1"), !this.hostEl) {
       const e = new MutationObserver(() => {
-        const t = document.querySelector("#bg1");
-        t && (e.disconnect(), this.hostEl = t, this.setupContainer());
+        const i = document.querySelector("#bg1");
+        i && (window.clearTimeout(t), e.disconnect(), this.hostEl = i, this.setupContainer());
       });
       e.observe(document.body, { childList: !0, subtree: !0 });
+      const t = window.setTimeout(() => e.disconnect(), Ae);
       return;
     }
     this.setupContainer();
@@ -1070,7 +1141,14 @@ class Ce {
     if (!this.hostEl) return;
     window.getComputedStyle(this.hostEl).position === "static" && (this.hostEl.style.position = "relative");
     let t = this.hostEl.querySelector(".st-bg-media-container");
-    t ? (this.layerA = t.querySelector(".st-bg-layer-a"), this.layerB = t.querySelector(".st-bg-layer-b")) : (t = document.createElement("div"), t.className = "st-bg-media-container", t.style.position = "absolute", t.style.top = "0", t.style.left = "0", t.style.width = "100%", t.style.height = "100%", t.style.overflow = "hidden", t.style.zIndex = "0", t.style.pointerEvents = "none", this.layerA = document.createElement("div"), this.layerA.className = "st-bg-layer st-bg-layer-a", this.setupLayerStyle(this.layerA), this.layerB = document.createElement("div"), this.layerB.className = "st-bg-layer st-bg-layer-b", this.setupLayerStyle(this.layerB), t.appendChild(this.layerA), t.appendChild(this.layerB), this.hostEl.appendChild(t)), this.containerEl = t, this.videoRendererA = new te(this.layerA, this.audioEngine), this.videoRendererB = new te(this.layerB, this.audioEngine), this.iframeRendererA = new ie(this.layerA), this.iframeRendererB = new ie(this.layerB), this.imageRendererA = new se(this.layerA), this.imageRendererB = new se(this.layerB), this.observer = new MutationObserver(() => this.syncFitting()), this.observer.observe(this.hostEl, { attributes: !0, attributeFilter: ["class"] }), this.syncFitting(), this.onHostReady?.(t);
+    if (t)
+      this.pumpWrapperEl = t.querySelector(".st-bg-pump-wrapper"), this.layerA = t.querySelector(".st-bg-layer-a"), this.layerB = t.querySelector(".st-bg-layer-b");
+    else {
+      t = document.createElement("div"), t.className = "st-bg-media-container", t.style.position = "absolute", t.style.top = "0", t.style.left = "0", t.style.width = "100%", t.style.height = "100%", t.style.overflow = "hidden", t.style.zIndex = "0", t.style.pointerEvents = "none";
+      const i = document.createElement("div");
+      i.className = "st-bg-pump-wrapper", i.style.position = "absolute", i.style.top = "0", i.style.left = "0", i.style.width = "100%", i.style.height = "100%", i.style.pointerEvents = "none", this.layerA = document.createElement("div"), this.layerA.className = "st-bg-layer st-bg-layer-a", this.setupLayerStyle(this.layerA), this.layerB = document.createElement("div"), this.layerB.className = "st-bg-layer st-bg-layer-b", this.setupLayerStyle(this.layerB), i.appendChild(this.layerA), i.appendChild(this.layerB), t.appendChild(i), this.hostEl.appendChild(t);
+    }
+    this.pumpWrapperEl || (this.pumpWrapperEl = this.layerA?.parentElement ?? t), this.containerEl = t, this.videoRendererA = new se(this.layerA, this.audioEngine), this.videoRendererB = new se(this.layerB, this.audioEngine), this.iframeRendererA = new ne(this.layerA), this.iframeRendererB = new ne(this.layerB), this.imageRendererA = new ae(this.layerA), this.imageRendererB = new ae(this.layerB), this.observer = new MutationObserver(() => this.syncFitting()), this.observer.observe(this.hostEl, { attributes: !0, attributeFilter: ["class"] }), this.syncFitting(), this.onHostReady?.(t);
   }
   setupLayerStyle(e) {
     e.style.position = "absolute", e.style.top = "0", e.style.left = "0", e.style.width = "100%", e.style.height = "100%", e.style.opacity = "0", e.style.transition = `all ${this.transitionDurationMs}ms cubic-bezier(0.4, 0, 0.2, 1)`, e.style.pointerEvents = "none";
@@ -1102,7 +1180,7 @@ class Ce {
       const m = this.activeLayer === "A" ? this.layerB : this.layerA;
       m && (m.style.opacity = "0", m.style.transform = "none", m.style.filter = "none");
     }
-    const i = this.activeLayer === "A" ? "B" : "A", n = i === "B" ? this.layerB : this.layerA, s = this.activeLayer === "A" ? this.layerA : this.layerB, a = i === "B" ? this.videoRendererB : this.videoRendererA, r = i === "B" ? this.iframeRendererB : this.iframeRendererA, c = i === "B" ? this.imageRendererB : this.imageRendererA;
+    const i = this.activeLayer === "A" ? "B" : "A", s = i === "B" ? this.layerB : this.layerA, n = this.activeLayer === "A" ? this.layerA : this.layerB, a = i === "B" ? this.videoRendererB : this.videoRendererA, r = i === "B" ? this.iframeRendererB : this.iframeRendererA, c = i === "B" ? this.imageRendererB : this.imageRendererA;
     a.destroy(), r.destroy(), c.destroy();
     const h = this.getFitting();
     switch (e.type) {
@@ -1121,19 +1199,19 @@ class Ce {
         break;
     }
     const u = this.transitionDurationMs;
-    n.style.transition = `all ${u}ms cubic-bezier(0.4, 0, 0.2, 1)`, s.style.transition = `all ${u}ms cubic-bezier(0.4, 0, 0.2, 1)`;
+    s.style.transition = `all ${u}ms cubic-bezier(0.4, 0, 0.2, 1)`, n.style.transition = `all ${u}ms cubic-bezier(0.4, 0, 0.2, 1)`;
     const p = this.transitionType;
-    p === "zoom_fade" ? (n.style.transform = "scale(1.06)", n.style.opacity = "0", n.offsetHeight, n.style.transform = "scale(1)", n.style.opacity = "1", s.style.transform = "scale(0.96)", s.style.opacity = "0") : p === "blur_fade" ? (n.style.filter = "blur(10px)", n.style.opacity = "0", n.offsetHeight, n.style.filter = "blur(0px)", n.style.opacity = "1", s.style.filter = "blur(10px)", s.style.opacity = "0") : p === "slide_left" ? (n.style.transform = "translate3d(100%, 0, 0)", n.style.opacity = "1", n.offsetHeight, n.style.transform = "translate3d(0, 0, 0)", s.style.transform = "translate3d(-100%, 0, 0)", s.style.opacity = "0") : p === "slide_right" ? (n.style.transform = "translate3d(-100%, 0, 0)", n.style.opacity = "1", n.offsetHeight, n.style.transform = "translate3d(0, 0, 0)", s.style.transform = "translate3d(100%, 0, 0)", s.style.opacity = "0") : (n.style.transform = "none", n.style.filter = "none", n.style.opacity = "1", s.style.transform = "none", s.style.filter = "none", s.style.opacity = "0"), this.activeLayer = i, this.crossfadeTimer = window.setTimeout(() => {
+    p === "zoom_fade" ? (s.style.transform = "scale(1.06)", s.style.opacity = "0", s.offsetHeight, s.style.transform = "scale(1)", s.style.opacity = "1", n.style.transform = "scale(0.96)", n.style.opacity = "0") : p === "blur_fade" ? (s.style.filter = "blur(10px)", s.style.opacity = "0", s.offsetHeight, s.style.filter = "blur(0px)", s.style.opacity = "1", n.style.filter = "blur(10px)", n.style.opacity = "0") : p === "slide_left" ? (s.style.transform = "translate3d(100%, 0, 0)", s.style.opacity = "1", s.offsetHeight, s.style.transform = "translate3d(0, 0, 0)", n.style.transform = "translate3d(-100%, 0, 0)", n.style.opacity = "0") : p === "slide_right" ? (s.style.transform = "translate3d(-100%, 0, 0)", s.style.opacity = "1", s.offsetHeight, s.style.transform = "translate3d(0, 0, 0)", n.style.transform = "translate3d(100%, 0, 0)", n.style.opacity = "0") : (s.style.transform = "none", s.style.filter = "none", s.style.opacity = "1", n.style.transform = "none", n.style.filter = "none", n.style.opacity = "0"), this.activeLayer = i, this.crossfadeTimer = window.setTimeout(() => {
       this.crossfadeTimer = null;
       const g = this.activeLayer === "A" ? this.videoRendererB : this.videoRendererA, f = this.activeLayer === "A" ? this.iframeRendererB : this.iframeRendererA, y = this.activeLayer === "A" ? this.imageRendererB : this.imageRendererA;
-      g.destroy(), f.destroy(), y.destroy(), s.style.transform = "none", s.style.filter = "none";
+      g.destroy(), f.destroy(), y.destroy(), n.style.transform = "none", n.style.filter = "none";
     }, u + 50);
   }
   clear() {
     this.crossfadeTimer !== null && (clearTimeout(this.crossfadeTimer), this.crossfadeTimer = null), this.layerA && (this.layerA.style.opacity = "0", this.layerA.style.transform = "none", this.layerA.style.filter = "none"), this.layerB && (this.layerB.style.opacity = "0", this.layerB.style.transform = "none", this.layerB.style.filter = "none"), this.videoRendererA?.destroy(), this.videoRendererB?.destroy(), this.iframeRendererA?.destroy(), this.iframeRendererB?.destroy(), this.imageRendererA?.destroy(), this.imageRendererB?.destroy();
   }
 }
-const ke = {
+const Le = {
   "&": "&amp;",
   "<": "&lt;",
   ">": "&gt;",
@@ -1141,16 +1219,16 @@ const ke = {
   "'": "&#39;"
 };
 function w(l) {
-  return String(l).replace(/[&<>"']/g, (e) => ke[e]);
+  return String(l).replace(/[&<>"']/g, (e) => Le[e]);
 }
-class Ae {
+class Re {
   container = null;
   settings;
   cacheManager;
   callbacks;
   authority;
-  constructor(e, t, i, n) {
-    this.settings = e, this.cacheManager = t, this.callbacks = i, this.authority = n ?? null;
+  constructor(e, t, i, s) {
+    this.settings = e, this.cacheManager = t, this.callbacks = i, this.authority = s ?? null;
   }
   /** Replace the drawer's settings copy with a remotely synced one and re-render the panel. */
   applyRemoteSettings(e) {
@@ -1160,10 +1238,11 @@ class Ae {
     const e = document.querySelector("#extensions_settings");
     if (!e) {
       console.warn("[ST-BgLoader] #extensions_settings not found yet, waiting for DOM insertion...");
-      const n = new MutationObserver(() => {
-        document.querySelector("#extensions_settings") && (n.disconnect(), this.render());
+      const s = new MutationObserver(() => {
+        document.querySelector("#extensions_settings") && (window.clearTimeout(n), s.disconnect(), this.render());
       });
-      n.observe(document.body, { childList: !0, subtree: !0 });
+      s.observe(document.body, { childList: !0, subtree: !0 });
+      const n = window.setTimeout(() => s.disconnect(), 3e4);
       return;
     }
     const t = document.querySelector("#st_bgloader_settings");
@@ -1505,24 +1584,24 @@ class Ae {
 
                 </div>
             </div>
-        `, e.appendChild(i), this.container = i, this.bindEvents(), this.populatePresets(), this.populateScenes(), this.refreshMediaGrid(), this.refreshTriggerList(), this.updateCacheStats(), this.updateCloudPanel();
+        `, e.appendChild(i), this.container = i, this.lastGridSignature = "", this.bindEvents(), this.populatePresets(), this.populateScenes(), this.refreshMediaGrid(), this.refreshTriggerList(), this.updateCacheStats(), this.updateCloudPanel();
   }
   /** Reflects the storage model: server source of truth + evictable browser cache + optional Authority. */
   updateCloudPanel() {
     const e = this.container?.querySelector("#st_bgloader_cloud_status"), t = this.container?.querySelector("#st_bgloader_agent_tools_cb");
     if (!e) return;
-    const i = '<span style="color:#4fae6b;">● 源端：服务端 backgrounds/ 目录</span><br/>媒体存于酒馆服务端（与原生背景同位置，换浏览器/设备可见）；本浏览器仅保留可清理的缓存。', n = this.authority?.getCapabilities();
-    let s;
-    n?.available && n.agentToolsState === "blocked" ? s = '<span style="color:#4fae6b;">● Authority 增强已连接</span>：设置/场景跨端同步 ✓ · CORS 服务端导入 ✓ · <span style="color:#c9a34f;">Agent 氛围工具被权限策略封锁</span>（管理员可在 Authority Security Center 调整）' : n?.available && n.agentToolsState === "pending" ? s = '<span style="color:#4fae6b;">● Authority 增强已连接</span>：设置/场景跨端同步 ✓ · CORS 服务端导入 ✓ · <span style="color:#c9a34f;">Agent 氛围工具等待授权</span>（处理页面上的 Authority 权限弹窗，或到 Security Center 查看）' : n?.available ? s = '<span style="color:#4fae6b;">● Authority 增强已连接</span>：设置/场景跨端同步 ✓ · Agent 氛围工具可用 · CORS 服务端导入 ✓' : s = '<span style="color:#c9a34f;">● 未检测到 Authority</span>：媒体功能不受影响（源端始终在服务端），仅跨端同步与 Agent 工具不可用。', e.innerHTML = `${i}<br/>${s}`, t && (t.checked = !!this.settings.agentToolsEnabled, t.disabled = !n?.available);
+    const i = '<span style="color:#4fae6b;">● 源端：服务端 backgrounds/ 目录</span><br/>媒体存于酒馆服务端（与原生背景同位置，换浏览器/设备可见）；本浏览器仅保留可清理的缓存。', s = this.authority?.getCapabilities();
+    let n;
+    s?.available && s.agentToolsState === "blocked" ? n = '<span style="color:#4fae6b;">● Authority 增强已连接</span>：设置/场景跨端同步 ✓ · CORS 服务端导入 ✓ · <span style="color:#c9a34f;">Agent 氛围工具被权限策略封锁</span>（管理员可在 Authority Security Center 调整）' : s?.available && s.agentToolsState === "pending" ? n = '<span style="color:#4fae6b;">● Authority 增强已连接</span>：设置/场景跨端同步 ✓ · CORS 服务端导入 ✓ · <span style="color:#c9a34f;">Agent 氛围工具等待授权</span>（处理页面上的 Authority 权限弹窗，或到 Security Center 查看）' : s?.available ? n = '<span style="color:#4fae6b;">● Authority 增强已连接</span>：设置/场景跨端同步 ✓ · Agent 氛围工具可用 · CORS 服务端导入 ✓' : n = '<span style="color:#c9a34f;">● 未检测到 Authority</span>：媒体功能不受影响（源端始终在服务端），仅跨端同步与 Agent 工具不可用。', e.innerHTML = `${i}<br/>${n}`, t && (t.checked = !!this.settings.agentToolsEnabled, t.disabled = !s?.available);
   }
   populateScenes() {
     const e = this.container?.querySelector("#st_scene_select");
-    e && (e.innerHTML = "", Object.values(I).forEach((t) => {
+    e && (e.innerHTML = "", Object.values(A).forEach((t) => {
       const i = document.createElement("option");
       i.value = t.id, i.textContent = t.name, t.id === this.settings.activeSceneId && (i.selected = !0), e.appendChild(i);
     }), Object.entries(this.settings.scenes || {}).forEach(([t, i]) => {
-      const n = document.createElement("option");
-      n.value = t, n.textContent = `★ ${i.name} (Custom)`, t === this.settings.activeSceneId && (n.selected = !0), e.appendChild(n);
+      const s = document.createElement("option");
+      s.value = t, s.textContent = `★ ${i.name} (Custom)`, t === this.settings.activeSceneId && (s.selected = !0), e.appendChild(s);
     }));
   }
   populatePresets() {
@@ -1531,8 +1610,8 @@ class Ae {
       const i = document.createElement("option");
       i.value = t.id, i.textContent = t.name, t.id === this.settings.activePresetId && (i.selected = !0), e.appendChild(i);
     }), Object.entries(this.settings.userPresets || {}).forEach(([t, i]) => {
-      const n = document.createElement("option");
-      n.value = t, n.textContent = `★ ${t} (Custom)`, t === this.settings.activePresetId && (n.selected = !0), e.appendChild(n);
+      const s = document.createElement("option");
+      s.value = t, s.textContent = `★ ${t} (Custom)`, t === this.settings.activePresetId && (s.selected = !0), e.appendChild(s);
     }));
   }
   bindEvents() {
@@ -1542,14 +1621,14 @@ class Ae {
       const o = t.style.display === "none";
       t.style.display = o ? "flex" : "none", i && (i.classList.toggle("down", o), i.classList.toggle("up", !o));
     });
-    const n = this.container.querySelector("#st_bgloader_dropzone"), s = this.container.querySelector("#st_bgloader_file_input");
-    n?.addEventListener("click", () => s?.click()), s?.addEventListener("change", async () => {
-      s.files && s.files.length > 0 && (await this.handleFileUpload(s.files[0]), s.value = "");
-    }), n?.addEventListener("dragover", (o) => {
-      o.preventDefault(), n.classList.add("dragover");
-    }), n?.addEventListener("dragleave", () => n.classList.remove("dragover")), n?.addEventListener("drop", async (o) => {
+    const s = this.container.querySelector("#st_bgloader_dropzone"), n = this.container.querySelector("#st_bgloader_file_input");
+    s?.addEventListener("click", () => n?.click()), n?.addEventListener("change", async () => {
+      n.files && n.files.length > 0 && (await this.handleFileUpload(n.files[0]), n.value = "");
+    }), s?.addEventListener("dragover", (o) => {
+      o.preventDefault(), s.classList.add("dragover");
+    }), s?.addEventListener("dragleave", () => s.classList.remove("dragover")), s?.addEventListener("drop", async (o) => {
       const d = o;
-      d.preventDefault(), n.classList.remove("dragover"), d.dataTransfer?.files && d.dataTransfer.files.length > 0 && await this.handleFileUpload(d.dataTransfer.files[0]);
+      d.preventDefault(), s.classList.remove("dragover"), d.dataTransfer?.files && d.dataTransfer.files.length > 0 && await this.handleFileUpload(d.dataTransfer.files[0]);
     });
     const a = this.container.querySelector("#st_bgloader_url_input");
     this.container.querySelector("#st_bgloader_url_btn")?.addEventListener("click", async () => {
@@ -1579,7 +1658,7 @@ class Ae {
       }
     }), this.container.querySelector("#st_scene_del_btn")?.addEventListener("click", () => {
       const o = c?.value;
-      if (I[o]) {
+      if (A[o]) {
         alert("Cannot delete built-in scenes.");
         return;
       }
@@ -1614,10 +1693,10 @@ class Ae {
         u = null, this.callbacks.onSettingsChanged(this.settings);
       }, 300);
     }, g = (o, d, _, T) => {
-      const X = this.container.querySelector(o), Y = this.container.querySelector(d);
-      X?.addEventListener("input", () => {
-        const J = Number(X.value);
-        Y && (Y.textContent = `${J}${_}`), T(J), p();
+      const J = this.container.querySelector(o), Q = this.container.querySelector(d);
+      J?.addEventListener("input", () => {
+        const Z = Number(J.value);
+        Q && (Q.textContent = `${Z}${_}`), T(Z), p();
       });
     };
     g("#st_filter_blur", "#st_filter_blur_val", "px", (o) => this.settings.filters.blur = o), g("#st_filter_brightness", "#st_filter_brightness_val", "%", (o) => this.settings.filters.brightness = o), g("#st_filter_opacity", "#st_filter_opacity_val", "%", (o) => this.settings.filters.opacity = o), g("#st_filter_saturate", "#st_filter_saturate_val", "%", (o) => this.settings.filters.saturate = o);
@@ -1639,67 +1718,67 @@ class Ae {
     }), g("#st_visualizer_sens", "#st_visualizer_sens_val", "x", (o) => {
       this.settings.visualizer.sensitivity = o / 10, this.callbacks.onVisualizerChanged?.(this.settings.visualizer);
     });
-    const U = this.container.querySelector("#st_parallax_enabled");
-    U?.addEventListener("change", () => {
-      this.settings.parallax.enabled = U.checked, this.callbacks.onParallaxChanged?.(this.settings.parallax), this.callbacks.onSettingsChanged(this.settings);
+    const q = this.container.querySelector("#st_parallax_enabled");
+    q?.addEventListener("change", () => {
+      this.settings.parallax.enabled = q.checked, this.callbacks.onParallaxChanged?.(this.settings.parallax), this.callbacks.onSettingsChanged(this.settings);
     }), g("#st_parallax_intensity", "#st_parallax_intensity_val", "", (o) => {
       this.settings.parallax.intensity = o / 10, this.callbacks.onParallaxChanged?.(this.settings.parallax);
     });
-    const q = this.container.querySelector("#st_ambient_type");
-    q?.addEventListener("change", () => {
-      this.settings.ambientSound.type = q.value, this.callbacks.onAmbientSoundChanged?.(this.settings.ambientSound), this.callbacks.onSettingsChanged(this.settings);
+    const V = this.container.querySelector("#st_ambient_type");
+    V?.addEventListener("change", () => {
+      this.settings.ambientSound.type = V.value, this.callbacks.onAmbientSoundChanged?.(this.settings.ambientSound), this.callbacks.onSettingsChanged(this.settings);
     }), g("#st_ambient_vol", "#st_ambient_vol_val", "%", (o) => {
       this.settings.ambientSound.volume = o / 100, this.callbacks.onAmbientSoundChanged?.(this.settings.ambientSound);
     });
-    const N = this.container.querySelector("#st_frosted_enabled");
-    N?.addEventListener("change", () => {
-      this.settings.frostedChat.enabled = N.checked, this.callbacks.onFrostedChatChanged?.(this.settings.frostedChat), this.callbacks.onSettingsChanged(this.settings);
+    const W = this.container.querySelector("#st_frosted_enabled");
+    W?.addEventListener("change", () => {
+      this.settings.frostedChat.enabled = W.checked, this.callbacks.onFrostedChatChanged?.(this.settings.frostedChat), this.callbacks.onSettingsChanged(this.settings);
     }), g("#st_frosted_blur", "#st_frosted_blur_val", "px", (o) => {
       this.settings.frostedChat.blur = o, this.callbacks.onFrostedChatChanged?.(this.settings.frostedChat);
     }), g("#st_frosted_opacity", "#st_frosted_opacity_val", "%", (o) => {
       this.settings.frostedChat.opacity = o, this.callbacks.onFrostedChatChanged?.(this.settings.frostedChat);
     });
-    const V = this.container.querySelector("#st_transition_effect");
-    V?.addEventListener("change", () => {
-      this.settings.transitionEffect = V.value, this.callbacks.onTransitionChanged?.(this.settings.transitionEffect, this.settings.transitionDurationMs), this.callbacks.onSettingsChanged(this.settings);
+    const G = this.container.querySelector("#st_transition_effect");
+    G?.addEventListener("change", () => {
+      this.settings.transitionEffect = G.value, this.callbacks.onTransitionChanged?.(this.settings.transitionEffect, this.settings.transitionDurationMs), this.callbacks.onSettingsChanged(this.settings);
     }), g("#st_transition_dur", "#st_transition_dur_val", "ms", (o) => {
       this.settings.transitionDurationMs = o, this.callbacks.onTransitionChanged?.(this.settings.transitionEffect, this.settings.transitionDurationMs);
     }), g("#st_audio_volume", "#st_audio_volume_val", "%", (o) => this.settings.volume = o / 100);
-    const G = this.container.querySelector("#st_playback_mode");
-    G?.addEventListener("change", () => {
-      this.settings.playbackMode = G.value, this.callbacks.onPlaybackModeChanged(this.settings.playbackMode), this.callbacks.onSettingsChanged(this.settings);
-    });
-    const W = this.container.querySelector("#st_audio_mute");
-    W?.addEventListener("change", () => {
-      this.settings.muted = W.checked, this.callbacks.onSettingsChanged(this.settings);
-    });
-    const P = this.container.querySelector("#st_audio_muffle");
-    P?.addEventListener("change", () => {
-      this.settings.muffleBGM = P.checked, this.callbacks.onMuffleChanged?.(P.checked), this.callbacks.onSettingsChanged(this.settings);
-    });
-    const H = this.container.querySelector("#st_audio_blur");
+    const H = this.container.querySelector("#st_playback_mode");
     H?.addEventListener("change", () => {
-      this.settings.pauseOnBlur = H.checked, this.callbacks.onSettingsChanged(this.settings);
+      this.settings.playbackMode = H.value, this.callbacks.onPlaybackModeChanged(this.settings.playbackMode), this.callbacks.onSettingsChanged(this.settings);
     });
-    const j = this.container.querySelector("#st_shortcuts_enabled");
+    const j = this.container.querySelector("#st_audio_mute");
     j?.addEventListener("change", () => {
-      this.settings.shortcutsEnabled = j.checked, this.callbacks.onSettingsChanged(this.settings);
+      this.settings.muted = j.checked, this.callbacks.onSettingsChanged(this.settings);
     });
-    const B = this.container.querySelector("#st_bg_interactive");
-    B?.addEventListener("change", () => {
-      this.settings.interactiveBackground = B.checked, this.callbacks.onInteractiveChanged(B.checked), this.callbacks.onSettingsChanged(this.settings);
+    const R = this.container.querySelector("#st_audio_muffle");
+    R?.addEventListener("change", () => {
+      this.settings.muffleBGM = R.checked, this.callbacks.onMuffleChanged?.(R.checked), this.callbacks.onSettingsChanged(this.settings);
     });
-    const K = this.container.querySelector("#st_bgloader_agent_tools_cb");
+    const K = this.container.querySelector("#st_audio_blur");
     K?.addEventListener("change", () => {
-      this.settings.agentToolsEnabled = K.checked, this.callbacks.onSettingsChanged(this.settings);
+      this.settings.pauseOnBlur = K.checked, this.callbacks.onSettingsChanged(this.settings);
     });
-    const F = this.container.querySelector("#st_mini_player_toggle");
+    const X = this.container.querySelector("#st_shortcuts_enabled");
+    X?.addEventListener("change", () => {
+      this.settings.shortcutsEnabled = X.checked, this.callbacks.onSettingsChanged(this.settings);
+    });
+    const P = this.container.querySelector("#st_bg_interactive");
+    P?.addEventListener("change", () => {
+      this.settings.interactiveBackground = P.checked, this.callbacks.onInteractiveChanged(P.checked), this.callbacks.onSettingsChanged(this.settings);
+    });
+    const Y = this.container.querySelector("#st_bgloader_agent_tools_cb");
+    Y?.addEventListener("change", () => {
+      this.settings.agentToolsEnabled = Y.checked, this.callbacks.onSettingsChanged(this.settings);
+    });
+    const B = this.container.querySelector("#st_mini_player_toggle");
+    B?.addEventListener("change", () => {
+      this.settings.showMiniPlayer = B.checked, this.callbacks.onMiniPlayerToggle(B.checked), this.callbacks.onSettingsChanged(this.settings);
+    });
+    const F = this.container.querySelector("#st_capsule_on_play");
     F?.addEventListener("change", () => {
-      this.settings.showMiniPlayer = F.checked, this.callbacks.onMiniPlayerToggle(F.checked), this.callbacks.onSettingsChanged(this.settings);
-    });
-    const O = this.container.querySelector("#st_capsule_on_play");
-    O?.addEventListener("change", () => {
-      this.settings.capsuleOnPlayOnly = O.checked, this.callbacks.onCapsuleOnPlayToggle?.(O.checked), this.callbacks.onSettingsChanged(this.settings);
+      this.settings.capsuleOnPlayOnly = F.checked, this.callbacks.onCapsuleOnPlayToggle?.(F.checked), this.callbacks.onSettingsChanged(this.settings);
     }), this.container.querySelector("#st_trigger_add_btn")?.addEventListener("click", () => {
       const o = this.container?.querySelector("#st_trigger_form");
       if (o) {
@@ -1724,7 +1803,7 @@ class Ae {
       if (S.files && S.files[0]) {
         try {
           const o = await S.files[0].text(), d = JSON.parse(o);
-          d && typeof d == "object" && (this.settings = { ...this.settings, ...d }, this.callbacks.onSettingsChanged(this.settings), this.render(), alert("Settings successfully imported!"));
+          d && typeof d == "object" && (this.settings = z(d), this.callbacks.onSettingsChanged(this.settings), this.render(), alert("Settings successfully imported!"));
         } catch (o) {
           alert(`Failed to import settings JSON: ${o}`);
         }
@@ -1735,25 +1814,25 @@ class Ae {
   addTriggerRuleFromForm() {
     const e = this.container?.querySelector("#st_trigger_name"), t = this.container?.querySelector("#st_trigger_pattern"), i = this.container?.querySelector("#st_trigger_type");
     if (!e || !t || !i) return;
-    const n = e.value.trim(), s = t.value.trim();
-    if (!n || !s) {
+    const s = e.value.trim(), n = t.value.trim();
+    if (!s || !n) {
       alert("规则名和匹配内容不能为空。");
       return;
     }
     const a = i.value;
     if (a === "regex")
       try {
-        new RegExp(s, "i");
+        new RegExp(n, "i");
       } catch (h) {
         alert(`正则表达式无效：${h instanceof Error ? h.message : String(h)}`);
         return;
       }
     const r = {
       id: `rule_${Date.now()}`,
-      name: n,
+      name: s,
       enabled: !0,
       type: a,
-      pattern: s,
+      pattern: n,
       action: {
         preset: this.settings.activePresetId,
         weather: this.settings.weather.type
@@ -1771,8 +1850,8 @@ class Ae {
         return;
       }
       this.settings.triggerRules.forEach((t, i) => {
-        const n = document.createElement("div");
-        n.className = "st-bgloader-trigger-item", n.innerHTML = `
+        const s = document.createElement("div");
+        s.className = "st-bgloader-trigger-item", s.innerHTML = `
                 <div style="display: flex; align-items: center; gap: 6px;">
                     <input type="checkbox" class="st-rule-toggle" ${t.enabled ? "checked" : ""} />
                     <div>
@@ -1782,48 +1861,54 @@ class Ae {
                 </div>
                 <button class="menu_button menu_button_danger st-rule-del" title="Delete"><i class="fa-solid fa-trash"></i></button>
             `;
-        const s = n.querySelector(".st-rule-toggle");
-        s.addEventListener("change", () => {
-          t.enabled = s.checked, this.callbacks.onSettingsChanged(this.settings);
-        }), n.querySelector(".st-rule-del")?.addEventListener("click", () => {
+        const n = s.querySelector(".st-rule-toggle");
+        n.addEventListener("change", () => {
+          t.enabled = n.checked, this.callbacks.onSettingsChanged(this.settings);
+        }), s.querySelector(".st-rule-del")?.addEventListener("click", () => {
           this.settings.triggerRules.splice(i, 1), this.callbacks.onSettingsChanged(this.settings), this.refreshTriggerList();
-        }), e.appendChild(n);
+        }), e.appendChild(s);
       });
     }
   }
   updateSliders(e) {
-    const t = (i, n, s, a) => {
-      const r = this.container?.querySelector(i), c = this.container?.querySelector(n);
-      r && (r.value = s.toString()), c && (c.textContent = `${s}${a}`);
+    const t = (i, s, n, a) => {
+      const r = this.container?.querySelector(i), c = this.container?.querySelector(s);
+      r && (r.value = n.toString()), c && (c.textContent = `${n}${a}`);
     };
     t("#st_filter_blur", "#st_filter_blur_val", e.blur, "px"), t("#st_filter_brightness", "#st_filter_brightness_val", e.brightness, "%"), t("#st_filter_opacity", "#st_filter_opacity_val", e.opacity, "%"), t("#st_filter_saturate", "#st_filter_saturate_val", e.saturate, "%");
   }
+  lastGridSignature = "";
   async refreshMediaGrid() {
     const e = this.container?.querySelector("#st_bgloader_grid");
     if (!e) return;
-    const t = await this.cacheManager.listMedia();
-    if (e.innerHTML = "", t.length === 0) {
-      e.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; padding: 20px; opacity: 0.6;">No media items imported yet.</div>';
-      return;
-    }
-    t.forEach((i) => {
-      const n = document.createElement("div");
-      n.className = "st-bgloader-media-card", this.settings.activeMediaId === i.id && n.classList.add("active"), n.innerHTML = `
-                <div class="st-bgloader-media-badge ${i.type}">${i.type}</div>
+    const t = await this.cacheManager.listMedia(), i = JSON.stringify([
+      this.settings.activeMediaId,
+      t.map((s) => [s.id, s.name, s.type, s.url])
+    ]);
+    if (i !== this.lastGridSignature) {
+      if (this.lastGridSignature = i, e.innerHTML = "", t.length === 0) {
+        e.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; padding: 20px; opacity: 0.6;">No media items imported yet.</div>';
+        return;
+      }
+      t.forEach((s) => {
+        const n = document.createElement("div");
+        n.className = "st-bgloader-media-card", this.settings.activeMediaId === s.id && n.classList.add("active"), n.innerHTML = `
+                <div class="st-bgloader-media-badge ${s.type}">${s.type}</div>
                 <button class="st-bgloader-media-delete" title="Delete"><i class="fa-solid fa-trash"></i></button>
-                <div class="st-bgloader-media-card-title" title="${w(i.name)}">${w(i.name)}</div>
-            `, n.addEventListener("click", (a) => {
-        a.target.closest(".st-bgloader-media-delete") || (this.settings.activeMediaId = i.id, this.container?.querySelectorAll(".st-bgloader-media-card").forEach((c) => c.classList.remove("active")), n.classList.add("active"), this.callbacks.onMediaSelected(i), this.callbacks.onSettingsChanged(this.settings));
-      }), n.querySelector(".st-bgloader-media-delete")?.addEventListener("click", async (a) => {
-        a.stopPropagation(), confirm(`Delete media "${i.name}"?`) && (await this.cacheManager.deleteMedia(i.id), this.settings.activeMediaId === i.id && (this.settings.activeMediaId = null, this.callbacks.onSettingsChanged(this.settings)), this.callbacks.onMediaDeleted(i.id), await this.refreshMediaGrid(), await this.updateCacheStats());
-      }), e.appendChild(n);
-    });
+                <div class="st-bgloader-media-card-title" title="${w(s.name)}">${w(s.name)}</div>
+            `, n.addEventListener("click", (r) => {
+          r.target.closest(".st-bgloader-media-delete") || (this.settings.activeMediaId = s.id, this.container?.querySelectorAll(".st-bgloader-media-card").forEach((h) => h.classList.remove("active")), n.classList.add("active"), this.callbacks.onMediaSelected(s), this.callbacks.onSettingsChanged(this.settings));
+        }), n.querySelector(".st-bgloader-media-delete")?.addEventListener("click", async (r) => {
+          r.stopPropagation(), confirm(`Delete media "${s.name}"?`) && (await this.cacheManager.deleteMedia(s.id), this.settings.activeMediaId === s.id && (this.settings.activeMediaId = null, this.callbacks.onSettingsChanged(this.settings)), this.callbacks.onMediaDeleted(s.id), await this.refreshMediaGrid(), await this.updateCacheStats());
+        }), e.appendChild(n);
+      });
+    }
   }
   async updateCacheStats() {
     const e = this.container?.querySelector("#st_cache_used"), t = this.container?.querySelector("#st_cache_count");
     if (!e || !t) return;
-    const { usedBytes: i, itemCount: n } = await this.cacheManager.getCacheUsage(), s = (i / (1024 * 1024)).toFixed(2);
-    e.textContent = `${s} MB`, t.textContent = n.toString();
+    const { usedBytes: i, itemCount: s } = await this.cacheManager.getCacheUsage(), n = (i / (1024 * 1024)).toFixed(2);
+    e.textContent = `${n} MB`, t.textContent = s.toString();
   }
   async handleFileUpload(e) {
     this.setImportBusy(!0);
@@ -1839,8 +1924,8 @@ class Ae {
   async handleUrlImport(e) {
     this.setImportBusy(!0);
     try {
-      const t = e.split("/").pop()?.split("?")[0] || "remote_media", i = M(t), n = await this.cacheManager.saveMedia(new Blob([]), t, i, "url", e);
-      await this.refreshMediaGrid(), await this.updateCacheStats(), this.callbacks.onMediaUploaded(n);
+      const t = e.split("/").pop()?.split("?")[0] || "remote_media", i = M(t), s = await this.cacheManager.saveMedia(new Blob([]), t, i, "url", e);
+      await this.refreshMediaGrid(), await this.updateCacheStats(), this.callbacks.onMediaUploaded(s);
     } catch (t) {
       this.reportImportError(t);
     } finally {
@@ -1860,7 +1945,7 @@ class Ae {
     window.toastr?.error(`媒体导入失败：${t}`, "ST-BgLoader");
   }
 }
-class Ie {
+class Pe {
   observer = null;
   onNativeMediaSelect;
   constructor(e) {
@@ -1872,20 +1957,21 @@ class Ie {
       this.augmentThumbnails(e), this.observer = new MutationObserver(() => this.augmentThumbnails(e)), this.observer.observe(e, { childList: !0, subtree: !0 });
     else {
       const t = new MutationObserver(() => {
-        document.querySelector("#bg_menu_content") && (t.disconnect(), this.start());
+        document.querySelector("#bg_menu_content") && (window.clearTimeout(i), t.disconnect(), this.start());
       });
       t.observe(document.body, { childList: !0, subtree: !0 });
+      const i = window.setTimeout(() => t.disconnect(), 3e4);
     }
   }
   augmentThumbnails(e) {
     e.querySelectorAll(".bg_example[bgfile]:not([data-st-bg-augmented])").forEach((i) => {
       i.setAttribute("data-st-bg-augmented", "true");
-      const n = i.getAttribute("bgfile") || "", s = M(n);
-      if (s !== "image") {
+      const s = i.getAttribute("bgfile") || "", n = M(s);
+      if (n !== "image") {
         const a = document.createElement("span");
-        a.className = `st-bg-native-badge ${s}`, a.textContent = s.toUpperCase(), i.appendChild(a), i.addEventListener("click", () => {
-          const r = i.dataset.url || `/backgrounds/${n}`;
-          this.onNativeMediaSelect(r, s, n);
+        a.className = `st-bg-native-badge ${n}`, a.textContent = n.toUpperCase(), i.appendChild(a), i.addEventListener("click", () => {
+          const r = i.dataset.url || `/backgrounds/${s}`;
+          this.onNativeMediaSelect(r, n, s);
         });
       }
     });
@@ -1894,12 +1980,14 @@ class Ie {
     this.observer && (this.observer.disconnect(), this.observer = null);
   }
 }
-class Le {
+class Be {
   container = null;
   audioEngine;
   isVisible = !0;
   capsuleOnPlayOnly = !0;
   hideTimer = null;
+  unsubscribeTrack = null;
+  unsubscribePlayState = null;
   constructor(e) {
     this.audioEngine = e;
   }
@@ -1907,10 +1995,10 @@ class Le {
     this.isVisible = e, this.capsuleOnPlayOnly = t;
     const i = document.querySelector("#st_bg_mini_player");
     i && i.remove();
-    const n = document.createElement("div");
-    n.id = "st_bg_mini_player", n.className = "st-bg-mini-player";
-    const s = this.audioEngine.getCurrentTrack(), a = s ? s.name : "No Audio Selected", r = this.audioEngine.isPlaying(), c = this.audioEngine.getPlaybackMode(), h = this.isVisible && (!this.capsuleOnPlayOnly || r);
-    n.classList.add(h ? "visible" : "hidden"), n.innerHTML = `
+    const s = document.createElement("div");
+    s.id = "st_bg_mini_player", s.className = "st-bg-mini-player";
+    const n = this.audioEngine.getCurrentTrack(), a = n ? n.name : "No Audio Selected", r = this.audioEngine.isPlaying(), c = this.audioEngine.getPlaybackMode(), h = this.isVisible && (!this.capsuleOnPlayOnly || r);
+    s.classList.add(h ? "visible" : "hidden"), s.innerHTML = `
             <div class="st-bg-mini-capsule">
                 <button class="st-bg-mini-btn" id="st_mini_prev" title="Previous Track">
                     <i class="fa-solid fa-backward-step"></i>
@@ -1926,18 +2014,18 @@ class Le {
                     <i class="fa-solid ${this.getModeIcon(c)}"></i>
                 </button>
             </div>
-        `, document.body.appendChild(n), this.container = n, this.bindEvents(), this.audioEngine.onTrackChange = (u) => {
+        `, document.body.appendChild(s), this.container = s, this.bindEvents(), this.unsubscribeTrack?.(), this.unsubscribePlayState?.(), this.unsubscribeTrack = this.audioEngine.addTrackListener((u) => {
       const p = this.container?.querySelector("#st_mini_title");
       if (p) {
         const g = u ? u.name : "No Audio";
         p.textContent = g, p.setAttribute("title", g);
       }
-    }, this.audioEngine.onPlayStateChange = (u) => {
+    }), this.unsubscribePlayState = this.audioEngine.addPlayStateListener((u) => {
       const p = this.container?.querySelector("#st_mini_play i");
       p && (p.className = `fa-solid ${u ? "fa-pause" : "fa-play"}`), this.capsuleOnPlayOnly && this.isVisible && (u ? (this.hideTimer !== null && (clearTimeout(this.hideTimer), this.hideTimer = null), this.show()) : (this.hideTimer !== null && clearTimeout(this.hideTimer), this.hideTimer = window.setTimeout(() => {
         this.hide();
       }, 1200)));
-    };
+    });
   }
   bindEvents() {
     this.container && (this.container.querySelector("#st_mini_prev")?.addEventListener("click", () => {
@@ -1952,8 +2040,8 @@ class Le {
       const i = this.container?.querySelector("#st_mini_mode");
       if (i) {
         i.setAttribute("title", `Mode: ${t}`);
-        const n = i.querySelector("i");
-        n && (n.className = `fa-solid ${this.getModeIcon(t)}`);
+        const s = i.querySelector("i");
+        s && (s.className = `fa-solid ${this.getModeIcon(t)}`);
       }
     }));
   }
@@ -1981,11 +2069,11 @@ class Le {
     this.capsuleOnPlayOnly = e, e ? this.audioEngine.isPlaying() || this.hide() : this.isVisible && this.show();
   }
   destroy() {
-    this.hideTimer !== null && (clearTimeout(this.hideTimer), this.hideTimer = null), this.container && (this.container.remove(), this.container = null);
+    this.hideTimer !== null && (clearTimeout(this.hideTimer), this.hideTimer = null), this.unsubscribeTrack?.(), this.unsubscribeTrack = null, this.unsubscribePlayState?.(), this.unsubscribePlayState = null, this.container && (this.container.remove(), this.container = null);
   }
 }
-const Re = ["off", "rain", "snow", "sakura", "cyber_motes", "scanlines"];
-class Pe {
+const Fe = ["off", "rain", "snow", "sakura", "cyber_motes", "scanlines"];
+class Oe {
   ext;
   eventListeners = /* @__PURE__ */ new Map();
   constructor(e) {
@@ -1996,12 +2084,12 @@ class Pe {
    * Supports MP4/WebM video, HTML/Canvas sandboxed pages, SVG animations, and images.
    */
   async setBackground(e, t) {
-    let n = (await this.ext.getCacheManager().listMedia()).find((s) => s.id === e || s.name === e || s.url === e || s.cacheKey === e);
-    if (!n) {
-      const s = t?.name || e.split("/").pop()?.split("?")[0] || "remote_background", a = t?.type || M(e);
-      t?.saveToLibrary ? n = await this.ext.getCacheManager().saveMedia(new Blob([]), s, a, "url", e) : n = {
+    let s = (await this.ext.getCacheManager().listMedia()).find((n) => n.id === e || n.name === e || n.url === e || n.cacheKey === e);
+    if (!s) {
+      const n = t?.name || e.split("/").pop()?.split("?")[0] || "remote_background", a = t?.type || M(e);
+      t?.saveToLibrary ? s = await this.ext.getCacheManager().saveMedia(new Blob([]), n, a, "url", e) : s = {
         id: "custom_" + Date.now(),
-        name: s,
+        name: n,
         type: a,
         source: "url",
         url: e,
@@ -2012,7 +2100,7 @@ class Pe {
         lastUsedTimestamp: Date.now()
       };
     }
-    t?.filters && this.setFilters(t.filters), typeof t?.interactive == "boolean" && this.setInteractive(t.interactive), await this.ext.applyMediaItem(n), this.emit("media-change", n);
+    t?.filters && this.setFilters(t.filters), typeof t?.interactive == "boolean" && this.setInteractive(t.interactive), await this.ext.applyMediaItem(s), this.emit("media-change", s);
   }
   /**
    * Clear the current background
@@ -2025,10 +2113,10 @@ class Pe {
    */
   async playBGM(e, t) {
     typeof t?.volume == "number" && this.setVolume(t.volume);
-    let n = (await this.ext.getCacheManager().listMedia()).find((a) => a.id === e || a.name === e || a.url === e || a.cacheKey === e);
-    if (!n) {
+    let s = (await this.ext.getCacheManager().listMedia()).find((a) => a.id === e || a.name === e || a.url === e || a.cacheKey === e);
+    if (!s) {
       const a = t?.title || e.split("/").pop()?.split("?")[0] || "BGM";
-      n = {
+      s = {
         id: "bgm_" + Date.now(),
         name: a,
         type: "audio",
@@ -2041,7 +2129,7 @@ class Pe {
         lastUsedTimestamp: Date.now()
       };
     }
-    await this.ext.getAudioEngine().playMediaItem(n), this.emit("track-change", n);
+    await this.ext.getAudioEngine().playMediaItem(s), this.emit("track-change", s);
   }
   /**
    * Stop background music with optional fade-out
@@ -2100,7 +2188,7 @@ class Pe {
       ...this.ext.getSettings().weather,
       type: e,
       ...t || {}
-    } : i = { ...e }, !Re.includes(i.type)) {
+    } : i = { ...e }, !Fe.includes(i.type)) {
       console.warn(`[ST-BgLoader PublicAPI] Ignored invalid weather type "${String(i.type)}".`);
       return;
     }
@@ -2181,37 +2269,43 @@ class Pe {
    * Audiovisual Scene Snapshots
    */
   applyScene(e) {
-    const t = this.ext.getSceneManager().applyScene(e);
-    return t && (this.ext.getSettings().activeSceneId = e, this.ext.saveSettings(), this.emit("scene-change", e)), t;
+    const t = this.ext.getSceneManager();
+    if (!t) return !1;
+    const i = t.applyScene(e);
+    return i && (this.ext.getSettings().activeSceneId = e, this.ext.saveSettings(), this.emit("scene-change", e)), i;
   }
   saveCurrentScene(e) {
-    const t = this.ext.getSettings(), i = {
+    const t = this.ext.getSceneManager();
+    if (!t) return null;
+    const i = this.ext.getSettings(), s = {
       id: `scene_${Date.now()}`,
       name: e,
-      mediaId: t.activeMediaId || void 0,
-      presetId: t.activePresetId,
-      filters: { ...t.filters },
-      weather: { ...t.weather },
-      visualizer: { ...t.visualizer },
-      parallax: { ...t.parallax },
-      ambientSound: { ...t.ambientSound },
-      frostedChat: t.frostedChat.enabled
+      mediaId: i.activeMediaId || void 0,
+      presetId: i.activePresetId,
+      filters: { ...i.filters },
+      weather: { ...i.weather },
+      visualizer: { ...i.visualizer },
+      parallax: { ...i.parallax },
+      ambientSound: { ...i.ambientSound },
+      frostedChat: i.frostedChat.enabled
     };
-    return this.ext.getSceneManager().saveScene(i), this.ext.getSettings().scenes = this.ext.getSceneManager().getUserScenes(), this.ext.saveSettings(), this.emit("scenes-change", this.ext.getSceneManager().getAllScenes()), i;
+    return t.saveScene(s), i.scenes = t.getUserScenes(), this.ext.saveSettings(), this.emit("scenes-change", t.getAllScenes()), s;
   }
   getScenes() {
-    return this.ext.getSceneManager().getAllScenes();
+    return this.ext.getSceneManager()?.getAllScenes() ?? {};
   }
   deleteScene(e) {
-    const t = this.ext.getSceneManager().deleteScene(e);
-    return t && (this.ext.getSettings().scenes = this.ext.getSceneManager().getUserScenes(), this.ext.saveSettings(), this.emit("scenes-change", this.ext.getSceneManager().getAllScenes())), t;
+    const t = this.ext.getSceneManager();
+    if (!t) return !1;
+    const i = t.deleteScene(e);
+    return i && (this.ext.getSettings().scenes = t.getUserScenes(), this.ext.saveSettings(), this.emit("scenes-change", t.getAllScenes())), i;
   }
   /**
    * Quick cycle through weather types
    */
   cycleWeather() {
-    const e = ["off", "rain", "snow", "sakura", "cyber_motes", "scanlines"], t = this.ext.getSettings().weather.type, i = (e.indexOf(t) + 1) % e.length, n = e[i];
-    return this.setWeather(n), n;
+    const e = ["off", "rain", "snow", "sakura", "cyber_motes", "scanlines"], t = this.ext.getSettings().weather.type, i = (e.indexOf(t) + 1) % e.length, s = e[i];
+    return this.setWeather(s), s;
   }
   getPlaybackState() {
     const e = this.ext.getSettings(), t = this.ext.getAudioEngine();
@@ -2236,9 +2330,9 @@ class Pe {
     return this.ext.getCacheManager().listMedia();
   }
   async preloadMedia(e, t) {
-    const i = Array.isArray(e) ? e : [e], n = [], s = t?.concurrency || 3;
+    const i = Array.isArray(e) ? e : [e], s = [], n = t?.concurrency || 3;
     let a = 0;
-    const r = [...i], c = Array.from({ length: Math.min(s, r.length) }, async () => {
+    const r = [...i], c = Array.from({ length: Math.min(n, r.length) }, async () => {
       for (; r.length > 0; ) {
         const h = r.shift();
         try {
@@ -2248,9 +2342,9 @@ class Pe {
             cached: !p,
             size: u.size || 0
           };
-          n.push(g);
+          s.push(g);
         } catch (u) {
-          n.push({
+          s.push({
             url: h,
             success: !1,
             cached: !1,
@@ -2261,7 +2355,7 @@ class Pe {
         a++, t?.onProgress?.(a, i.length, h), this.emit("preload-progress", a, i.length, h);
       }
     });
-    return await Promise.all(c), this.emit("preload-complete", n), n;
+    return await Promise.all(c), this.emit("preload-complete", s), s;
   }
   // --- Event Bus ---
   on(e, t) {
@@ -2274,13 +2368,13 @@ class Pe {
     this.eventListeners.get(e)?.forEach((i) => {
       try {
         i(...t);
-      } catch (n) {
-        console.error(`[ST-BgLoader PublicAPI] Error in listener for "${e}":`, n);
+      } catch (s) {
+        console.error(`[ST-BgLoader PublicAPI] Error in listener for "${e}":`, s);
       }
     });
   }
 }
-class Be {
+class $e {
   canvas;
   ctx = null;
   parentEl = null;
@@ -2337,37 +2431,37 @@ class Be {
       this.particles.push(this.createParticle(t, !0));
   }
   createParticle(e, t = !1) {
-    const i = t ? Math.random() * this.height : -20, n = Math.random() * (this.width + 400) - 200, s = this.currentOptions.speed, a = this.currentOptions.wind;
+    const i = t ? Math.random() * this.height : -20, s = Math.random() * (this.width + 400) - 200, n = this.currentOptions.speed, a = this.currentOptions.wind;
     switch (e) {
       case "rain":
         return {
-          x: n,
+          x: s,
           y: i,
           vx: a * 3,
-          vy: (12 + Math.random() * 8) * s,
+          vy: (12 + Math.random() * 8) * n,
           size: 10 + Math.random() * 15,
           alpha: (0.3 + Math.random() * 0.4) * this.currentOptions.opacity
         };
       case "snow":
         return {
-          x: n,
+          x: s,
           y: i,
           vx: a * 0.8 + (Math.random() - 0.5) * 0.5,
-          vy: (1 + Math.random() * 2) * s,
+          vy: (1 + Math.random() * 2) * n,
           size: 2 + Math.random() * 3.5,
           alpha: (0.4 + Math.random() * 0.5) * this.currentOptions.opacity,
           oscillationOffset: Math.random() * Math.PI * 2
         };
       case "sakura":
         return {
-          x: n,
+          x: s,
           y: i,
           vx: a * 1.2 + (Math.random() - 0.5) * 0.8,
-          vy: (1.2 + Math.random() * 2.2) * s,
+          vy: (1.2 + Math.random() * 2.2) * n,
           size: 8 + Math.random() * 6,
           alpha: (0.6 + Math.random() * 0.3) * this.currentOptions.opacity,
           rotation: Math.random() * Math.PI * 2,
-          vRotation: (Math.random() - 0.5) * 0.04 * s,
+          vRotation: (Math.random() - 0.5) * 0.04 * n,
           oscillationOffset: Math.random() * Math.PI * 2
         };
       case "cyber_motes": {
@@ -2376,7 +2470,7 @@ class Be {
           x: Math.random() * this.width,
           y: t ? Math.random() * this.height : this.height + 20,
           vx: (Math.random() - 0.5) * 1.5 + a * 0.5,
-          vy: -(1.5 + Math.random() * 3) * s,
+          vy: -(1.5 + Math.random() * 3) * n,
           size: 2 + Math.random() * 3.5,
           alpha: (0.5 + Math.random() * 0.5) * this.currentOptions.opacity,
           color: r[Math.floor(Math.random() * r.length)],
@@ -2408,58 +2502,61 @@ class Be {
       return;
     }
     const i = this.particles.length;
-    for (let n = 0; n < i; n++) {
-      const s = this.particles[n];
+    for (let s = 0; s < i; s++) {
+      const n = this.particles[s];
       if (t === "rain")
-        e.beginPath(), e.strokeStyle = `rgba(180, 215, 255, ${s.alpha})`, e.lineWidth = 1.2, e.moveTo(s.x, s.y), e.lineTo(s.x + s.vx * 1.2, s.y + s.size), e.stroke(), s.x += s.vx, s.y += s.vy, s.y > this.height - 20 && Math.random() < 0.15 && this.ripples.push({
-          x: s.x,
+        e.beginPath(), e.strokeStyle = `rgba(180, 215, 255, ${n.alpha})`, e.lineWidth = 1.2, e.moveTo(n.x, n.y), e.lineTo(n.x + n.vx * 1.2, n.y + n.size), e.stroke(), n.x += n.vx, n.y += n.vy, n.y > this.height - 20 && Math.random() < 0.15 && this.ripples.push({
+          x: n.x,
           y: this.height - 5 + Math.random() * 5,
           vx: 0,
           vy: 0,
           size: 1,
-          alpha: s.alpha * 0.8
-        }), (s.y > this.height || s.x < -100 || s.x > this.width + 100) && (this.particles[n] = this.createParticle(t, !1));
+          alpha: n.alpha * 0.8
+        }), (n.y > this.height || n.x < -100 || n.x > this.width + 100) && (this.particles[s] = this.createParticle(t, !1));
       else if (t === "snow") {
-        s.oscillationOffset = (s.oscillationOffset || 0) + 0.02;
-        const a = Math.sin(s.oscillationOffset) * 0.8;
-        s.x += s.vx + a, s.y += s.vy, e.beginPath(), e.arc(s.x, s.y, s.size, 0, Math.PI * 2), e.fillStyle = `rgba(255, 255, 255, ${s.alpha})`, e.fill(), (s.y > this.height || s.x < -50 || s.x > this.width + 50) && (this.particles[n] = this.createParticle(t, !1));
+        n.oscillationOffset = (n.oscillationOffset || 0) + 0.02;
+        const a = Math.sin(n.oscillationOffset) * 0.8;
+        n.x += n.vx + a, n.y += n.vy, e.beginPath(), e.arc(n.x, n.y, n.size, 0, Math.PI * 2), e.fillStyle = `rgba(255, 255, 255, ${n.alpha})`, e.fill(), (n.y > this.height || n.x < -50 || n.x > this.width + 50) && (this.particles[s] = this.createParticle(t, !1));
       } else if (t === "sakura") {
-        s.oscillationOffset = (s.oscillationOffset || 0) + 0.03, s.rotation = (s.rotation || 0) + (s.vRotation || 0.02);
-        const a = Math.sin(s.oscillationOffset) * 1.5;
-        s.x += s.vx + a, s.y += s.vy, e.save(), e.translate(s.x, s.y), e.rotate(s.rotation), e.beginPath(), e.ellipse(0, 0, s.size, s.size * 0.55, 0, 0, Math.PI * 2), e.fillStyle = `rgba(255, 183, 197, ${s.alpha})`, e.fill(), e.restore(), (s.y > this.height || s.x < -50 || s.x > this.width + 50) && (this.particles[n] = this.createParticle(t, !1));
+        n.oscillationOffset = (n.oscillationOffset || 0) + 0.03, n.rotation = (n.rotation || 0) + (n.vRotation || 0.02);
+        const a = Math.sin(n.oscillationOffset) * 1.5;
+        n.x += n.vx + a, n.y += n.vy, e.save(), e.translate(n.x, n.y), e.rotate(n.rotation), e.beginPath(), e.ellipse(0, 0, n.size, n.size * 0.55, 0, 0, Math.PI * 2), e.fillStyle = `rgba(255, 183, 197, ${n.alpha})`, e.fill(), e.restore(), (n.y > this.height || n.x < -50 || n.x > this.width + 50) && (this.particles[s] = this.createParticle(t, !1));
       } else if (t === "cyber_motes") {
-        s.life = (s.life || 0) + 1, s.x += s.vx, s.y += s.vy;
-        const a = s.life / (s.maxLife || 200), r = s.alpha * Math.sin(a * Math.PI);
-        e.save(), e.shadowBlur = 8, e.shadowColor = s.color || "#00f0ff", e.beginPath(), e.arc(s.x, s.y, s.size, 0, Math.PI * 2), e.fillStyle = s.color || "#00f0ff", e.globalAlpha = Math.max(0, r), e.fill(), e.restore(), (s.y < -20 || s.life && s.life > (s.maxLife || 200)) && (this.particles[n] = this.createParticle(t, !1));
+        n.life = (n.life || 0) + 1, n.x += n.vx, n.y += n.vy;
+        const a = n.life / (n.maxLife || 200), r = n.alpha * Math.sin(a * Math.PI);
+        e.save(), e.shadowBlur = 8, e.shadowColor = n.color || "#00f0ff", e.beginPath(), e.arc(n.x, n.y, n.size, 0, Math.PI * 2), e.fillStyle = n.color || "#00f0ff", e.globalAlpha = Math.max(0, r), e.fill(), e.restore(), (n.y < -20 || n.life && n.life > (n.maxLife || 200)) && (this.particles[s] = this.createParticle(t, !1));
       }
     }
-    for (let n = this.ripples.length - 1; n >= 0; n--) {
-      const s = this.ripples[n];
-      if (s.size += 0.8, s.alpha -= 0.03, s.alpha <= 0 || s.size > 14) {
-        this.ripples.splice(n, 1);
+    for (let s = this.ripples.length - 1; s >= 0; s--) {
+      const n = this.ripples[s];
+      if (n.size += 0.8, n.alpha -= 0.03, n.alpha <= 0 || n.size > 14) {
+        this.ripples.splice(s, 1);
         continue;
       }
-      e.beginPath(), e.ellipse(s.x, s.y, s.size * 1.5, s.size * 0.6, 0, 0, Math.PI * 2), e.strokeStyle = `rgba(180, 215, 255, ${s.alpha})`, e.lineWidth = 1, e.stroke();
+      e.beginPath(), e.ellipse(n.x, n.y, n.size * 1.5, n.size * 0.6, 0, 0, Math.PI * 2), e.strokeStyle = `rgba(180, 215, 255, ${n.alpha})`, e.lineWidth = 1, e.stroke();
     }
   }
   renderScanlines(e) {
     const i = 0.12 * this.currentOptions.opacity;
     e.fillStyle = `rgba(0, 0, 0, ${i})`;
-    for (let s = 0; s < this.height; s += 4)
-      e.fillRect(0, s, this.width, 1.5);
+    for (let n = 0; n < this.height; n += 4)
+      e.fillRect(0, n, this.width, 1.5);
     this.scanlineOffset = (this.scanlineOffset + 2 * this.currentOptions.speed) % this.height;
-    const n = e.createLinearGradient(0, this.scanlineOffset - 30, 0, this.scanlineOffset + 30);
-    n.addColorStop(0, "rgba(255, 255, 255, 0)"), n.addColorStop(0.5, `rgba(255, 255, 255, ${0.08 * this.currentOptions.opacity})`), n.addColorStop(1, "rgba(255, 255, 255, 0)"), e.fillStyle = n, e.fillRect(0, this.scanlineOffset - 30, this.width, 60), Math.random() < 0.05 && (e.fillStyle = `rgba(255, 255, 255, ${0.02 * this.currentOptions.opacity})`, e.fillRect(0, 0, this.width, this.height));
+    const s = e.createLinearGradient(0, this.scanlineOffset - 30, 0, this.scanlineOffset + 30);
+    s.addColorStop(0, "rgba(255, 255, 255, 0)"), s.addColorStop(0.5, `rgba(255, 255, 255, ${0.08 * this.currentOptions.opacity})`), s.addColorStop(1, "rgba(255, 255, 255, 0)"), e.fillStyle = s, e.fillRect(0, this.scanlineOffset - 30, this.width, 60), Math.random() < 0.05 && (e.fillStyle = `rgba(255, 255, 255, ${0.02 * this.currentOptions.opacity})`, e.fillRect(0, 0, this.width, this.height));
   }
   destroy() {
     this.stop(), window.removeEventListener("resize", this.onWindowResize), this.resizeObserver && (this.resizeObserver.disconnect(), this.resizeObserver = null), this.canvas.parentElement && this.canvas.parentElement.removeChild(this.canvas), this.particles = [], this.ripples = [];
   }
 }
-class Fe {
+class De {
   canvas;
   ctx = null;
   parentEl = null;
-  mediaContainerEl = null;
+  // Pulse-mode pump target: MediaMount's pump wrapper, NOT the media container — the
+  // container's transform belongs to the parallax controller (two writers on one
+  // style property would fight each other).
+  pumpTargetEl = null;
   analyser = null;
   animFrameId = null;
   dataArray = null;
@@ -2475,7 +2572,7 @@ class Fe {
     this.canvas = document.createElement("canvas"), this.canvas.className = "st-bg-visualizer-canvas", this.canvas.style.position = "absolute", this.canvas.style.left = "0", this.canvas.style.bottom = "0", this.canvas.style.width = "100%", this.canvas.style.height = "140px", this.canvas.style.pointerEvents = "none", this.canvas.style.zIndex = "3", this.canvas.style.display = "none", this.ctx = this.canvas.getContext("2d");
   }
   mount(e, t) {
-    this.parentEl = e, this.mediaContainerEl = t || null, this.canvas.parentElement || e.appendChild(this.canvas), this.updateDimensions(), window.addEventListener("resize", this.onResize);
+    this.parentEl = e, this.pumpTargetEl = t || null, this.canvas.parentElement || e.appendChild(this.canvas), this.updateDimensions(), window.addEventListener("resize", this.onResize);
   }
   onResize = () => {
     this.updateDimensions();
@@ -2511,40 +2608,40 @@ class Fe {
     const e = this.currentOptions.mode, t = this.currentOptions.sensitivity;
     if (e === "pulse") {
       let i = 0;
-      const n = Math.min(12, this.dataArray.length);
-      for (let r = 0; r < n; r++)
+      const s = Math.min(12, this.dataArray.length);
+      for (let r = 0; r < s; r++)
         i += this.dataArray[r];
-      const s = i / n / 255, a = Math.pow(s, 2) * 0.35 * t;
-      if (this.mediaContainerEl) {
+      const n = i / s / 255, a = Math.pow(n, 2) * 0.35 * t;
+      if (this.pumpTargetEl) {
         const r = 1 + a * 0.015;
-        this.mediaContainerEl.style.transform = `scale(${r})`, this.mediaContainerEl.style.transition = "transform 0.06s ease-out";
+        this.pumpTargetEl.style.transform = `scale(${r})`, this.pumpTargetEl.style.transition = "transform 0.06s ease-out";
       }
     } else if (e === "spectrum") {
       if (!this.ctx) return;
       const i = this.ctx;
       i.clearRect(0, 0, this.width, this.height);
-      const n = this.dataArray.length, s = Math.max(3, this.width / n * 1.6);
+      const s = this.dataArray.length, n = Math.max(3, this.width / s * 1.6);
       let a = 0;
       const r = this.currentOptions.color || "#4fa3d1";
-      for (let c = 0; c < n; c++) {
+      for (let c = 0; c < s; c++) {
         const h = this.dataArray[c] / 255 * t, u = Math.min(this.height, h * (this.height - 10));
         if (u > 1) {
           const p = i.createLinearGradient(0, this.height, 0, this.height - u);
           p.addColorStop(0, `${r}22`), p.addColorStop(0.7, `${r}aa`), p.addColorStop(1, `${r}ff`), i.fillStyle = p;
           const g = this.height - u;
           i.beginPath();
-          const f = Math.min(s / 2, 3);
-          i.roundRect(a, g, s - 1.5, u, [f, f, 0, 0]), i.fill();
+          const f = Math.min(n / 2, 3);
+          i.roundRect(a, g, n - 1.5, u, [f, f, 0, 0]), i.fill();
         }
-        if (a += s, a > this.width) break;
+        if (a += n, a > this.width) break;
       }
     }
   }
   destroy() {
-    this.stop(), window.removeEventListener("resize", this.onResize), this.canvas.parentElement && this.canvas.parentElement.removeChild(this.canvas), this.mediaContainerEl && (this.mediaContainerEl.style.transform = "", this.mediaContainerEl.style.transition = "");
+    this.stop(), window.removeEventListener("resize", this.onResize), this.canvas.parentElement && this.canvas.parentElement.removeChild(this.canvas), this.pumpTargetEl && (this.pumpTargetEl.style.transform = "", this.pumpTargetEl.style.transition = "", this.pumpTargetEl = null);
   }
 }
-class Oe {
+class ze {
   targetEl = null;
   options = {
     enabled: !1,
@@ -2568,8 +2665,8 @@ class Oe {
   }
   onMouseMove = (e) => {
     if (!this.options.enabled) return;
-    const t = window.innerWidth / 2, i = window.innerHeight / 2, n = 30 * this.options.intensity, s = (e.clientX - t) / t, a = (e.clientY - i) / i;
-    this.targetX = s * n, this.targetY = a * n, this.isRunning || this.startLoop();
+    const t = window.innerWidth / 2, i = window.innerHeight / 2, s = 30 * this.options.intensity, n = (e.clientX - t) / t, a = (e.clientY - i) / i;
+    this.targetX = n * s, this.targetY = a * s, this.isRunning || this.startLoop();
   };
   enable() {
     this.listenerAttached || (window.addEventListener("mousemove", this.onMouseMove, { passive: !0 }), this.listenerAttached = !0), this.targetEl && (this.targetEl.style.willChange = "transform"), this.startLoop();
@@ -2587,8 +2684,8 @@ class Oe {
       }
       const t = 0.08;
       if (this.currentX += (this.targetX - this.currentX) * t, this.currentY += (this.targetY - this.currentY) * t, this.targetEl) {
-        const n = 1 + 0.05 * this.options.intensity;
-        this.targetEl.style.transform = `translate3d(${this.currentX.toFixed(2)}px, ${this.currentY.toFixed(2)}px, 0) scale(${n.toFixed(3)})`;
+        const s = 1 + 0.05 * this.options.intensity;
+        this.targetEl.style.transform = `translate3d(${this.currentX.toFixed(2)}px, ${this.currentY.toFixed(2)}px, 0) scale(${s.toFixed(3)})`;
       }
       Math.abs(this.targetX - this.currentX) + Math.abs(this.targetY - this.currentY) > 0.01 ? this.animFrameId = requestAnimationFrame(e) : (this.isRunning = !1, this.animFrameId = null);
     };
@@ -2598,12 +2695,15 @@ class Oe {
     this.disable(), this.targetEl = null;
   }
 }
-class $e {
+class Ue {
   rules = [];
   onTriggerCallback;
   eventSourceUnlisteners = [];
   lastTriggeredId = null;
   lastTriggerTime = 0;
+  // MESSAGE_RECEIVED + CHARACTER_MESSAGE_RENDERED both evaluate every message; compiling
+  // each rule's RegExp per message is wasted work. null caches "known invalid".
+  regexCache = /* @__PURE__ */ new Map();
   constructor(e = [], t) {
     this.rules = [...e], this.onTriggerCallback = t;
   }
@@ -2611,16 +2711,26 @@ class $e {
     this.onTriggerCallback = e;
   }
   setRules(e) {
-    this.rules = [...e];
+    this.rules = [...e], this.regexCache.clear();
   }
   getRules() {
     return this.rules;
   }
   addRule(e) {
-    this.rules.push(e);
+    this.rules.push(e), this.regexCache.clear();
   }
   removeRule(e) {
-    this.rules = this.rules.filter((t) => t.id !== e);
+    this.rules = this.rules.filter((t) => t.id !== e), this.regexCache.clear();
+  }
+  getRegex(e) {
+    if (this.regexCache.has(e))
+      return this.regexCache.get(e) ?? null;
+    try {
+      const t = new RegExp(e, "i");
+      return this.regexCache.set(e, t), t;
+    } catch (t) {
+      return console.warn(`[ST-BgLoader TriggerManager] Invalid regex pattern "${e}":`, t), this.regexCache.set(e, null), null;
+    }
   }
   evaluateCharacter(e) {
     if (!e) return !1;
@@ -2638,14 +2748,12 @@ class $e {
   }
   evaluateMessage(e) {
     if (!e) return !1;
-    for (const t of this.rules)
-      if (!(!t.enabled || t.type !== "regex"))
-        try {
-          if (new RegExp(t.pattern, "i").test(e))
-            return this.fireRule(t), !0;
-        } catch (i) {
-          console.warn(`[ST-BgLoader TriggerManager] Invalid regex pattern "${t.pattern}":`, i);
-        }
+    for (const t of this.rules) {
+      if (!t.enabled || t.type !== "regex") continue;
+      const i = this.getRegex(t.pattern);
+      if (i && i.test(e))
+        return this.fireRule(t), !0;
+    }
     return !1;
   }
   fireRule(e) {
@@ -2656,10 +2764,10 @@ class $e {
     if (this.unbindEvents(), !e || typeof e.on != "function") return;
     const i = (r) => {
       typeof r == "string" ? this.evaluateMessage(r) : r && typeof r.mes == "string" && this.evaluateMessage(r.mes);
-    }, n = (r) => {
+    }, s = (r) => {
       const c = typeof r == "string" ? r : r?.chatId || r?.id;
       c && this.evaluateChat(String(c));
-    }, s = (r) => {
+    }, n = (r) => {
       const c = typeof r == "string" ? r : r?.name || r?.avatar;
       c && this.evaluateCharacter(String(c));
     }, a = (r, c) => {
@@ -2667,7 +2775,7 @@ class $e {
         typeof e.removeListener == "function" ? e.removeListener(r, c) : typeof e.off == "function" && e.off(r, c);
       });
     };
-    t ? (t.MESSAGE_RECEIVED && a(t.MESSAGE_RECEIVED, i), t.CHARACTER_MESSAGE_RENDERED && a(t.CHARACTER_MESSAGE_RENDERED, i), t.CHAT_CHANGED && a(t.CHAT_CHANGED, n), t.CHARACTER_PAGE_LOADED && a(t.CHARACTER_PAGE_LOADED, s)) : (a("message_received", i), a("character_message_rendered", i), a("chat_changed", n));
+    t ? (t.MESSAGE_RECEIVED && a(t.MESSAGE_RECEIVED, i), t.CHARACTER_MESSAGE_RENDERED && a(t.CHARACTER_MESSAGE_RENDERED, i), t.CHAT_CHANGED && a(t.CHAT_CHANGED, s), t.CHARACTER_PAGE_LOADED && a(t.CHARACTER_PAGE_LOADED, n)) : (a("message_received", i), a("character_message_rendered", i), a("chat_changed", s));
   }
   unbindEvents() {
     for (const e of this.eventSourceUnlisteners)
@@ -2678,10 +2786,10 @@ class $e {
     this.eventSourceUnlisteners = [];
   }
   destroy() {
-    this.unbindEvents(), this.rules = [], this.onTriggerCallback = void 0;
+    this.unbindEvents(), this.rules = [], this.regexCache.clear(), this.onTriggerCallback = void 0;
   }
 }
-class De {
+class Ne {
   ctx = null;
   gainNode = null;
   activeSource = null;
@@ -2758,11 +2866,11 @@ class De {
    * Synthesize Rain: Pink noise filtered with lowpass & bandpass
    */
   startRain(e) {
-    const t = 2 * e.sampleRate, i = e.createBuffer(1, t, e.sampleRate), n = i.getChannelData(0);
-    let s = 0, a = 0, r = 0, c = 0, h = 0, u = 0, p = 0;
+    const t = 2 * e.sampleRate, i = e.createBuffer(1, t, e.sampleRate), s = i.getChannelData(0);
+    let n = 0, a = 0, r = 0, c = 0, h = 0, u = 0, p = 0;
     for (let y = 0; y < t; y++) {
       const m = Math.random() * 2 - 1;
-      s = 0.99886 * s + m * 0.0555179, a = 0.99332 * a + m * 0.0750759, r = 0.969 * r + m * 0.153852, c = 0.8665 * c + m * 0.3104856, h = 0.55 * h + m * 0.5329522, u = -0.7616 * u - m * 0.016898, n[y] = (s + a + r + c + h + u + p + m * 0.5362) * 0.11, p = m * 0.115926;
+      n = 0.99886 * n + m * 0.0555179, a = 0.99332 * a + m * 0.0750759, r = 0.969 * r + m * 0.153852, c = 0.8665 * c + m * 0.3104856, h = 0.55 * h + m * 0.5329522, u = -0.7616 * u - m * 0.016898, s[y] = (n + a + r + c + h + u + p + m * 0.5362) * 0.11, p = m * 0.115926;
     }
     const g = e.createBufferSource();
     g.buffer = i, g.loop = !0;
@@ -2784,24 +2892,24 @@ class De {
    * Synthesize Wind: Lowpass filtered noise modulated by a gentle LFO
    */
   startWind(e) {
-    const t = 2 * e.sampleRate, i = e.createBuffer(1, t, e.sampleRate), n = i.getChannelData(0);
+    const t = 2 * e.sampleRate, i = e.createBuffer(1, t, e.sampleRate), s = i.getChannelData(0);
     for (let h = 0; h < t; h++)
-      n[h] = Math.random() * 2 - 1;
-    const s = e.createBufferSource();
-    s.buffer = i, s.loop = !0;
+      s[h] = Math.random() * 2 - 1;
+    const n = e.createBufferSource();
+    n.buffer = i, n.loop = !0;
     const a = e.createBiquadFilter();
     a.type = "bandpass", a.frequency.value = 400, a.Q.value = 3;
     const r = e.createOscillator();
     r.frequency.value = 0.2;
     const c = e.createGain();
-    c.gain.value = 250, r.connect(c), c.connect(a.frequency), s.connect(a), a.connect(this.gainNode), r.start(0), s.start(0), this.lfoOsc = r, this.activeSource = s;
+    c.gain.value = 250, r.connect(c), c.connect(a.frequency), n.connect(a), a.connect(this.gainNode), r.start(0), n.start(0), this.lfoOsc = r, this.activeSource = n;
   }
   destroy() {
     this.stop(), this.teardownInteractionListener(), this.ctx && (this.ctx.close().catch(() => {
     }), this.ctx = null), this.gainNode = null;
   }
 }
-class ze {
+class qe {
   styleEl = null;
   options = {
     enabled: !1,
@@ -2845,7 +2953,7 @@ class ze {
     document.body.classList.remove("st-bgloader-frosted-active"), this.styleEl && this.styleEl.parentElement && (this.styleEl.parentElement.removeChild(this.styleEl), this.styleEl = null);
   }
 }
-class ne {
+class Ve {
   userScenes = {};
   onApplySceneCallback;
   constructor(e = {}, t) {
@@ -2859,7 +2967,7 @@ class ne {
   }
   getAllScenes() {
     return {
-      ...I,
+      ...A,
       ...this.userScenes
     };
   }
@@ -2873,14 +2981,14 @@ class ne {
     this.userScenes[e.id] = { ...e, isBuiltin: !1 };
   }
   deleteScene(e) {
-    return I[e] ? (console.warn(`[ST-BgLoader SceneManager] Cannot delete builtin scene "${e}"`), !1) : this.userScenes[e] ? (delete this.userScenes[e], !0) : !1;
+    return A[e] ? (console.warn(`[ST-BgLoader SceneManager] Cannot delete builtin scene "${e}"`), !1) : this.userScenes[e] ? (delete this.userScenes[e], !0) : !1;
   }
   applyScene(e) {
     const t = this.getScene(e);
     return t ? (console.log(`[ST-BgLoader SceneManager] Applying scene: "${t.name}"`), this.onApplySceneCallback?.(t), !0) : (console.warn(`[ST-BgLoader SceneManager] Scene "${e}" not found.`), !1);
   }
 }
-class Ue {
+class We {
   isEnabled = !0;
   actions;
   constructor(e = {}) {
@@ -2902,8 +3010,8 @@ class Ue {
     window.removeEventListener("keydown", this.onKeyDown);
   }
 }
-const ae = "settings:rev", re = "settings:data", qe = 2e3, Ne = 1e4;
-class Ve {
+const re = "settings:rev", oe = "settings:data", Ge = 2e3, He = 1e4;
+class je {
   constructor(e, t) {
     this.client = e, this.onRemoteSettings = t;
   }
@@ -2930,7 +3038,7 @@ class Ve {
       } catch (e) {
         console.warn("[ST-BgLoader] Failed to read cloud settings mirror:", e);
       }
-      this.pollTimer = window.setInterval(() => void this.pollOnce(), Ne);
+      this.pollTimer = window.setInterval(() => void this.pollOnce(), He);
     }
   }
   stop() {
@@ -2939,19 +3047,19 @@ class Ve {
   schedulePush(e) {
     !this.running || this.applyingRemote || (this.pushTimer !== null && window.clearTimeout(this.pushTimer), this.pushTimer = window.setTimeout(() => {
       this.pushTimer = null, this.push(e);
-    }, qe));
+    }, Ge));
   }
   async push(e) {
     try {
-      const t = JSON.stringify(e), i = await Ge(t);
+      const t = JSON.stringify(e), i = await Ke(t);
       if (i === this.lastPushedFingerprint) return;
-      const n = this.localRevision + 1, s = {
-        revision: n,
+      const s = this.localRevision + 1, n = {
+        revision: s,
         fingerprint: i,
         updatedAt: Date.now(),
         settings: e
       };
-      await this.client.storage.kv.set(re, s), await this.client.storage.kv.set(ae, n), this.localRevision = n, this.lastPushedFingerprint = i;
+      await this.client.storage.kv.set(oe, n), await this.client.storage.kv.set(re, s), this.localRevision = s, this.lastPushedFingerprint = i;
     } catch (t) {
       console.warn("[ST-BgLoader] Failed to push settings to cloud mirror:", t);
     }
@@ -2959,7 +3067,7 @@ class Ve {
   async pollOnce() {
     if (!this.applyingRemote)
       try {
-        const e = await this.client.storage.kv.get(ae);
+        const e = await this.client.storage.kv.get(re);
         if ((typeof e == "number" ? e : 0) <= this.localRevision) return;
         const i = await this.readPayload();
         if (!i || i.revision <= this.localRevision) return;
@@ -2979,13 +3087,13 @@ class Ve {
       }
   }
   async readPayload() {
-    const e = await this.client.storage.kv.get(re);
+    const e = await this.client.storage.kv.get(oe);
     if (!e || typeof e != "object") return null;
     const t = e;
     return typeof t.revision != "number" || !t.settings || typeof t.fingerprint != "string" ? null : t;
   }
 }
-async function Ge(l) {
+async function Ke(l) {
   try {
     if (crypto?.subtle) {
       const t = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(l));
@@ -2998,21 +3106,23 @@ async function Ge(l) {
     e = (e << 5) + e + l.charCodeAt(t) | 0;
   return "djb2:" + (e >>> 0).toString(16);
 }
-const oe = "st-bg-loader-settings.json", We = 1, He = 800;
-class je {
+const le = "st-bg-loader-settings.json", Xe = 1, Ye = 800;
+class Je {
   saveTimer = null;
   pending = null;
   writing = !1;
   warnedAboutWriteFailure = !1;
+  /** Invoked when a newer server document (another tab/device) beats the pending write. */
+  onRemoteNewer = null;
   /** Returns the server document, or null when it is missing/unparsable (first run). */
   async load() {
-    const e = await ue(oe);
+    const e = await pe(le);
     return !e || typeof e != "object" || !e.settings || typeof e.revision != "number" ? null : e;
   }
   scheduleSave(e, t) {
     this.pending = { settings: e, revision: t }, this.saveTimer !== null && window.clearTimeout(this.saveTimer), this.saveTimer = window.setTimeout(() => {
       this.saveTimer = null, this.flush();
-    }, He);
+    }, Ye);
   }
   /** Resolves once every scheduled write has been attempted (test hook). */
   async flush() {
@@ -3023,7 +3133,12 @@ class je {
           const e = this.pending;
           this.pending = null;
           try {
-            await ge(oe, this.toDoc(e)), this.warnedAboutWriteFailure = !1;
+            const t = await this.load();
+            if (t && t.revision > e.revision) {
+              this.onRemoteNewer?.(t);
+              break;
+            }
+            await me(le, this.toDoc(e)), this.warnedAboutWriteFailure = !1;
           } catch (t) {
             this.warnedAboutWriteFailure || (this.warnedAboutWriteFailure = !0, console.warn("[ST-BgLoader] Server settings write failed; localStorage stays the durable copy:", t));
             break;
@@ -3036,20 +3151,20 @@ class je {
   }
   toDoc(e) {
     return {
-      version: We,
+      version: Xe,
       revision: e.revision,
       updatedTimestamp: Date.now(),
       settings: e.settings
     };
   }
 }
-const le = 3e4, Ke = 2e3, Xe = 5 * 60 * 1e3, Ye = 2 * 60 * 1e3, Je = 15e3;
-class ce extends Error {
+const ce = 3e4, Qe = 2e3, Ze = 5 * 60 * 1e3, et = 2 * 60 * 1e3, tt = 15e3;
+class he extends Error {
   constructor() {
     super("Agent tool registration timed out"), this.name = "AgentRegisterTimeoutError";
   }
 }
-const Qe = [
+const it = [
   {
     id: "stbg_set_background",
     title: "设置背景媒体",
@@ -3118,7 +3233,7 @@ const Qe = [
     }
   }
 ];
-class Ze {
+class st {
   constructor(e, t, i = () => {
   }) {
     this.client = e, this.host = t, this.reportState = i;
@@ -3136,7 +3251,7 @@ class Ze {
   registrationOk = !1;
   warnedIssue = !1;
   start() {
-    this.running || (this.running = !0, this.permissionBlockedUntil = 0, this.registerWaitUntil = 0, this.register(), this.claimLoop(), this.registerTimer = window.setInterval(() => void this.register(), le));
+    this.running || (this.running = !0, this.permissionBlockedUntil = 0, this.registerWaitUntil = 0, this.register(), this.claimLoop(), this.registerTimer = window.setInterval(() => void this.register(), ce));
   }
   stop() {
     this.running = !1, this.timer !== null && window.clearTimeout(this.timer), this.registerTimer !== null && window.clearInterval(this.registerTimer), this.timer = null, this.registerTimer = null, this.reportedState = null, this.registrationOk = !1;
@@ -3152,7 +3267,7 @@ class Ze {
         if (!e) return;
         await this.registerWithTimeout(e), this.permissionBlockedUntil = 0, this.registerWaitUntil = 0, this.registrationOk = !0, this.warnedIssue = !1, this.publishState("ok"), console.log("[ST-BgLoader] Agent ambient tools registered.");
       } catch (e) {
-        this.registrationOk = !1, de(e) ? (this.permissionBlockedUntil = Date.now() + Xe, this.publishState("blocked", e instanceof Error ? e.message : String(e)), this.warnOnce("Agent tool registration blocked by permission policy (retrying every 5 min — adjust in Authority Security Center if intended):", e)) : e instanceof ce ? (this.registerWaitUntil = Date.now() + Ye, this.publishState("pending", "等待 agent.browser 授权（若页面出现 Authority 权限弹窗请处理；稍后自动重试）"), this.warnOnce("Agent tool registration is waiting for permission (check the Authority prompt / Security Center):", e)) : console.warn("[ST-BgLoader] Agent tool registration failed (will retry):", e);
+        this.registrationOk = !1, ge(e) ? (this.permissionBlockedUntil = Date.now() + Ze, this.publishState("blocked", e instanceof Error ? e.message : String(e)), this.warnOnce("Agent tool registration blocked by permission policy (retrying every 5 min — adjust in Authority Security Center if intended):", e)) : e instanceof he ? (this.registerWaitUntil = Date.now() + et, this.publishState("pending", "等待 agent.browser 授权（若页面出现 Authority 权限弹窗请处理；稍后自动重试）"), this.warnOnce("Agent tool registration is waiting for permission (check the Authority prompt / Security Center):", e)) : console.warn("[ST-BgLoader] Agent tool registration failed (will retry):", e);
       } finally {
         this.registerInFlight = !1;
       }
@@ -3163,19 +3278,19 @@ class Ze {
   }
   async registerWithTimeout(e) {
     let t;
-    const i = new Promise((n, s) => {
-      t = window.setTimeout(() => s(new ce()), Je);
+    const i = new Promise((s, n) => {
+      t = window.setTimeout(() => n(new he()), tt);
     });
     try {
       return await Promise.race([
         e.registerTools({
           browserInstanceId: x,
-          leaseDurationMs: le * 2,
-          tools: Qe.map((n) => ({
-            id: n.id,
-            title: n.title,
-            description: n.description,
-            inputSchema: n.inputSchema,
+          leaseDurationMs: ce * 2,
+          tools: it.map((s) => ({
+            id: s.id,
+            title: s.title,
+            description: s.description,
+            inputSchema: s.inputSchema,
             riskLevel: "low",
             approvalPolicy: "never",
             mutatesWorkspace: !1
@@ -3193,25 +3308,25 @@ class Ze {
   claimLoop() {
     this.running && (this.timer = window.setTimeout(() => {
       this.claimOnce().finally(() => this.claimLoop());
-    }, Ke));
+    }, Qe));
   }
   async claimOnce() {
     const e = this.agentApi();
     if (!(!e || !this.running) && this.registrationOk)
       try {
         this.pendingSubmit && (await this.reportResult(this.pendingSubmit.claimId, this.pendingSubmit.invocation, "completed", void 0), this.pendingSubmit = null);
-        const t = `stbg-claim-${Date.now()}-${this.claimSeq++}`, n = (await e.claim({ browserInstanceId: x, claimId: t })).invocation;
-        if (!n) return;
-        let s, a;
+        const t = `stbg-claim-${Date.now()}-${this.claimSeq++}`, s = (await e.claim({ browserInstanceId: x, claimId: t })).invocation;
+        if (!s) return;
+        let n, a;
         try {
-          s = await this.execute(n.toolId, n.arguments);
+          n = await this.execute(s.toolId, s.arguments);
         } catch (r) {
           a = r instanceof Error ? r.message : String(r);
         }
         if (a) {
           await e.submitResult({
-            runId: n.runId,
-            callId: n.callId,
+            runId: s.runId,
+            callId: s.callId,
             claimId: t,
             browserInstanceId: x,
             status: "failed",
@@ -3221,28 +3336,28 @@ class Ze {
         }
         try {
           await e.submitResult({
-            runId: n.runId,
-            callId: n.callId,
+            runId: s.runId,
+            callId: s.callId,
             claimId: t,
             browserInstanceId: x,
             status: "completed",
-            result: s
+            result: n
           });
         } catch {
-          this.pendingSubmit = { claimId: t, invocation: { runId: n.runId, callId: n.callId } };
+          this.pendingSubmit = { claimId: t, invocation: { runId: s.runId, callId: s.callId } };
         }
       } catch {
       }
   }
-  async reportResult(e, t, i, n) {
-    const s = this.agentApi();
-    s && await s.submitResult({
+  async reportResult(e, t, i, s) {
+    const n = this.agentApi();
+    n && await n.submitResult({
       runId: t.runId,
       callId: t.callId,
       claimId: e,
       browserInstanceId: x,
       status: i,
-      error: n
+      error: s
     });
   }
   async execute(e, t) {
@@ -3270,12 +3385,12 @@ class Ze {
     }
   }
 }
-const D = "st_bgloader_settings", he = "st_bgloader_settings_rev";
-class et {
+const D = "st_bgloader_settings", de = "st_bgloader_settings_rev";
+class nt {
   isInitialized = !1;
-  settings = { ...k };
+  settings = { ...I };
   settingsRevision = 0;
-  serverSettings = new je();
+  serverSettings = new Je();
   cacheManager;
   audioEngine;
   mediaMount;
@@ -3289,7 +3404,9 @@ class et {
   triggerManager;
   ambientSoundGenerator;
   frostedGlassController;
-  sceneManager;
+  // Lazy: created in init() with real configuration. Same discipline as ShortcutManager —
+  // no speculative instance that init() would replace.
+  sceneManager = null;
   // Lazy: the constructor registers a window keydown listener, so creating a throwaway
   // instance here would leak an orphan listener when init() replaces it.
   shortcutManager = null;
@@ -3298,7 +3415,7 @@ class et {
   agentBridge = null;
   publicApi;
   constructor() {
-    this.cacheManager = new _e(), this.audioEngine = new Ee(), this.mediaMount = new Ce(this.audioEngine, (e) => this.mountOverlays(e)), this.atmosphereFX = new Be(), this.audioVisualizer = new Fe(), this.parallaxController = new Oe(), this.triggerManager = new $e(), this.ambientSoundGenerator = new De(), this.frostedGlassController = new ze(), this.sceneManager = new ne(), this.publicApi = new Pe(this);
+    this.cacheManager = new xe(), this.audioEngine = new Me(), this.mediaMount = new Ie(this.audioEngine, (e) => this.mountOverlays(e)), this.atmosphereFX = new $e(), this.audioVisualizer = new De(), this.parallaxController = new ze(), this.triggerManager = new Ue(), this.ambientSoundGenerator = new Ne(), this.frostedGlassController = new qe(), this.publicApi = new Oe(this);
   }
   getCacheManager() {
     return this.cacheManager;
@@ -3355,117 +3472,113 @@ class et {
     await this.applyMedia(e);
   }
   async init() {
-    console.log("[ST-BgLoader] Initializing Rich Media Background Plugin..."), await this.reconcileSettings(), await this.cacheManager.init(this.authorityBridge), this.mediaMount.init(), this.mediaMount.applyFilters(this.settings.filters), this.mediaMount.setInteractive(this.settings.interactiveBackground), this.mediaMount.setTransition(this.settings.transitionEffect, this.settings.transitionDurationMs), this.mountOverlaysIfHostReady(), this.atmosphereFX.setWeather(this.settings.weather), this.audioVisualizer.setOptions(this.settings.visualizer), this.parallaxController.setOptions(this.settings.parallax), this.ambientSoundGenerator.setSound(this.settings.ambientSound), this.frostedGlassController.setOptions(this.settings.frostedChat), this.audioEngine.setUrlResolver((s) => this.cacheManager.getMediaBlobUrl(s)), this.audioEngine.setVolume(this.settings.volume), this.audioEngine.setMuted(this.settings.muted), this.audioEngine.setMuffled(this.settings.muffleBGM), this.audioEngine.setPlaybackMode(this.settings.playbackMode), this.audioEngine.onAnalyserReady = (s) => {
-      this.audioVisualizer.setAnalyser(s);
+    console.log("[ST-BgLoader] Initializing Rich Media Background Plugin..."), await this.reconcileSettings(), await this.cacheManager.init(this.authorityBridge), this.mediaMount.init(), this.mediaMount.applyFilters(this.settings.filters), this.mediaMount.setInteractive(this.settings.interactiveBackground), this.mediaMount.setTransition(this.settings.transitionEffect, this.settings.transitionDurationMs), this.mountOverlaysIfHostReady(), this.atmosphereFX.setWeather(this.settings.weather), this.audioVisualizer.setOptions(this.settings.visualizer), this.parallaxController.setOptions(this.settings.parallax), this.ambientSoundGenerator.setSound(this.settings.ambientSound), this.frostedGlassController.setOptions(this.settings.frostedChat), this.audioEngine.setUrlResolver((i) => this.cacheManager.getMediaBlobUrl(i)), this.audioEngine.setVolume(this.settings.volume), this.audioEngine.setMuted(this.settings.muted), this.audioEngine.setMuffled(this.settings.muffleBGM), this.audioEngine.setPlaybackMode(this.settings.playbackMode), this.audioEngine.onAnalyserReady = (i) => {
+      this.audioVisualizer.setAnalyser(i);
     };
-    const t = (await this.cacheManager.listMedia()).filter((s) => s.type === "audio");
-    this.audioEngine.setPlaylist(t), this.miniPlayer = new Le(this.audioEngine), this.miniPlayer.render(this.settings.showMiniPlayer, this.settings.capsuleOnPlayOnly);
-    const i = this.audioEngine.onTrackChange;
-    this.audioEngine.onTrackChange = (s) => {
-      i?.(s), this.publicApi.emit("track-change", s);
-    };
-    const n = this.audioEngine.onPlayStateChange;
-    if (this.audioEngine.onPlayStateChange = (s) => {
-      n?.(s), this.publicApi.emit("play-state-change", s);
-    }, this.triggerManager.setRules(this.settings.triggerRules || []), this.triggerManager.setTriggerCallback(async (s, a) => {
-      console.log(`[ST-BgLoader] Executing trigger rule: "${a.name}"`), s.mediaIdOrUrl && await this.publicApi.setBackground(s.mediaIdOrUrl), s.bgmUrl && await this.publicApi.playBGM(s.bgmUrl), s.weather && this.publicApi.setWeather(s.weather), s.preset && this.publicApi.applyPreset(s.preset), s.filters && this.publicApi.setFilters(s.filters);
-    }), this.sceneManager = new ne(this.settings.scenes || {}, async (s) => {
-      if (s.mediaId) {
-        const a = await this.cacheManager.getMedia(s.mediaId);
-        a && await this.applyMedia(a);
-      } else s.mediaUrl && await this.publicApi.setBackground(s.mediaUrl);
-      s.bgmUrl && await this.publicApi.playBGM(s.bgmUrl), s.presetId && this.publicApi.applyPreset(s.presetId), s.filters && this.publicApi.setFilters(s.filters), s.weather && this.publicApi.setWeather(s.weather), s.visualizer && this.publicApi.setVisualizer(s.visualizer), s.parallax && this.publicApi.setParallax(s.parallax.enabled, s.parallax.intensity), s.ambientSound && this.publicApi.setAmbientSound(s.ambientSound), typeof s.frostedChat == "boolean" && this.publicApi.setFrostedChat(s.frostedChat);
-    }), this.shortcutManager = new Ue({
+    const t = (await this.cacheManager.listMedia()).filter((i) => i.type === "audio");
+    if (this.audioEngine.setPlaylist(t), this.miniPlayer = new Be(this.audioEngine), this.miniPlayer.render(this.settings.showMiniPlayer, this.settings.capsuleOnPlayOnly), this.audioEngine.addTrackListener((i) => {
+      this.publicApi.emit("track-change", i);
+    }), this.audioEngine.addPlayStateListener((i) => {
+      this.publicApi.emit("play-state-change", i);
+    }), this.triggerManager.setRules(this.settings.triggerRules || []), this.triggerManager.setTriggerCallback(async (i, s) => {
+      console.log(`[ST-BgLoader] Executing trigger rule: "${s.name}"`), i.mediaIdOrUrl && await this.publicApi.setBackground(i.mediaIdOrUrl), i.bgmUrl && await this.publicApi.playBGM(i.bgmUrl), i.weather && this.publicApi.setWeather(i.weather), i.preset && this.publicApi.applyPreset(i.preset), i.filters && this.publicApi.setFilters(i.filters);
+    }), this.sceneManager = new Ve(this.settings.scenes || {}, async (i) => {
+      if (i.mediaId) {
+        const s = await this.cacheManager.getMedia(i.mediaId);
+        s && await this.applyMedia(s);
+      } else i.mediaUrl && await this.publicApi.setBackground(i.mediaUrl);
+      i.bgmUrl && await this.publicApi.playBGM(i.bgmUrl), i.presetId && this.publicApi.applyPreset(i.presetId), i.filters && this.publicApi.setFilters(i.filters), i.weather && this.publicApi.setWeather(i.weather), i.visualizer && this.publicApi.setVisualizer(i.visualizer), i.parallax && this.publicApi.setParallax(i.parallax.enabled, i.parallax.intensity), i.ambientSound && this.publicApi.setAmbientSound(i.ambientSound), typeof i.frostedChat == "boolean" && this.publicApi.setFrostedChat(i.frostedChat);
+    }), this.shortcutManager = new We({
       onToggleBackground: () => {
-        const s = this.mediaMount.getContainerElement();
-        s && (s.style.display = s.style.display === "none" ? "block" : "none");
+        const i = this.mediaMount.getContainerElement();
+        i && (i.style.display = i.style.display === "none" ? "block" : "none");
       },
       onTogglePlay: () => {
         this.audioEngine.togglePlay();
       },
       onToggleMuffle: () => {
-        const s = this.audioEngine.getMuffled();
-        this.publicApi.setMuffled(!s);
+        const i = this.audioEngine.getMuffled();
+        this.publicApi.setMuffled(!i);
       },
       onCycleWeather: () => {
         this.publicApi.cycleWeather();
       },
       onToggleFrostedChat: () => {
-        const s = this.settings.frostedChat.enabled;
-        this.publicApi.setFrostedChat(!s);
+        const i = this.settings.frostedChat.enabled;
+        this.publicApi.setFrostedChat(!i);
       }
-    }), this.shortcutManager?.setEnabled(this.settings.shortcutsEnabled), this.settingsDrawer = new Ae(this.settings, this.cacheManager, {
-      onSettingsChanged: (s) => {
-        this.settings = s, this.saveSettings(), this.applySettingsToSubsystems();
+    }), this.shortcutManager?.setEnabled(this.settings.shortcutsEnabled), this.settingsDrawer = new Re(this.settings, this.cacheManager, {
+      onSettingsChanged: (i) => {
+        this.settings = i, this.saveSettings(), this.applySettingsToSubsystems();
       },
-      onPresetChanged: (s) => {
-        this.mediaMount.applyFilters(s.filters), this.publicApi.emit("preset-change", s.id, s.filters);
+      onPresetChanged: (i) => {
+        this.mediaMount.applyFilters(i.filters), this.publicApi.emit("preset-change", i.id, i.filters);
       },
-      onInteractiveChanged: (s) => {
-        this.mediaMount.setInteractive(s), this.publicApi.emit("interactive-change", s);
+      onInteractiveChanged: (i) => {
+        this.mediaMount.setInteractive(i), this.publicApi.emit("interactive-change", i);
       },
-      onMiniPlayerToggle: (s) => {
-        this.miniPlayer?.setVisible(s);
+      onMiniPlayerToggle: (i) => {
+        this.miniPlayer?.setVisible(i);
       },
-      onCapsuleOnPlayToggle: (s) => {
-        this.miniPlayer?.setCapsuleOnPlayOnly(s);
+      onCapsuleOnPlayToggle: (i) => {
+        this.miniPlayer?.setCapsuleOnPlayOnly(i);
       },
-      onPlaybackModeChanged: (s) => {
-        this.audioEngine.setPlaybackMode(s);
+      onPlaybackModeChanged: (i) => {
+        this.audioEngine.setPlaybackMode(i);
       },
-      onWeatherChanged: (s) => {
-        this.atmosphereFX.setWeather(s), this.publicApi.emit("weather-change", s);
+      onWeatherChanged: (i) => {
+        this.atmosphereFX.setWeather(i), this.publicApi.emit("weather-change", i);
       },
-      onVisualizerChanged: (s) => {
-        this.audioVisualizer.setOptions(s), this.publicApi.emit("visualizer-change", s);
+      onVisualizerChanged: (i) => {
+        this.audioVisualizer.setOptions(i), this.publicApi.emit("visualizer-change", i);
       },
-      onParallaxChanged: (s) => {
-        this.parallaxController.setOptions(s), this.publicApi.emit("parallax-change", s);
+      onParallaxChanged: (i) => {
+        this.parallaxController.setOptions(i), this.publicApi.emit("parallax-change", i);
       },
-      onTransitionChanged: (s, a) => {
-        this.mediaMount.setTransition(s, a), this.publicApi.emit("transition-change", s, a);
+      onTransitionChanged: (i, s) => {
+        this.mediaMount.setTransition(i, s), this.publicApi.emit("transition-change", i, s);
       },
-      onMuffleChanged: (s) => {
-        this.audioEngine.setMuffled(s), this.publicApi.emit("muffle-change", s);
+      onMuffleChanged: (i) => {
+        this.audioEngine.setMuffled(i), this.publicApi.emit("muffle-change", i);
       },
-      onMediaSelected: async (s) => {
-        await this.applyMedia(s);
+      onMediaSelected: async (i) => {
+        await this.applyMedia(i);
       },
-      onMediaDeleted: async (s) => {
-        this.settings.activeMediaId === s && (this.settings.activeMediaId = null, this.mediaMount.clear(), this.audioEngine.stopTrack(), this.saveSettings());
-        const a = await this.cacheManager.listMedia();
-        this.audioEngine.setPlaylist(a.filter((r) => r.type === "audio"));
+      onMediaDeleted: async (i) => {
+        this.settings.activeMediaId === i && (this.settings.activeMediaId = null, this.mediaMount.clear(), this.audioEngine.stopTrack(), this.saveSettings());
+        const s = await this.cacheManager.listMedia();
+        this.audioEngine.setPlaylist(s.filter((n) => n.type === "audio"));
       },
-      onMediaUploaded: async (s) => {
+      onMediaUploaded: async (i) => {
         if (this.settings.lruAutoClean) {
-          const a = this.settings.cacheQuotaMB * 1024 * 1024;
-          await this.cacheManager.cleanLRU(a);
+          const s = this.settings.cacheQuotaMB * 1024 * 1024;
+          await this.cacheManager.cleanLRU(s);
         }
-        if (s.type === "audio") {
-          const a = await this.cacheManager.listMedia();
-          this.audioEngine.setPlaylist(a.filter((r) => r.type === "audio"));
+        if (i.type === "audio") {
+          const s = await this.cacheManager.listMedia();
+          this.audioEngine.setPlaylist(s.filter((n) => n.type === "audio"));
         }
-        await this.applyMedia(s);
+        await this.applyMedia(i);
       }
-    }, this.authorityBridge), this.settingsDrawer.render(), this.nativeAugmenter = new Ie(async (s, a, r) => {
-      const c = {
-        id: "native_" + r,
-        name: r,
-        type: a,
+    }, this.authorityBridge), this.settingsDrawer.render(), this.nativeAugmenter = new Pe(async (i, s, n) => {
+      const a = {
+        id: "native_" + n,
+        name: n,
+        type: s,
         source: "server",
-        url: s,
-        cacheKey: s,
+        url: i,
+        cacheKey: i,
         size: 0,
         mimeType: "",
         addedTimestamp: Date.now(),
         lastUsedTimestamp: Date.now()
       };
-      await this.applyMedia(c);
+      await this.applyMedia(a);
     }), this.nativeAugmenter.start(), document.addEventListener("visibilitychange", () => {
       this.audioEngine.handleVisibilityChange(document.hidden, this.settings.pauseOnBlur);
-    }), this.authorityBridge.onCapabilitiesChanged(() => this.settingsDrawer?.updateCloudPanel()), await this.startSettingsSync(), this.syncAgentTools(), this.hookSillyTavernEvents(), this.settings.activeMediaId) {
-      const s = await this.cacheManager.getMedia(this.settings.activeMediaId);
-      s && await this.applyMedia(s);
+    }), this.authorityBridge.onCapabilitiesChanged(() => this.settingsDrawer?.updateCloudPanel()), this.serverSettings.onRemoteNewer = () => void this.reconcileRemoteConflict(), await this.startSettingsSync(), this.syncAgentTools(), this.hookSillyTavernEvents(), this.settings.activeMediaId) {
+      const i = await this.cacheManager.getMedia(this.settings.activeMediaId);
+      i && await this.applyMedia(i);
     }
     this.isInitialized = !0, console.log("[ST-BgLoader] All Modular Subsystems fully initialized.");
   }
@@ -3483,16 +3596,16 @@ class et {
     if (this.overlaysMounted) return;
     this.overlaysMounted = !0;
     const t = this.mediaMount.getHostElement();
-    t && (this.atmosphereFX.mount(t), this.audioVisualizer.mount(t, e)), this.parallaxController.attach(e);
+    t && (this.atmosphereFX.mount(t), this.audioVisualizer.mount(t, this.mediaMount.getPumpWrapperElement() ?? e)), this.parallaxController.attach(e);
   }
   applySettingsToSubsystems() {
-    this.mediaMount.applyFilters(this.settings.filters), this.mediaMount.setInteractive(this.settings.interactiveBackground), this.mediaMount.setTransition(this.settings.transitionEffect, this.settings.transitionDurationMs), this.audioEngine.setVolume(this.settings.volume), this.audioEngine.setMuted(this.settings.muted), this.audioEngine.setMuffled(this.settings.muffleBGM), this.audioEngine.setPlaybackMode(this.settings.playbackMode), this.atmosphereFX.setWeather(this.settings.weather), this.audioVisualizer.setOptions(this.settings.visualizer), this.parallaxController.setOptions(this.settings.parallax), this.ambientSoundGenerator.setSound(this.settings.ambientSound), this.frostedGlassController.setOptions(this.settings.frostedChat), this.shortcutManager?.setEnabled(this.settings.shortcutsEnabled), this.triggerManager.setRules(this.settings.triggerRules || []), this.sceneManager.setUserScenes(this.settings.scenes || {}), this.syncAgentTools();
+    this.mediaMount.applyFilters(this.settings.filters), this.mediaMount.setInteractive(this.settings.interactiveBackground), this.mediaMount.setTransition(this.settings.transitionEffect, this.settings.transitionDurationMs), this.audioEngine.setVolume(this.settings.volume), this.audioEngine.setMuted(this.settings.muted), this.audioEngine.setMuffled(this.settings.muffleBGM), this.audioEngine.setPlaybackMode(this.settings.playbackMode), this.atmosphereFX.setWeather(this.settings.weather), this.audioVisualizer.setOptions(this.settings.visualizer), this.parallaxController.setOptions(this.settings.parallax), this.ambientSoundGenerator.setSound(this.settings.ambientSound), this.frostedGlassController.setOptions(this.settings.frostedChat), this.shortcutManager?.setEnabled(this.settings.shortcutsEnabled), this.triggerManager.setRules(this.settings.triggerRules || []), this.sceneManager?.setUserScenes(this.settings.scenes || {}), this.syncAgentTools();
   }
   /** Opt-in Agent Runtime ambient tools (AI director mode); requires the cloud backend. */
   syncAgentTools() {
     const e = this.authorityBridge.getClient(), t = this.settings.agentToolsEnabled && !!e;
-    t && !this.agentBridge && e ? (this.agentBridge = new Ze(e, this.buildAgentHost(), (i, n) => {
-      this.authorityBridge.reportAgentToolsState(i, n);
+    t && !this.agentBridge && e ? (this.agentBridge = new st(e, this.buildAgentHost(), (i, s) => {
+      this.authorityBridge.reportAgentToolsState(i, s);
     }), this.agentBridge.start(), console.log("[ST-BgLoader] Agent ambient tools enabled.")) : !t && this.agentBridge && (this.agentBridge.stop(), this.agentBridge = null, console.log("[ST-BgLoader] Agent ambient tools disabled."));
   }
   buildAgentHost() {
@@ -3512,7 +3625,7 @@ class et {
   }
   async startSettingsSync() {
     const e = this.authorityBridge.getClient();
-    e && (this.settingsSync = new Ve(e, (t) => {
+    e && (this.settingsSync = new je(e, (t) => {
       this.settings = t;
       try {
         localStorage.setItem(D, JSON.stringify(this.settings));
@@ -3521,14 +3634,27 @@ class et {
       this.applySettingsToSubsystems(), this.settingsDrawer?.applyRemoteSettings(this.settings), this.publicApi.emit("settings-sync", this.settings);
     }), await this.settingsSync.start());
   }
+  reconcilingRemote = !1;
+  /** A newer server settings document was detected mid-session (another tab/device);
+   *  converge the same way the init-time reconcile does. */
+  async reconcileRemoteConflict() {
+    if (!this.reconcilingRemote) {
+      this.reconcilingRemote = !0;
+      try {
+        await this.reconcileSettings(), this.applySettingsToSubsystems(), this.settingsDrawer?.applyRemoteSettings(this.settings), this.publicApi.emit("settings-sync", this.settings);
+      } finally {
+        this.reconcilingRemote = !1;
+      }
+    }
+  }
   hookSillyTavernEvents() {
     const e = window;
     e.eventSource && (this.triggerManager.bindSillyTavernEvents(e.eventSource, e.event_types), e.event_types && e.event_types.CHAT_CHANGED && e.eventSource.on(e.event_types.CHAT_CHANGED, async () => {
       const t = e.getCurrentChatId ? e.getCurrentChatId() : null;
       if (t && this.settings.chatBindings[t]) {
-        const i = this.settings.chatBindings[t], n = await this.cacheManager.getMedia(i);
-        if (n) {
-          await this.applyMedia(n);
+        const i = this.settings.chatBindings[t], s = await this.cacheManager.getMedia(i);
+        if (s) {
+          await this.applyMedia(s);
           return;
         }
       }
@@ -3541,9 +3667,9 @@ class et {
   loadSettings() {
     try {
       const e = localStorage.getItem(D);
-      e && (this.settings = { ...k, ...JSON.parse(e) }), this.settingsRevision = parseInt(localStorage.getItem(he) || "0", 10) || 0;
+      e && (this.settings = z(JSON.parse(e))), this.settingsRevision = parseInt(localStorage.getItem(de) || "0", 10) || 0;
     } catch (e) {
-      console.error("[ST-BgLoader] Failed to parse saved settings:", e), this.settings = { ...k }, this.settingsRevision = 0;
+      console.error("[ST-BgLoader] Failed to parse saved settings:", e), this.settings = { ...I }, this.settingsRevision = 0;
     }
   }
   /**
@@ -3555,14 +3681,14 @@ class et {
     this.loadSettings();
     try {
       const e = await this.serverSettings.load();
-      e && e.revision >= this.settingsRevision ? (this.settings = { ...k, ...e.settings }, this.settingsRevision = e.revision, this.persistLocalSettings()) : this.settingsRevision > 0 && this.serverSettings.scheduleSave(this.settings, this.settingsRevision);
+      e && e.revision >= this.settingsRevision ? (this.settings = z(e.settings), this.settingsRevision = e.revision, this.persistLocalSettings()) : this.settingsRevision > 0 && this.serverSettings.scheduleSave(this.settings, this.settingsRevision);
     } catch (e) {
       console.warn("[ST-BgLoader] Server settings unavailable, using local settings:", e);
     }
   }
   persistLocalSettings() {
     try {
-      localStorage.setItem(D, JSON.stringify(this.settings)), localStorage.setItem(he, String(this.settingsRevision));
+      localStorage.setItem(D, JSON.stringify(this.settings)), localStorage.setItem(de, String(this.settingsRevision));
     } catch (e) {
       console.error("[ST-BgLoader] Failed to save settings:", e);
     }
@@ -3571,10 +3697,10 @@ class et {
     this.settingsRevision += 1, this.persistLocalSettings(), this.serverSettings.scheduleSave(this.settings, this.settingsRevision), this.settingsSync?.schedulePush(this.settings);
   }
 }
-const R = new et();
-document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", () => R.init()) : R.init();
-window.STBgLoader = R;
-window.stBgLoader = R.getAPI();
+const N = new nt(), ue = () => N.init().catch((l) => console.error("[ST-BgLoader] Initialization failed:", l));
+document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", ue) : ue();
+window.STBgLoader = N;
+window.stBgLoader = N.getAPI();
 export {
-  et as STBgLoaderExtension
+  nt as STBgLoaderExtension
 };

@@ -1,0 +1,2 @@
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "回归门禁与 UI 标准核查"}
+{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "生命周期改造未破坏 destroy/挂载契约核查"}

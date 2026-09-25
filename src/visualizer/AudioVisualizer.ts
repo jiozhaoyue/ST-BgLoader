@@ -4,7 +4,10 @@ export class AudioVisualizer {
     private canvas: HTMLCanvasElement;
     private ctx: CanvasRenderingContext2D | null = null;
     private parentEl: HTMLElement | null = null;
-    private mediaContainerEl: HTMLElement | null = null;
+    // Pulse-mode pump target: MediaMount's pump wrapper, NOT the media container — the
+    // container's transform belongs to the parallax controller (two writers on one
+    // style property would fight each other).
+    private pumpTargetEl: HTMLElement | null = null;
     private analyser: AnalyserNode | null = null;
     private animFrameId: number | null = null;
     private dataArray: Uint8Array<ArrayBuffer> | null = null;
@@ -34,9 +37,9 @@ export class AudioVisualizer {
         this.ctx = this.canvas.getContext('2d');
     }
 
-    public mount(parent: HTMLElement, mediaContainer?: HTMLElement): void {
+    public mount(parent: HTMLElement, pumpTarget?: HTMLElement): void {
         this.parentEl = parent;
-        this.mediaContainerEl = mediaContainer || null;
+        this.pumpTargetEl = pumpTarget || null;
         if (!this.canvas.parentElement) {
             parent.appendChild(this.canvas);
         }
@@ -132,12 +135,12 @@ export class AudioVisualizer {
             const bassAvg = (bassSum / binCount) / 255; // 0 to 1
             const pump = Math.pow(bassAvg, 2) * 0.35 * sensitivity;
 
-            if (this.mediaContainerEl) {
+            if (this.pumpTargetEl) {
                 // Subtle reactive brightness pump
                 const brightness = 100 + pump * 25;
                 const scale = 1 + pump * 0.015;
-                this.mediaContainerEl.style.transform = `scale(${scale})`;
-                this.mediaContainerEl.style.transition = 'transform 0.06s ease-out';
+                this.pumpTargetEl.style.transform = `scale(${scale})`;
+                this.pumpTargetEl.style.transition = 'transform 0.06s ease-out';
             }
         } else if (mode === 'spectrum') {
             if (!this.ctx) return;
@@ -182,9 +185,10 @@ export class AudioVisualizer {
         if (this.canvas.parentElement) {
             this.canvas.parentElement.removeChild(this.canvas);
         }
-        if (this.mediaContainerEl) {
-            this.mediaContainerEl.style.transform = '';
-            this.mediaContainerEl.style.transition = '';
+        if (this.pumpTargetEl) {
+            this.pumpTargetEl.style.transform = '';
+            this.pumpTargetEl.style.transition = '';
+            this.pumpTargetEl = null;
         }
     }
 }

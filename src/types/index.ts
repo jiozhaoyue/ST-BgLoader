@@ -203,6 +203,35 @@ export interface SceneSnapshot {
     isBuiltin?: boolean;
 }
 
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Merges a stored/partial settings object onto DEFAULT_SETTINGS: top-level spread plus
+ * ONE level of nested-object merge. Persisted settings from older versions lack keys
+ * added later, and a shallow spread left those nested objects (weather/visualizer/…)
+ * with missing fields at runtime. Arrays (triggerRules/playlist) and records
+ * (userPresets/scenes/chatBindings) replace wholesale — merging them with defaults is
+ * meaningless; nested option objects are all flat, so one level is enough.
+ */
+export function mergeSettings(stored: unknown): BgLoaderSettings {
+    const merged: BgLoaderSettings = { ...DEFAULT_SETTINGS };
+    if (!isPlainObject(stored)) return merged;
+    const source = stored as Record<string, unknown>;
+    const defaults = DEFAULT_SETTINGS as unknown as Record<string, unknown>;
+    const target = merged as unknown as Record<string, unknown>;
+    for (const key of Object.keys(defaults)) {
+        const incoming = source[key];
+        if (incoming === undefined) continue;
+        const def = defaults[key];
+        target[key] = isPlainObject(def) && isPlainObject(incoming)
+            ? { ...def, ...incoming }
+            : incoming;
+    }
+    return merged;
+}
+
 export const BUILTIN_SCENES: Record<string, SceneSnapshot> = {
     cyber_rain: {
         id: 'cyber_rain',

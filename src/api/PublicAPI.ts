@@ -369,7 +369,9 @@ export class PublicAPI {
      * Audiovisual Scene Snapshots
      */
     public applyScene(id: string): boolean {
-        const success = this.ext.getSceneManager().applyScene(id);
+        const sceneManager = this.ext.getSceneManager();
+        if (!sceneManager) return false;
+        const success = sceneManager.applyScene(id);
         if (success) {
             this.ext.getSettings().activeSceneId = id;
             this.ext.saveSettings();
@@ -378,7 +380,9 @@ export class PublicAPI {
         return success;
     }
 
-    public saveCurrentScene(name: string): SceneSnapshot {
+    public saveCurrentScene(name: string): SceneSnapshot | null {
+        const sceneManager = this.ext.getSceneManager();
+        if (!sceneManager) return null;
         const settings = this.ext.getSettings();
         const snapshot: SceneSnapshot = {
             id: `scene_${Date.now()}`,
@@ -393,23 +397,25 @@ export class PublicAPI {
             frostedChat: settings.frostedChat.enabled,
         };
 
-        this.ext.getSceneManager().saveScene(snapshot);
-        this.ext.getSettings().scenes = this.ext.getSceneManager().getUserScenes();
+        sceneManager.saveScene(snapshot);
+        settings.scenes = sceneManager.getUserScenes();
         this.ext.saveSettings();
-        this.emit('scenes-change', this.ext.getSceneManager().getAllScenes());
+        this.emit('scenes-change', sceneManager.getAllScenes());
         return snapshot;
     }
 
     public getScenes(): Record<string, SceneSnapshot> {
-        return this.ext.getSceneManager().getAllScenes();
+        return this.ext.getSceneManager()?.getAllScenes() ?? {};
     }
 
     public deleteScene(id: string): boolean {
-        const deleted = this.ext.getSceneManager().deleteScene(id);
+        const sceneManager = this.ext.getSceneManager();
+        if (!sceneManager) return false;
+        const deleted = sceneManager.deleteScene(id);
         if (deleted) {
-            this.ext.getSettings().scenes = this.ext.getSceneManager().getUserScenes();
+            this.ext.getSettings().scenes = sceneManager.getUserScenes();
             this.ext.saveSettings();
-            this.emit('scenes-change', this.ext.getSceneManager().getAllScenes());
+            this.emit('scenes-change', sceneManager.getAllScenes());
         }
         return deleted;
     }

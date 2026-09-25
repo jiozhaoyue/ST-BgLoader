@@ -31,6 +31,8 @@ export class ServerSettings {
     private pending: SavePayload | null = null;
     private writing = false;
     private warnedAboutWriteFailure = false;
+    /** Invoked when a newer server document (another tab/device) beats the pending write. */
+    public onRemoteNewer: ((doc: ServerSettingsDoc) => void) | null = null;
 
     /** Returns the server document, or null when it is missing/unparsable (first run). */
     public async load(): Promise<ServerSettingsDoc | null> {
@@ -67,6 +69,14 @@ export class ServerSettings {
                 const payload = this.pending;
                 this.pending = null;
                 try {
+                    // Conflict detection: another tab/device may have written a newer
+                    // revision between our load and this flush — their copy wins, ours
+                    // would silently revert it.
+                    const remote = await this.load();
+                    if (remote && remote.revision > payload.revision) {
+                        this.onRemoteNewer?.(remote);
+                        break;
+                    }
                     await writeServerJson(SETTINGS_FILE, this.toDoc(payload));
                     this.warnedAboutWriteFailure = false;
                 } catch (err) {

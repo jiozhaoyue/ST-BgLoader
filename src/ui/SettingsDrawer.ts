@@ -5,6 +5,7 @@ import {
     FilterPreset,
     MediaItem,
     MediaType,
+    mergeSettings,
     PlaybackMode,
     SceneSnapshot,
     TransitionType,
@@ -67,11 +68,13 @@ export class SettingsDrawer {
             console.warn('[ST-BgLoader] #extensions_settings not found yet, waiting for DOM insertion...');
             const observer = new MutationObserver(() => {
                 if (document.querySelector('#extensions_settings')) {
+                    window.clearTimeout(giveUp);
                     observer.disconnect();
                     this.render();
                 }
             });
             observer.observe(document.body, { childList: true, subtree: true });
+            const giveUp = window.setTimeout(() => observer.disconnect(), 30000);
             return;
         }
 
@@ -423,6 +426,8 @@ export class SettingsDrawer {
 
         target.appendChild(drawer);
         this.container = drawer;
+        // The grid DOM was just rebuilt empty — force the next refresh to repopulate.
+        this.lastGridSignature = '';
         this.bindEvents();
         this.populatePresets();
         this.populateScenes();
@@ -906,7 +911,9 @@ export class SettingsDrawer {
                     const text = await importFile.files[0].text();
                     const imported = JSON.parse(text);
                     if (imported && typeof imported === 'object') {
-                        this.settings = { ...this.settings, ...imported };
+                        // mergeSettings fills nested-object defaults the import may lack
+                        // (older exports) instead of shallow-spreading over them.
+                        this.settings = mergeSettings(imported);
                         this.callbacks.onSettingsChanged(this.settings);
                         this.render();
                         alert('Settings successfully imported!');
@@ -1019,11 +1026,22 @@ export class SettingsDrawer {
         setVal('#st_filter_saturate', '#st_filter_saturate_val', filters.saturate, '%');
     }
 
+    private lastGridSignature = '';
+
     public async refreshMediaGrid(): Promise<void> {
         const grid = this.container?.querySelector('#st_bgloader_grid');
         if (!grid) return;
 
         const items = await this.cacheManager.listMedia();
+        // Signature guard: applyMedia refreshes the grid on every background switch; a
+        // full DOM rebuild per switch is wasted work when nothing visible changed.
+        const signature = JSON.stringify([
+            this.settings.activeMediaId,
+            items.map(i => [i.id, i.name, i.type, i.url]),
+        ]);
+        if (signature === this.lastGridSignature) return;
+        this.lastGridSignature = signature;
+
         grid.innerHTML = '';
 
         if (items.length === 0) {

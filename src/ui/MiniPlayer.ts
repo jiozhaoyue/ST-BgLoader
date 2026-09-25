@@ -8,6 +8,8 @@ export class MiniPlayer {
     private isVisible: boolean = true;
     private capsuleOnPlayOnly: boolean = true;
     private hideTimer: number | null = null;
+    private unsubscribeTrack: (() => void) | null = null;
+    private unsubscribePlayState: (() => void) | null = null;
 
     constructor(audioEngine: AudioEngine) {
         this.audioEngine = audioEngine;
@@ -55,17 +57,20 @@ export class MiniPlayer {
         this.container = el;
         this.bindEvents();
 
-        // Listen for AudioEngine events
-        this.audioEngine.onTrackChange = (item) => {
+        // Subscribe (not assign) so re-renders and the publicAPI bridge coexist; the old
+        // single-slot assignment silently dropped earlier subscribers.
+        this.unsubscribeTrack?.();
+        this.unsubscribePlayState?.();
+        this.unsubscribeTrack = this.audioEngine.addTrackListener((item) => {
             const titleEl = this.container?.querySelector('#st_mini_title');
             if (titleEl) {
                 const name = item ? item.name : 'No Audio';
                 titleEl.textContent = name;
                 titleEl.setAttribute('title', name);
             }
-        };
+        });
 
-        this.audioEngine.onPlayStateChange = (playing) => {
+        this.unsubscribePlayState = this.audioEngine.addPlayStateListener((playing) => {
             const icon = this.container?.querySelector('#st_mini_play i');
             if (icon) {
                 icon.className = `fa-solid ${playing ? 'fa-pause' : 'fa-play'}`;
@@ -85,7 +90,7 @@ export class MiniPlayer {
                     }, 1200);
                 }
             }
-        };
+        });
     }
 
     private bindEvents(): void {
@@ -167,6 +172,10 @@ export class MiniPlayer {
             clearTimeout(this.hideTimer);
             this.hideTimer = null;
         }
+        this.unsubscribeTrack?.();
+        this.unsubscribeTrack = null;
+        this.unsubscribePlayState?.();
+        this.unsubscribePlayState = null;
         if (this.container) {
             this.container.remove();
             this.container = null;

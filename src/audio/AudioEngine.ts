@@ -26,9 +26,46 @@ export class AudioEngine {
     private analyserNode: AnalyserNode | null = null;
     private isMuffled: boolean = false;
 
-    public onTrackChange?: (item: MediaItem | null) => void;
-    public onPlayStateChange?: (isPlaying: boolean) => void;
+    // Multicast listeners (subscribe via addTrackListener/addPlayStateListener, both
+    // return an unsubscriber). The old single-slot onTrackChange/onPlayStateChange
+    // properties are gone: last-writer-wins silently dropped earlier subscribers.
+    private trackListeners: Array<(item: MediaItem | null) => void> = [];
+    private playStateListeners: Array<(isPlaying: boolean) => void> = [];
     public onAnalyserReady?: (analyser: AnalyserNode) => void;
+
+    public addTrackListener(listener: (item: MediaItem | null) => void): () => void {
+        this.trackListeners.push(listener);
+        return () => {
+            this.trackListeners = this.trackListeners.filter(l => l !== listener);
+        };
+    }
+
+    public addPlayStateListener(listener: (isPlaying: boolean) => void): () => void {
+        this.playStateListeners.push(listener);
+        return () => {
+            this.playStateListeners = this.playStateListeners.filter(l => l !== listener);
+        };
+    }
+
+    private emitTrackChange(item: MediaItem | null): void {
+        for (const listener of this.trackListeners) {
+            try {
+                listener(item);
+            } catch (err) {
+                console.error('[ST-BgLoader AudioEngine] Track listener failed:', err);
+            }
+        }
+    }
+
+    private emitPlayState(isPlaying: boolean): void {
+        for (const listener of this.playStateListeners) {
+            try {
+                listener(isPlaying);
+            } catch (err) {
+                console.error('[ST-BgLoader AudioEngine] Play-state listener failed:', err);
+            }
+        }
+    }
 
     public setUrlResolver(resolver: (item: MediaItem) => Promise<string>): void {
         this.urlResolver = resolver;
@@ -104,16 +141,22 @@ export class AudioEngine {
     }
 
     public async playMediaItem(item: MediaItem, mediaUrl?: string): Promise<void> {
-        const idx = this.playlist.findIndex(p => p.id === item.id);
-        if (idx !== -1) {
-            this.currentIndex = idx;
-        } else {
-            this.playlist.push(item);
-            this.currentIndex = this.playlist.length - 1;
+        let idx = this.playlist.findIndex(p => p.id === item.id);
+        if (idx === -1) {
+            // Repeated playBGM calls with the same URL used to append a fresh virtual
+            // item every time, growing the playlist for the whole session — reuse.
+            idx = this.playlist.findIndex(p => p.url === item.url && p.type === item.type);
+            if (idx === -1) {
+                this.playlist.push(item);
+                idx = this.playlist.length - 1;
+            } else {
+                this.playlist[idx] = item;
+            }
         }
+        this.currentIndex = idx;
         const url = mediaUrl || (this.urlResolver ? await this.urlResolver(item) : item.url);
         await this.playTrack(url, this.playbackMode === 'single');
-        this.onTrackChange?.(item);
+        this.emitTrackChange(item);
     }
 
     public async playCurrentTrack(): Promise<void> {
@@ -141,7 +184,7 @@ export class AudioEngine {
                 }),
                 new Promise((resolve) => window.setTimeout(resolve, PLAY_SETTLE_TIMEOUT_MS)),
             ]);
-            this.onTrackChange?.(item);
+            this.emitTrackChange(item);
         } catch (err) {
             console.warn('[ST-BgLoader AudioEngine] Autoplay was prevented by browser policy:', err);
         }
@@ -156,11 +199,11 @@ export class AudioEngine {
         });
 
         this.audioElement.addEventListener('play', () => {
-            this.onPlayStateChange?.(true);
+            this.emitPlayState(true);
         });
 
         this.audioElement.addEventListener('pause', () => {
-            this.onPlayStateChange?.(false);
+            this.emitPlayState(false);
         });
 
         this.setupInteractionListener();

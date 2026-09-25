@@ -6,6 +6,9 @@ export class TriggerManager {
     private eventSourceUnlisteners: Array<() => void> = [];
     private lastTriggeredId: string | null = null;
     private lastTriggerTime = 0;
+    // MESSAGE_RECEIVED + CHARACTER_MESSAGE_RENDERED both evaluate every message; compiling
+    // each rule's RegExp per message is wasted work. null caches "known invalid".
+    private regexCache = new Map<string, RegExp | null>();
 
     constructor(rules: TriggerRule[] = [], onTrigger?: (action: TriggerAction, rule: TriggerRule) => void) {
         this.rules = [...rules];
@@ -18,6 +21,7 @@ export class TriggerManager {
 
     public setRules(rules: TriggerRule[]): void {
         this.rules = [...rules];
+        this.regexCache.clear();
     }
 
     public getRules(): TriggerRule[] {
@@ -26,10 +30,27 @@ export class TriggerManager {
 
     public addRule(rule: TriggerRule): void {
         this.rules.push(rule);
+        this.regexCache.clear();
     }
 
     public removeRule(id: string): void {
         this.rules = this.rules.filter(r => r.id !== id);
+        this.regexCache.clear();
+    }
+
+    private getRegex(pattern: string): RegExp | null {
+        if (this.regexCache.has(pattern)) {
+            return this.regexCache.get(pattern) ?? null;
+        }
+        try {
+            const regex = new RegExp(pattern, 'i');
+            this.regexCache.set(pattern, regex);
+            return regex;
+        } catch (err) {
+            console.warn(`[ST-BgLoader TriggerManager] Invalid regex pattern "${pattern}":`, err);
+            this.regexCache.set(pattern, null);
+            return null;
+        }
     }
 
     public evaluateCharacter(characterName: string): boolean {
@@ -60,14 +81,10 @@ export class TriggerManager {
         if (!text) return false;
         for (const rule of this.rules) {
             if (!rule.enabled || rule.type !== 'regex') continue;
-            try {
-                const regex = new RegExp(rule.pattern, 'i');
-                if (regex.test(text)) {
-                    this.fireRule(rule);
-                    return true;
-                }
-            } catch (err) {
-                console.warn(`[ST-BgLoader TriggerManager] Invalid regex pattern "${rule.pattern}":`, err);
+            const regex = this.getRegex(rule.pattern);
+            if (regex && regex.test(text)) {
+                this.fireRule(rule);
+                return true;
             }
         }
         return false;
@@ -150,6 +167,7 @@ export class TriggerManager {
     public destroy(): void {
         this.unbindEvents();
         this.rules = [];
+        this.regexCache.clear();
         this.onTriggerCallback = undefined;
     }
 }

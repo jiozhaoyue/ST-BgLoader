@@ -85,6 +85,10 @@ const EXTERNAL_DOWNLOAD_TIMEOUT_MS = 60000;
  */
 export class ServerOrigin {
     private manifest: Manifest = { version: MANIFEST_VERSION, items: [] };
+    // Serializes manifest writes: manifest mutations are synchronous on this single
+    // instance, so queueing uploads guarantees the last write carries the newest state
+    // and prevents redundant parallel POSTs (two rapid putMedia calls).
+    private saveQueue: Promise<void> = Promise.resolve();
 
     public async init(): Promise<void> {
         try {
@@ -296,7 +300,14 @@ export class ServerOrigin {
         return false;
     }
 
-    private async saveManifest(): Promise<void> {
+    public saveManifest(): Promise<void> {
+        const run = () => this.doSaveManifest();
+        // A failed save must not poison the queue for the next caller.
+        this.saveQueue = this.saveQueue.then(run, run);
+        return this.saveQueue;
+    }
+
+    private async doSaveManifest(): Promise<void> {
         this.manifest.version = MANIFEST_VERSION;
         const blob = new Blob([JSON.stringify(this.manifest, null, 2)], { type: 'application/json' });
         try {
