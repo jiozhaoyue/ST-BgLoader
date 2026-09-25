@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 16
-- **Last Active**: 2026-09-25
+- **Total Sessions**: 17
+- **Last Active**: 2026-09-26
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~441 | Active |
+| `journal-1.md` | ~478 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 17 | 2026-09-26 | 子任务 1：折叠修复 + 去溢光 + 原生风格对齐（P3-10 结项） | `ceb9eec`, `6486550`, `8d2f322`, `2023a25` | `master` |
 | 16 | 2026-09-25 | P3 改进批：体检遗留 12 项全部实施 + shell 纪律进 spec | `491b71e` | `master` |
 | 15 | 2026-09-25 | 全仓全面体检：27 文件审查 + 14 项 P1/P2 修复 + UI 优化 | `a0f99d3` | `master` |
 | 7 | 2026-09-06 | Add Ambient Sound, Frosted Glass, Scenes and Shortcuts | - | `master` |

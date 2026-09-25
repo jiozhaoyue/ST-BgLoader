@@ -439,3 +439,40 @@ Added procedural WebAudio ambient soundscape synthesizer, frosted glass transpar
 ### Status
 
 [OK] **Completed**
+
+
+## Session 17: 子任务 1：折叠修复 + 去溢光 + 原生风格对齐（P3-10 结项）
+<!-- trellis-session: v=2 fp=850be2cef92f4fc1 -->
+
+**Date**: 2026-09-26
+**Task**: 子任务 1：折叠修复 + 去溢光 + 原生风格对齐（P3-10 结项）
+**Branch**: `master`
+
+### Summary
+
+定位并修复「扩展面板折叠不上」：宿主以 document 级委托 + jQuery slideToggle 接管 .inline-drawer-toggle，扩展又自建元素级监听器，后者先执行设 display:none，前者随后 slideDown 重新展开 → 面板永不折叠，图标 down/up 亦被两侧各切一次。删除自建监听器交还宿主；移除 .inline-drawer-content 上的行内 display:flex（与宿主动画互斥），改块级 + margin-bottom 承担分区间距，不触碰任何被动画控制的属性。清除全部 box-shadow（选中态溢光、迷你播放器胶囊基础投影与 hover 加深，用户裁定投影全去），层级与选中态改由边框 + 色调 + 标题强调表达，并去掉 hover 的 transform: scale。P3-10 由「明确不做」改为已实施：SettingsDrawer 行内样式 43 处 → 1 处（仅 #st_trigger_form 的 display 保留，因 JS 运行时切换），新增 19 个语义类，状态色纳入面板作用域变量。新增 spec/frontend/host-native-ui.md 固化规范。执行期发现 A4「媒体库间歇性渲染为空」（P1，签名守卫跨面板实例共享 + 栅格元素按渲染新建，await 完成顺序决定命中）并转交子任务 2。
+
+### Main Changes
+
+- 关键发现：实际宿主为 Luker（Instance/Dev/Luker :8003）而非原版 ST，其 public/script.js:21422 的委托处理器与原版 script.js:12193 逐字一致，style.css:5804 同为 display:none —— 根因分析对实际宿主成立。折叠修复方案优于原设计：不加内层 flex 容器，改用 margin，故永不触碰宿主的 display/height。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `ceb9eec` | fix(ui): 修复设置面板无法折叠 + 去除溢光特效 + 原生风格对齐 |
+| `6486550` | docs(spec): 新增宿主原生 UI 规范（fe/frontend/host-native-ui） |
+| `8d2f322` | chore(task): 建父任务 + 四子任务规划，子任务 1 执行完毕 |
+| `2023a25` | chore(task): archive 09-26-native-style-and-fold-fix |
+
+### Testing
+
+- [OK] tsc ✓ build ✓（dist/style.css 5.74→7.14kB、index.js 170.71→169.56kB）· e2e 24/24 ✓ · stress 4/4 ✓ · authority 18/18 真后端 ✓ · CSS 裸选择器门禁 0 ✓ · box-shadow 门禁 0 ✓ · 折叠专项探针 43/43 ✓（5 轮开合 display 序列严格交替，且与同页原生抽屉序列完全一致，图标态语义一致）· 选中态计算样式断言：43 张卡片全部 boxShadow=none，选中卡 border 2px 主题强调色
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 进入子任务 2（全仓体检 + 健壮性 + 裁剪候选清单，清单交付用户逐项拍板）
