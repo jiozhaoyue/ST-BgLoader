@@ -92,15 +92,18 @@ export class SettingsDrawer {
                     <b><i class="fa-solid fa-photo-film"></i> ST-BgLoader (Rich Media Backgrounds & FX)</b>
                     <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
                 </div>
-                <div class="inline-drawer-content" style="display: flex; flex-direction: column; gap: 12px; padding-top: 10px;">
-                    
+                <div class="inline-drawer-content">
+                    <!-- No inline display here: the host's delegated handler owns
+                         .inline-drawer-content's display via slideToggle(). Writing a display
+                         value on this element made click-to-collapse impossible — see the
+                         host-verification evidence in the 09-26-native-style-and-fold-fix task. -->
                     <!-- Media Upload Section -->
                     <div class="st-bgloader-section">
                         <h4><i class="fa-solid fa-cloud-arrow-up"></i> Import Media (Video, Audio, HTML, SVG)</h4>
                         <div class="st-bgloader-dropzone" id="st_bgloader_dropzone">
-                            <i class="fa-solid fa-file-video fa-2x" style="margin-bottom: 6px; opacity: 0.7;"></i>
+                            <i class="fa-solid fa-file-video fa-2x"></i>
                             <div>Click or Drag files here (MP4, WebM, MP3, WAV, HTML, SVG, Images)</div>
-                            <input type="file" id="st_bgloader_file_input" style="display: none;" accept="video/*,audio/*,image/*,.html,.htm,.svg" />
+                            <input type="file" id="st_bgloader_file_input" class="st-bgloader-hidden" accept="video/*,audio/*,image/*,.html,.htm,.svg" />
                         </div>
                         <div class="st-bgloader-url-import">
                             <input type="text" id="st_bgloader_url_input" placeholder="Or enter direct media URL (HTTP/HTTPS)..." />
@@ -120,7 +123,7 @@ export class SettingsDrawer {
                     <div class="st-bgloader-section">
                         <h4><i class="fa-solid fa-earth-americas"></i> Audiovisual Scene Presets (全景视听预设)</h4>
                         <div class="st-bgloader-preset-row">
-                            <label style="font-size: 0.9em; flex: 0 0 60px;">Scene:</label>
+                            <label class="st-bgloader-label-sm">Scene:</label>
                             <select id="st_scene_select">
                                 <!-- Populated dynamically -->
                             </select>
@@ -135,7 +138,7 @@ export class SettingsDrawer {
                         <h4><i class="fa-solid fa-sliders"></i> Visual Adjustments & Presets</h4>
                         
                         <div class="st-bgloader-preset-row">
-                            <label style="font-size: 0.9em; flex: 0 0 60px;">Preset:</label>
+                            <label class="st-bgloader-label-sm">Preset:</label>
                             <select id="st_preset_select">
                                 <!-- Populated dynamically -->
                             </select>
@@ -172,8 +175,8 @@ export class SettingsDrawer {
                         </div>
 
                         <!-- Sandbox Interactive Mode Toggle -->
-                        <div style="margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 8px;">
-                            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                        <div class="st-bgloader-divider">
+                            <label class="st-bgloader-check">
                                 <input type="checkbox" id="st_bg_interactive" ${this.settings.interactiveBackground ? 'checked' : ''} />
                                 <span>Allow background mouse interaction (3D/Canvas/Games)</span>
                             </label>
@@ -185,7 +188,7 @@ export class SettingsDrawer {
                         <h4><i class="fa-solid fa-cloud-sun-rain"></i> Atmospheric Weather & Particles</h4>
                         
                         <div class="st-bgloader-preset-row">
-                            <label style="font-size: 0.9em; flex: 0 0 80px;">Weather:</label>
+                            <label class="st-bgloader-label-md">Weather:</label>
                             <select id="st_weather_type">
                                 <option value="off" ${this.settings.weather.type === 'off' ? 'selected' : ''}>Off (关闭天气)</option>
                                 <option value="rain" ${this.settings.weather.type === 'rain' ? 'selected' : ''}>Rain (细雨微涟)</option>
@@ -197,7 +200,7 @@ export class SettingsDrawer {
                         </div>
 
                         <div class="st-bgloader-preset-row">
-                            <label style="font-size: 0.9em; flex: 0 0 80px;">Density:</label>
+                            <label class="st-bgloader-label-md">Density:</label>
                             <select id="st_weather_density">
                                 <option value="low" ${this.settings.weather.density === 'low' ? 'selected' : ''}>Low (稀疏)</option>
                                 <option value="medium" ${this.settings.weather.density === 'medium' ? 'selected' : ''}>Medium (适中)</option>
@@ -223,7 +226,7 @@ export class SettingsDrawer {
                         <h4><i class="fa-solid fa-chart-simple"></i> Audio Visualizer & Parallax</h4>
                         
                         <div class="st-bgloader-preset-row">
-                            <label style="font-size: 0.9em; flex: 0 0 90px;">Visualizer:</label>
+                            <label>Visualizer:</label>
                             <select id="st_visualizer_mode">
                                 <option value="off" ${this.settings.visualizer.mode === 'off' ? 'selected' : ''}>Off (关闭律动)</option>
                                 <option value="pulse" ${this.settings.visualizer.mode === 'pulse' ? 'selected' : ''}>Pulse (低音呼吸律动)</option>
@@ -237,14 +240,14 @@ export class SettingsDrawer {
                             <span class="st-bgloader-slider-val" id="st_visualizer_sens_val">${this.settings.visualizer.sensitivity}x</span>
                         </div>
 
-                        <div style="margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 8px;">
-                            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                        <div class="st-bgloader-divider">
+                            <label class="st-bgloader-check">
                                 <input type="checkbox" id="st_parallax_enabled" ${this.settings.parallax.enabled ? 'checked' : ''} />
                                 <span>Enable 2.5D Mouse Gyro Parallax (景深视差)</span>
                             </label>
                         </div>
 
-                        <div class="st-bgloader-slider-row" style="margin-top: 8px;">
+                        <div class="st-bgloader-slider-row st-bgloader-gap-top-md">
                             <label>Depth Intensity</label>
                             <input type="range" id="st_parallax_intensity" min="1" max="10" step="1" value="${Math.round(this.settings.parallax.intensity * 10)}" />
                             <span class="st-bgloader-slider-val" id="st_parallax_intensity_val">${this.settings.parallax.intensity}</span>
@@ -256,7 +259,7 @@ export class SettingsDrawer {
                         <h4><i class="fa-solid fa-fire"></i> Ambient Soundscape Generator (环境白噪音)</h4>
                         
                         <div class="st-bgloader-preset-row">
-                            <label style="font-size: 0.9em; flex: 0 0 90px;">Soundscape:</label>
+                            <label>Soundscape:</label>
                             <select id="st_ambient_type">
                                 <option value="off" ${this.settings.ambientSound.type === 'off' ? 'selected' : ''}>Off (关闭白噪音)</option>
                                 <option value="rain" ${this.settings.ambientSound.type === 'rain' ? 'selected' : ''}>Gentle Rain (淅沥雨声)</option>
@@ -276,7 +279,7 @@ export class SettingsDrawer {
                     <div class="st-bgloader-section">
                         <h4><i class="fa-solid fa-eye"></i> Frosted Glass Chat UI (毛玻璃对话框穿透)</h4>
                         
-                        <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; margin-bottom: 8px;">
+                        <label class="st-bgloader-check st-bgloader-check-lead">
                             <input type="checkbox" id="st_frosted_enabled" ${this.settings.frostedChat.enabled ? 'checked' : ''} />
                             <span>Enable transparent blurred chat bubbles (穿透显示背景)</span>
                         </label>
@@ -299,7 +302,7 @@ export class SettingsDrawer {
                         <h4><i class="fa-solid fa-wand-magic-sparkles"></i> Scene Transitions</h4>
                         
                         <div class="st-bgloader-preset-row">
-                            <label style="font-size: 0.9em; flex: 0 0 90px;">Effect:</label>
+                            <label>Effect:</label>
                             <select id="st_transition_effect">
                                 <option value="fade" ${this.settings.transitionEffect === 'fade' ? 'selected' : ''}>Fade (平滑淡入淡出)</option>
                                 <option value="zoom_fade" ${this.settings.transitionEffect === 'zoom_fade' ? 'selected' : ''}>Zoom Fade (缩放推进淡入)</option>
@@ -326,8 +329,8 @@ export class SettingsDrawer {
                             <span class="st-bgloader-slider-val" id="st_audio_volume_val">${Math.round(this.settings.volume * 100)}%</span>
                         </div>
 
-                        <div class="st-bgloader-preset-row" style="margin-top: 6px;">
-                            <label style="font-size: 0.9em; flex: 0 0 90px;">Play Mode:</label>
+                        <div class="st-bgloader-preset-row st-bgloader-gap-top">
+                            <label>Play Mode:</label>
                             <select id="st_playback_mode">
                                 <option value="loop" ${this.settings.playbackMode === 'loop' ? 'selected' : ''}>Loop Playlist (循环列表)</option>
                                 <option value="single" ${this.settings.playbackMode === 'single' ? 'selected' : ''}>Single Track Loop (单曲循环)</option>
@@ -335,28 +338,28 @@ export class SettingsDrawer {
                             </select>
                         </div>
 
-                        <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 8px;">
-                            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                        <div class="st-bgloader-check-stack">
+                            <label class="st-bgloader-check">
                                 <input type="checkbox" id="st_audio_mute" ${this.settings.muted ? 'checked' : ''} />
                                 <span>Mute Audio</span>
                             </label>
-                            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                            <label class="st-bgloader-check">
                                 <input type="checkbox" id="st_audio_muffle" ${this.settings.muffleBGM ? 'checked' : ''} />
                                 <span>Lo-Fi Acoustic Muffle (隔壁房间低通滤波沉浸感)</span>
                             </label>
-                            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                            <label class="st-bgloader-check">
                                 <input type="checkbox" id="st_audio_blur" ${this.settings.pauseOnBlur ? 'checked' : ''} />
                                 <span>Pause when tab inactive</span>
                             </label>
-                            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                            <label class="st-bgloader-check">
                                 <input type="checkbox" id="st_shortcuts_enabled" ${this.settings.shortcutsEnabled ? 'checked' : ''} />
                                 <span>Enable Alt Shortcuts (Alt+B: 背景, Alt+P: 播放, Alt+M: 隔音, Alt+W: 天气, Alt+F: 毛玻璃)</span>
                             </label>
-                            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                            <label class="st-bgloader-check">
                                 <input type="checkbox" id="st_mini_player_toggle" ${this.settings.showMiniPlayer ? 'checked' : ''} />
                                 <span>Show floating mini player capsule</span>
                             </label>
-                            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; margin-left: 18px; font-size: 0.9em; opacity: 0.85;">
+                            <label class="st-bgloader-check st-bgloader-check-sub">
                                 <input type="checkbox" id="st_capsule_on_play" ${this.settings.capsuleOnPlayOnly ? 'checked' : ''} />
                                 <span>Only show capsule during active playback</span>
                             </label>
@@ -371,7 +374,7 @@ export class SettingsDrawer {
                         </div>
                         <div class="st-bgloader-trigger-form" id="st_trigger_form" style="display: none;">
                             <div class="st-bgloader-preset-row">
-                                <label style="font-size: 0.9em; flex: 0 0 90px;">类型:</label>
+                                <label>类型:</label>
                                 <select id="st_trigger_type">
                                     <option value="character">角色名 (Character)</option>
                                     <option value="chat">聊天 ID (Chat)</option>
@@ -379,11 +382,11 @@ export class SettingsDrawer {
                                 </select>
                             </div>
                             <div class="st-bgloader-preset-row">
-                                <label style="font-size: 0.9em; flex: 0 0 90px;">规则名:</label>
+                                <label>规则名:</label>
                                 <input type="text" id="st_trigger_name" placeholder="规则名称" />
                             </div>
                             <div class="st-bgloader-preset-row">
-                                <label style="font-size: 0.9em; flex: 0 0 90px;">匹配:</label>
+                                <label>匹配:</label>
                                 <input type="text" id="st_trigger_pattern" placeholder="角色名 / 聊天 ID / 正则表达式" />
                             </div>
                             <div class="st-bgloader-btn-row">
@@ -391,7 +394,7 @@ export class SettingsDrawer {
                                 <button id="st_trigger_cancel_btn" class="menu_button">取消</button>
                             </div>
                         </div>
-                        <button id="st_trigger_add_btn" class="menu_button" style="width: 100%;">
+                        <button id="st_trigger_add_btn" class="menu_button st-bgloader-btn-full">
                             <i class="fa-solid fa-plus"></i> Add Scene Trigger Rule
                         </button>
                     </div>
@@ -399,22 +402,22 @@ export class SettingsDrawer {
                     <!-- Backup & Cache -->
                     <div class="st-bgloader-section">
                         <h4><i class="fa-solid fa-file-export"></i> Backup & Cache</h4>
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <div class="st-bgloader-row-between">
                             <div>Used: <strong id="st_cache_used">Calculating...</strong> (<span id="st_cache_count">0</span> items)</div>
                             <button id="st_cache_clear_btn" class="menu_button menu_button_danger">Clear Cache</button>
                         </div>
                         <div class="st-bgloader-btn-row">
                             <button id="st_backup_export_btn" class="menu_button"><i class="fa-solid fa-download"></i> Export Settings JSON</button>
                             <button id="st_backup_import_btn" class="menu_button"><i class="fa-solid fa-upload"></i> Import Settings JSON</button>
-                            <input type="file" id="st_backup_import_file" style="display: none;" accept=".json" />
+                            <input type="file" id="st_backup_import_file" class="st-bgloader-hidden" accept=".json" />
                         </div>
                     </div>
 
                     <!-- Storage & Authority Enhancement -->
                     <div class="st-bgloader-section">
                         <h4><i class="fa-solid fa-cloud"></i> 存储与 Authority 增强</h4>
-                        <div id="st_bgloader_cloud_status" style="font-size:0.9em; line-height:1.6;">检测中...</div>
-                        <label style="display:flex; align-items:center; gap:8px; font-size:0.9em; margin-top:6px;">
+                        <div id="st_bgloader_cloud_status" class="st-bgloader-status-text">检测中...</div>
+                        <label class="st-bgloader-check-inline">
                             <input type="checkbox" id="st_bgloader_agent_tools_cb" />
                             允许 Authority Agent 调度氛围工具（AI 导演模式）
                         </label>
@@ -443,20 +446,20 @@ export class SettingsDrawer {
         const agentCb = this.container?.querySelector('#st_bgloader_agent_tools_cb') as HTMLInputElement | null;
         if (!statusEl) return;
 
-        const storageLine = '<span style="color:#4fae6b;">● 源端：服务端 backgrounds/ 目录</span><br/>媒体存于酒馆服务端（与原生背景同位置，换浏览器/设备可见）；本浏览器仅保留可清理的缓存。';
+        const storageLine = '<span class="st-bgloader-status-ok">● 源端：服务端 backgrounds/ 目录</span><br/>媒体存于酒馆服务端（与原生背景同位置，换浏览器/设备可见）；本浏览器仅保留可清理的缓存。';
 
         const caps = this.authority?.getCapabilities();
         let authorityLine: string;
         if (caps?.available && caps.agentToolsState === 'blocked') {
-            authorityLine = '<span style="color:#4fae6b;">● Authority 增强已连接</span>：设置/场景跨端同步 ✓ · CORS 服务端导入 ✓ · '
-                + '<span style="color:#c9a34f;">Agent 氛围工具被权限策略封锁</span>（管理员可在 Authority Security Center 调整）';
+            authorityLine = '<span class="st-bgloader-status-ok">● Authority 增强已连接</span>：设置/场景跨端同步 ✓ · CORS 服务端导入 ✓ · '
+                + '<span class="st-bgloader-status-warn">Agent 氛围工具被权限策略封锁</span>（管理员可在 Authority Security Center 调整）';
         } else if (caps?.available && caps.agentToolsState === 'pending') {
-            authorityLine = '<span style="color:#4fae6b;">● Authority 增强已连接</span>：设置/场景跨端同步 ✓ · CORS 服务端导入 ✓ · '
-                + '<span style="color:#c9a34f;">Agent 氛围工具等待授权</span>（处理页面上的 Authority 权限弹窗，或到 Security Center 查看）';
+            authorityLine = '<span class="st-bgloader-status-ok">● Authority 增强已连接</span>：设置/场景跨端同步 ✓ · CORS 服务端导入 ✓ · '
+                + '<span class="st-bgloader-status-warn">Agent 氛围工具等待授权</span>（处理页面上的 Authority 权限弹窗，或到 Security Center 查看）';
         } else if (caps?.available) {
-            authorityLine = '<span style="color:#4fae6b;">● Authority 增强已连接</span>：设置/场景跨端同步 ✓ · Agent 氛围工具可用 · CORS 服务端导入 ✓';
+            authorityLine = '<span class="st-bgloader-status-ok">● Authority 增强已连接</span>：设置/场景跨端同步 ✓ · Agent 氛围工具可用 · CORS 服务端导入 ✓';
         } else {
-            authorityLine = '<span style="color:#c9a34f;">● 未检测到 Authority</span>：媒体功能不受影响（源端始终在服务端），仅跨端同步与 Agent 工具不可用。';
+            authorityLine = '<span class="st-bgloader-status-warn">● 未检测到 Authority</span>：媒体功能不受影响（源端始终在服务端），仅跨端同步与 Agent 工具不可用。';
         }
         statusEl.innerHTML = `${storageLine}<br/>${authorityLine}`;
 
@@ -519,18 +522,13 @@ export class SettingsDrawer {
     private bindEvents(): void {
         if (!this.container) return;
 
-        // Toggle inline drawer collapse
-        const toggle = this.container.querySelector('.inline-drawer-toggle');
-        const content = this.container.querySelector('.inline-drawer-content') as HTMLElement;
-        const icon = this.container.querySelector('.inline-drawer-icon');
-        toggle?.addEventListener('click', () => {
-            const isHidden = content.style.display === 'none';
-            content.style.display = isHidden ? 'flex' : 'none';
-            if (icon) {
-                icon.classList.toggle('down', isHidden);
-                icon.classList.toggle('up', !isHidden);
-            }
-        });
+        // Collapse/expand is NOT implemented here on purpose. The host binds a document-level
+        // delegated handler for '.inline-drawer-toggle' (Luker/ST public/script.js) that drives
+        // the animation via jQuery slideToggle() and maintains the icon's down/up +
+        // fa-circle-chevron-down/up classes. An element-level listener of our own would run
+        // first, set display:none, and make the host's slideToggle() see a hidden element and
+        // slide it back open — the panel could never be collapsed. The same double handling
+        // also flipped the icon classes twice, leaving the chevron pointing the wrong way.
 
         // Dropzone & File Pick
         const dropzone = this.container.querySelector('#st_bgloader_dropzone');
@@ -977,7 +975,7 @@ export class SettingsDrawer {
 
         list.innerHTML = '';
         if (this.settings.triggerRules.length === 0) {
-            list.innerHTML = `<div style="text-align: center; opacity: 0.6; padding: 8px;">No trigger rules configured yet.</div>`;
+            list.innerHTML = `<div class="st-bgloader-empty">No trigger rules configured yet.</div>`;
             return;
         }
 
@@ -986,7 +984,7 @@ export class SettingsDrawer {
             item.className = 'st-bgloader-trigger-item';
 
             item.innerHTML = `
-                <div style="display: flex; align-items: center; gap: 6px;">
+                <div class="st-bgloader-trigger-row">
                     <input type="checkbox" class="st-rule-toggle" ${rule.enabled ? 'checked' : ''} />
                     <div>
                         <span class="st-bgloader-trigger-badge">${escapeHtml(rule.type)}</span>
@@ -1045,7 +1043,7 @@ export class SettingsDrawer {
         grid.innerHTML = '';
 
         if (items.length === 0) {
-            grid.innerHTML = `<div style="grid-column: 1 / -1; text-align: center; padding: 20px; opacity: 0.6;">No media items imported yet.</div>`;
+            grid.innerHTML = `<div class="st-bgloader-empty-grid">No media items imported yet.</div>`;
             return;
         }
 

@@ -15,6 +15,29 @@
     --st-bg-badge-html: #fb8c00;
     --st-bg-badge-svg: #43a047;
     --st-bg-badge-image: #1e88e5;
+    /* Storage/Authority status colours: same rationale as the badges — they encode a
+       verdict (connected / degraded / blocked) and must not drift with the theme. */
+    --st-bg-status-ok: #4fae6b;
+    --st-bg-status-warn: #c9a34f;
+}
+
+/* Panel body spacing lives on the host's own .inline-drawer-content, which the host's
+   delegated handler animates with jQuery slideToggle(). Two consequences:
+     1. We must NOT set `display` on that element — the host's slideToggle() reads it to
+        decide the direction, so an extension-written `display` inverts the animation and
+        makes the drawer un-collapsible.
+     2. `flex` + `gap` are therefore unavailable; block-level children plus margin-bottom
+        give the same single-column spacing without touching any animated property. */
+.st-bgloader-panel .inline-drawer-content {
+    padding-top: 10px;
+}
+
+.st-bgloader-panel .inline-drawer-content > .st-bgloader-section {
+    margin-bottom: 12px;
+}
+
+.st-bgloader-panel .inline-drawer-content > .st-bgloader-section:last-child {
+    margin-bottom: 0;
 }
 
 .st-bgloader-section {
@@ -117,19 +140,27 @@
     display: flex;
     flex-direction: column;
     justify-content: flex-end;
-    transition: transform 0.15s, border-color 0.15s;
+    transition: border-color 0.15s;
 }
 
 .st-bgloader-media-card:hover {
-    transform: scale(1.02);
     border-color: var(--SmartThemeQuoteColor, #4fa3d1);
 }
 
+/* Selection is expressed with a border + a tinted fill + an accented title, never a glow:
+   native ST thumbnails mark the selected background the same way (border/overlay), and a
+   glow reads as a non-native button effect. The fixed-rgba line is the color-mix fallback. */
 .st-bgloader-media-card.active {
     border: 2px solid var(--SmartThemeQuoteColor, #4fa3d1);
-    /* Glow follows the accent color; the fixed rgba line is the color-mix fallback. */
-    box-shadow: 0 0 8px rgba(79, 163, 209, 0.5);
-    box-shadow: 0 0 8px color-mix(in srgb, var(--SmartThemeQuoteColor, #4fa3d1) 50%, transparent);
+    background: rgba(79, 163, 209, 0.18);
+    background: color-mix(in srgb, var(--SmartThemeQuoteColor, #4fa3d1) 18%, var(--SmartThemeBlurTintColor, #1e1e24));
+}
+
+/* The title bar keeps its fixed dark backdrop, so an accent-colored label stays readable on
+   both light and dark themes without hardcoding a foreground color. */
+.st-bgloader-media-card.active .st-bgloader-media-card-title {
+    color: var(--SmartThemeQuoteColor, #4fa3d1);
+    font-weight: 600;
 }
 
 .st-bgloader-media-badge {
@@ -218,7 +249,9 @@
 }
 
 /* Mini Player Capsule — the capsule keeps its own dark-glass look on every theme
-   (theme-neutral by design): fixed dark rgba backdrop with light text is intentional. */
+   (theme-neutral by design): fixed dark rgba backdrop with light text is intentional.
+   No box-shadow at all (user decision, 2026-09-26): the boundary is carried entirely by
+   the border, whose contrast is raised to compensate for the removed elevation shadow. */
 .st-bg-mini-player {
     position: fixed;
     bottom: 20px;
@@ -250,16 +283,14 @@
     background: rgba(20, 20, 28, 0.75);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.25);
     color: #fff;
     font-size: 0.85em;
-    transition: transform 0.2s, box-shadow 0.2s;
+    transition: border-color 0.2s;
 }
 
 .st-bg-mini-capsule:hover {
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.6);
-    border-color: rgba(255, 255, 255, 0.3);
+    border-color: rgba(255, 255, 255, 0.45);
 }
 
 .st-bg-mini-btn {
@@ -272,12 +303,11 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: color 0.15s, transform 0.15s;
+    transition: color 0.15s;
 }
 
 .st-bg-mini-btn:hover {
     color: var(--SmartThemeQuoteColor, #4fa3d1);
-    transform: scale(1.1);
 }
 
 .st-bg-mini-play {
@@ -333,4 +363,147 @@
 
 .st-bgloader-btn-row button {
     flex: 1;
+}
+
+/* ---------------------------------------------------------------------------
+   Layout utilities
+   ---------------------------------------------------------------------------
+   These exist so SettingsDrawer's template does not carry structural inline
+   styles (P3-10). Inline styles are reserved for *dynamic values* the template
+   must interpolate (slider values, `selected`, `checked`) and for the two
+   elements JS toggles at runtime (`#st_trigger_form`, `#st_bgloader_grid` empty
+   states) — everything structural lives here instead.
+   --------------------------------------------------------------------------- */
+
+/* Vertical stack of checkbox/toggle rows */
+.st-bgloader-check-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+/* One checkbox + label row */
+.st-bgloader-check {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+}
+
+/* A nested/indented option belonging to the check above it */
+.st-bgloader-check-sub {
+    margin-left: 18px;
+    font-size: 0.9em;
+    opacity: 0.85;
+}
+
+/* Inline checkbox row with a slight top offset (cloud / agent tools area) */
+.st-bgloader-check-inline {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.9em;
+    margin-top: 6px;
+}
+
+/* A check row that leads a group of controls (extra breathing room below) */
+.st-bgloader-check-lead {
+    margin-bottom: 8px;
+}
+
+/* Section-internal separator */
+.st-bgloader-divider {
+    margin-top: 10px;
+    border-top: 1px solid var(--SmartThemeBorderColor, rgba(255, 255, 255, 0.08));
+    padding-top: 8px;
+}
+
+/* Small top gaps for a control that follows another one. Two variants so the original
+   6px / 8px values are preserved exactly rather than rounded to one value. */
+.st-bgloader-gap-top {
+    margin-top: 6px;
+}
+
+.st-bgloader-gap-top-md {
+    margin-top: 8px;
+}
+
+/* Preset/scene control row labels. 90px is the default width; the two narrower
+   variants below override it. */
+.st-bgloader-preset-row > label {
+    font-size: 0.9em;
+    flex: 0 0 90px;
+}
+
+.st-bgloader-preset-row > label.st-bgloader-label-sm {
+    flex: 0 0 60px;
+}
+
+.st-bgloader-preset-row > label.st-bgloader-label-md {
+    flex: 0 0 80px;
+}
+
+/* Full-width button */
+.st-bgloader-btn-full {
+    width: 100%;
+}
+
+/* Label-left / value-right row (cache usage) */
+.st-bgloader-row-between {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+/* Multi-line status text (storage / Authority panel) */
+.st-bgloader-status-text {
+    font-size: 0.9em;
+    line-height: 1.6;
+}
+
+/* Status colours are semantic and must read identically on every theme, so they
+   are fixed values declared once here rather than following the theme. */
+.st-bgloader-status-ok {
+    color: var(--st-bg-status-ok);
+}
+
+.st-bgloader-status-warn {
+    color: var(--st-bg-status-warn);
+}
+
+/* Centred empty-state placeholder (trigger list) */
+.st-bgloader-empty {
+    text-align: center;
+    opacity: 0.6;
+    padding: 8px;
+}
+
+/* Centred empty-state placeholder spanning the whole media grid */
+.st-bgloader-empty-grid {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 20px;
+    opacity: 0.6;
+}
+
+/* Permanently hidden control (hidden file inputs). JS calls .click() on these,
+   it never toggles their display — unlike #st_trigger_form, whose display is
+   driven at runtime and therefore stays inline. */
+.st-bgloader-hidden {
+    display: none;
+}
+
+/* Dropzone glyph */
+.st-bgloader-dropzone > i {
+    margin-bottom: 6px;
+    opacity: 0.7;
+}
+
+/* One trigger rule: enable toggle + description on the left, delete on the right */
+.st-bgloader-trigger-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
 }
