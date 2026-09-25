@@ -1,0 +1,13 @@
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "UI 代码标准与三套件运行命令/目标地址——审查判定与回归验证的基准"}
+{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "子系统类约定（构造注入、destroy 契约、A/B 双缓冲）——G1/G2/G6 审查判定基准"}
+{"file": ".trellis/spec/frontend/state-management.md", "reason": "设置扇出 + 事件总线约定——审查设置流与 UI 一致性"}
+{"file": ".trellis/spec/frontend/type-safety.md", "reason": "严格 TS + 中央类型模块 + cast 边界——B3 合规扫描与 as any 计数基线"}
+{"file": ".trellis/spec/backend/error-handling.md", "reason": "两级错误 + 有界等待契约——L1-MR-7 审查判定的 spec 依据"}
+{"file": ".trellis/spec/backend/database-guidelines.md", "reason": "三层持久化边界（服务器源端/浏览器缓存/localStorage）——G3 审查判定基准"}
+{"file": ".trellis/spec/backend/logging-guidelines.md", "reason": "日志标签与级别用法——P2 日志噪音判定的基准"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "测试门禁与实例隔离约定——Phase A/D/E 验证门禁依据"}
+{"file": ".trellis/spec/backend/directory-structure.md", "reason": "src/backend/ 层定位与桥接层集中原则——架构一致性审查基准"}
+{"file": ".trellis/spec/frontend/directory-structure.md", "reason": "模块组织与文件布局——架构一致性审查基准"}
+{"file": ".trellis/spec/frontend/hook-guidelines.md", "reason": "事件总线（代替 hooks）约定——审查订阅清理与扇出"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "跨层数据流思考清单——G1 装配与 G3/G4 边界审查的思维框架"}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "重复模式识别——P2 冗余重复代码判定的思维框架"}

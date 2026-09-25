@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "E2E/authority/stress 三套件门禁与 UI 代码标准——检查修复是否达标"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "测试门禁与实例隔离——检查验证命令与目标地址合规"}
+{"file": ".trellis/spec/backend/error-handling.md", "reason": "有界等待与降级契约——检查 P1/P2 修复未破坏错误路径"}
+{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "destroy 契约与构造注入——检查修复未破坏子系统生命周期"}
+{"file": ".trellis/spec/frontend/type-safety.md", "reason": "cast 边界——检查修复未新增越界 as any"}
