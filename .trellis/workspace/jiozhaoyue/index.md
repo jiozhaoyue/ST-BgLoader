@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 15
+- **Total Sessions**: 16
 - **Last Active**: 2026-09-25
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~419 | Active |
+| `journal-1.md` | ~441 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 16 | 2026-09-25 | P3 改进批：体检遗留 12 项全部实施 + shell 纪律进 spec | `491b71e` | `master` |
 | 15 | 2026-09-25 | 全仓全面体检：27 文件审查 + 14 项 P1/P2 修复 + UI 优化 | `a0f99d3` | `master` |
 | 7 | 2026-09-06 | Add Ambient Sound, Frosted Glass, Scenes and Shortcuts | - | `master` |
 | 6 | 2026-09-06 | Full-Power Modular Expansion and Project Wiki | - | `master` |

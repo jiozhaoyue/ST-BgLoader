@@ -417,3 +417,25 @@ Added procedural WebAudio ambient soundscape synthesizer, frosted glass transpar
 ### Status
 
 [OK] **Completed**
+
+
+## Session 16: P3 改进批：体检遗留 12 项全部实施 + shell 纪律进 spec
+<!-- trellis-session: v=2 fp=2120d83e6b34ac0e -->
+
+**Date**: 2026-09-25
+**Task**: P3 改进批：体检遗留 12 项全部实施 + shell 纪律进 spec
+**Branch**: `master`
+
+### Summary
+
+上一任务 findings 的 14 项 P3 全部闭环：12 项实施（设置深合并 mergeSettings、init 兜底 catch、SceneManager 懒创建、三处观察者 30s 放弃上限、pulse/视差分层 pump 包裹层、manifest 写单飞、postMessage origin 收紧、徽章色面板作用域变量化、正则编译缓存、网格签名守卫、播放列表去重、设置写前冲突检测 onRemoteNewer→reconcileRemoteConflict）+ AudioEngine 事件改多播（删单槽脆弱链）；P3-10 内联样式清理与 P3-9 双事件源去重明确保持 open（外观/行为变更裁定）。新增 spec/guides/trellis-shell-discipline.md（pre-shell hook 相对路径失联坑、恢复垫片、预防纪律），guides 索引更新。回归零失败：tsc ✓ build 170.84KB ✓ e2e 24/24 ✓ stress 4/4×2 ✓ authority 18/18 真后端 ✓ CSS 门禁 0 ✓ Dev 冒烟 5/5（深合并补默认、DOM 分层、写者分离、正则缓存安全、零插件报错）。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `491b71e` | feat: P3 改进批——体检遗留 12 项全部实施 + shell 纪律进 spec |
+
+### Status
+
+[OK] **Completed**
