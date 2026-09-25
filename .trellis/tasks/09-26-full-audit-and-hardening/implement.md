@@ -4,38 +4,59 @@
 
 ## Phase A：激活与基线
 
-- [ ] A1 任务激活（`task.py start`；**须在子任务 1 提交之后**）
-- [ ] A2 基线：`git status` 干净、`npm run type-check && npm run build` 绿
-- [ ] A3 基线三套件留档
+- [x] A1 任务激活（`task.py start`；**须在子任务 1 提交之后**）
+- [x] A2 基线：`git status` 干净、`npm run type-check && npm run build` 绿
+- [x] A3 基线三套件留档
 
 ## Phase B：复核种子发现
 
-- [ ] B1 复核 A1（Alt+B 隐藏后切背景不显示）——Dev 实例复现并留证
-- [ ] B2 复核 A2（虚拟项持久化后丢失）——留证
-- [ ] B3 复核 A3（原生缩略图点击双写）——留证
-- [ ] B4 复核 B1–B5（半接线字段）——交叉引用确认
-- [ ] B5 复核 C1–C7（死代码）——交叉引用确认
-- [ ] B6 复核 D1–D3（一致性）、E1–E3（性能）、F1–F2（安全/边界）
-- [ ] B7 复核结论写入 `research/findings.md`（确认/推翻各有结论）
+- [x] B1 复核 A1（Alt+B 隐藏后切背景不显示）——Dev 实例复现并留证
+- [x] B2 复核 A2（虚拟项持久化后丢失）——留证
+- [x] B3 复核 A3（原生缩略图点击双写）——留证
+- [x] B4 复核 B1–B5（半接线字段）——交叉引用确认
+- [x] B5 复核 C1–C7（死代码）——交叉引用确认
+- [x] B6 复核 D1–D3（一致性）、E1–E3（性能）、F1–F2（安全/边界）
+- [x] B7 复核结论写入 `research/findings.md`（确认/推翻各有结论）
 
 ## Phase C：补齐全模块扫描
 
-- [ ] C1 core/（MediaMount、ParallaxController、SceneManager、ShortcutManager、mediaType、sanitize）
-- [ ] C2 renderers/（Video、Iframe、Image）
-- [ ] C3 audio/（AudioEngine、AmbientSoundGenerator）
-- [ ] C4 fx/ + visualizer/
-- [ ] C5 ui/（SettingsDrawer、MiniPlayer、FrostedGlassController、NativeBgAugmenter）——**只记录不修改**（视觉归子任务 1、接管归子任务 3）
-- [ ] C6 cache/ + backend/（CacheManager、ServerOrigin、ServerSettings、SettingsSync、AuthorityBridge、AgentBridge、RemoteImporter）
-- [ ] C7 api/ + triggers/ + types/ + index.ts
-- [ ] C8 全部发现按 P0–P4 分级写入 `research/findings.md`
+- [x] C1 core/（MediaMount、ParallaxController、SceneManager、ShortcutManager、mediaType、sanitize）
+- [x] C2 renderers/（Video、Iframe、Image）
+- [x] C3 audio/（AudioEngine、AmbientSoundGenerator）
+- [x] C4 fx/ + visualizer/
+- [x] C5 ui/（SettingsDrawer、MiniPlayer、FrostedGlassController、NativeBgAugmenter）——**只记录不修改**（视觉归子任务 1、接管归子任务 3）
+- [x] C6 cache/ + backend/（CacheManager、ServerOrigin、ServerSettings、SettingsSync、AuthorityBridge、AgentBridge、RemoteImporter）
+- [x] C7 api/ + triggers/ + types/ + index.ts
+- [x] C8 全部发现按 P0–P4 分级写入 `research/findings.md`
 
 ## Phase D：产出裁剪候选清单
 
-- [ ] D1 `research/prune-candidates.md` 落盘：死字段 / 半接线 / 死代码 / 重复真源 / 一致性 / 重复逻辑 六组
-- [ ] D2 每条含：建议（保留/合并/砍掉）、理由、影响面、成本（S/M/L）、是否影响用户数据
-- [ ] D3 `PublicAPI` 对外方法统一标注「保留（契约）」并注明文档出处
-- [ ] D4 文首明确标注「**待用户批准，本轮不执行任何删除**」
-- [ ] D5 **交付用户逐项拍板**
+- [x] D1 `research/prune-candidates.md` 落盘：死字段 / 半接线 / 死代码 / 重复真源 / 一致性 / 重复逻辑 六组
+- [x] D2 每条含：建议（保留/合并/砍掉）、理由、影响面、成本（S/M/L）、是否影响用户数据
+- [x] D3 `PublicAPI` 对外方法统一标注「保留（契约）」并注明文档出处
+- [x] D4 文首明确标注「**待用户批准，本轮不执行任何删除**」
+- [x] D5 **交付用户逐项拍板**
+
+
+## 执行记录（Phase A–D）
+
+- **Phase A** 完成。任务激活于子任务 1 提交之后。
+- **Phase B 复核结论（重要修正）**：
+  - A1 **确认成立**（实测：Alt+B 隐藏后切背景，图层已渲染且 opacity=1 但容器仍 `display:none`；奇偶次 Alt+B 相消）。
+  - A2 **确认成立**（实测：`setBackground(url)` 不带 `saveToLibrary` 时把 `custom_<ts>` 写进持久化的 `activeMediaId`，该 id 无法解析；且 `init()` 不自愈）。
+  - A3 **确认成立但范围修正**：原生 `/api/backgrounds/all` 实测返回 **27 项、非图片 0 项**，故「非图片双写」的原设想不成立；实际受影响集合是原生网格中**被判为非 `image` 类型**的条目，当前仅 `.svg`（`detectMediaType('.svg') === 'svg'`）。实测点击 SVG 缩略图：宿主改写 `#bg1` 的 `background-image` **且** 扩展同时切换自身背景 → 双写成立。
+  - B1–B5 / C1–C7 / D1–D3 / E1–E3 **交叉引用确认**（证据见 `research/findings.md`）。
+  - F2 **核验为非问题**：ST 的扩展启停/更新一律 `location.reload()`（`extensions.js:479/496/1325`），不存在原地重载导致监听器翻倍的路径 → 降级为防御性候选。
+  - **C8 新增**：`NativeBgAugmenter` 在当前宿主上只对 `.svg` 生效（原生网格 27 项全为图片扩展名，其中 3 个 `.svg` 命中）→ 其面向 video/audio/html 的功能面在现实中为零。
+  - **A5 新增（本次体检新发现）**：三套设置存储并存，KV 与服务端文档的 revision **互相独立且量级悬殊（实测 41 vs 202）**，而 `SettingsSync.start()` **无条件**套用 KV 镜像 → 启动时陈旧 KV 会覆盖服务端文档已修正的状态（实测症状：服务端已是 `null`，运行态仍复活悬空的 `custom_` id）。
+  - **A4** 由子任务 1 转交（见 `research/findings-from-child1.md`）。
+- **Phase C** 完成：按模块（core / renderers / audio / fx+visualizer / ui / cache+backend / api+triggers+types+index）扫描；种子之外新增 C8、A5 两项。`ui/` 只记录不修改（视觉归子任务 1、接管归子任务 3），已遵守。
+- **Phase D** 完成：`research/prune-candidates.md` 落盘，含 11 个待用户拍板的决策点、每组统一口径、逐项建议/理由/影响面/成本/数据影响，并显式标注「本轮不执行任何删除」。
+
+### Phase B–D 期间的实例侧副作用（已复原）
+
+- A2 复核留下悬空 `activeMediaId` → 已跨**三套存储**清理并实测三方一致（`localStorage` / 服务端文档 / KV 镜像均为 `null`）。
+- 探针在服务端 `backgrounds/` 留下了 `visual-check*.svg` 与既有 e2e/stress 产物（`test-animation*.html` 等）。**未擅自删除这些文件**——删除属不可逆操作，已列入待用户确认事项。
 
 ## Phase E：实施 P0/P1 修复
 
