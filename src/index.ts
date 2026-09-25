@@ -32,6 +32,7 @@ export class STBgLoaderExtension {
     private cacheManager: CacheManager;
     private audioEngine: AudioEngine;
     private mediaMount: MediaMount;
+    private overlaysMounted = false;
     private settingsDrawer: SettingsDrawer | null = null;
     private nativeAugmenter: NativeBgAugmenter | null = null;
     private miniPlayer: MiniPlayer | null = null;
@@ -42,7 +43,9 @@ export class STBgLoaderExtension {
     private ambientSoundGenerator: AmbientSoundGenerator;
     private frostedGlassController: FrostedGlassController;
     private sceneManager: SceneManager;
-    private shortcutManager: ShortcutManager;
+    // Lazy: the constructor registers a window keydown listener, so creating a throwaway
+    // instance here would leak an orphan listener when init() replaces it.
+    private shortcutManager: ShortcutManager | null = null;
     private authorityBridge: AuthorityBridge = new AuthorityBridge();
     private settingsSync: SettingsSync | null = null;
     private agentBridge: AgentBridge | null = null;
@@ -51,7 +54,7 @@ export class STBgLoaderExtension {
     constructor() {
         this.cacheManager = new CacheManager();
         this.audioEngine = new AudioEngine();
-        this.mediaMount = new MediaMount(this.audioEngine);
+        this.mediaMount = new MediaMount(this.audioEngine, (container) => this.mountOverlays(container));
         this.atmosphereFX = new AtmosphereFX();
         this.audioVisualizer = new AudioVisualizer();
         this.parallaxController = new ParallaxController();
@@ -59,7 +62,6 @@ export class STBgLoaderExtension {
         this.ambientSoundGenerator = new AmbientSoundGenerator();
         this.frostedGlassController = new FrostedGlassController();
         this.sceneManager = new SceneManager();
-        this.shortcutManager = new ShortcutManager();
         this.publicApi = new PublicAPI(this);
     }
 
@@ -75,7 +77,7 @@ export class STBgLoaderExtension {
     public getAmbientSoundGenerator(): AmbientSoundGenerator { return this.ambientSoundGenerator; }
     public getFrostedGlassController(): FrostedGlassController { return this.frostedGlassController; }
     public getSceneManager(): SceneManager { return this.sceneManager; }
-    public getShortcutManager(): ShortcutManager { return this.shortcutManager; }
+    public getShortcutManager(): ShortcutManager | null { return this.shortcutManager; }
     public getAuthorityBridge(): AuthorityBridge { return this.authorityBridge; }
     public getServerSettings(): ServerSettings { return this.serverSettings; }
     public getAPI(): PublicAPI { return this.publicApi; }
@@ -108,17 +110,10 @@ export class STBgLoaderExtension {
         this.mediaMount.setInteractive(this.settings.interactiveBackground);
         this.mediaMount.setTransition(this.settings.transitionEffect, this.settings.transitionDurationMs);
 
-        // 3. Mount FX & Controllers to host
-        const hostEl = this.mediaMount.getHostElement() || document.querySelector('#bg1') as HTMLElement;
-        const containerEl = this.mediaMount.getContainerElement();
-
-        if (hostEl) {
-            this.atmosphereFX.mount(hostEl);
-            this.audioVisualizer.mount(hostEl, containerEl || undefined);
-        }
-        if (containerEl) {
-            this.parallaxController.attach(containerEl);
-        }
+        // 3. Mount FX & Controllers to host — happens via MediaMount's onHostReady callback
+        //    (immediately when #bg1 exists at init, or when the DOM observer finds it later),
+        //    so a late-appearing host no longer leaves FX/visualizer/parallax unmounted.
+        this.mountOverlaysIfHostReady();
 
         // Apply subsystem configurations
         this.atmosphereFX.setWeather(this.settings.weather);
@@ -237,7 +232,7 @@ export class STBgLoaderExtension {
                 this.publicApi.setFrostedChat(!current);
             },
         });
-        this.shortcutManager.setEnabled(this.settings.shortcutsEnabled);
+        this.shortcutManager?.setEnabled(this.settings.shortcutsEnabled);
 
         // 9. Setup Settings Drawer
         this.settingsDrawer = new SettingsDrawer(this.settings, this.cacheManager, {
@@ -366,6 +361,25 @@ export class STBgLoaderExtension {
         }
     }
 
+    /** Mounted-once guard for the onHostReady callback path (idempotent across late hosts). */
+    private mountOverlaysIfHostReady(): void {
+        const containerEl = this.mediaMount.getContainerElement();
+        if (containerEl) {
+            this.mountOverlays(containerEl);
+        }
+    }
+
+    private mountOverlays(containerEl: HTMLElement): void {
+        if (this.overlaysMounted) return;
+        this.overlaysMounted = true;
+        const hostEl = this.mediaMount.getHostElement();
+        if (hostEl) {
+            this.atmosphereFX.mount(hostEl);
+            this.audioVisualizer.mount(hostEl, containerEl);
+        }
+        this.parallaxController.attach(containerEl);
+    }
+
     private applySettingsToSubsystems(): void {
         this.mediaMount.applyFilters(this.settings.filters);
         this.mediaMount.setInteractive(this.settings.interactiveBackground);
@@ -379,7 +393,7 @@ export class STBgLoaderExtension {
         this.parallaxController.setOptions(this.settings.parallax);
         this.ambientSoundGenerator.setSound(this.settings.ambientSound);
         this.frostedGlassController.setOptions(this.settings.frostedChat);
-        this.shortcutManager.setEnabled(this.settings.shortcutsEnabled);
+        this.shortcutManager?.setEnabled(this.settings.shortcutsEnabled);
         this.triggerManager.setRules(this.settings.triggerRules || []);
         this.sceneManager.setUserScenes(this.settings.scenes || {});
         this.syncAgentTools();

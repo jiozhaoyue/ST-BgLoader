@@ -1,5 +1,6 @@
 import { AudioEngine } from '../audio/AudioEngine';
 import { PlaybackMode } from '../types';
+import { escapeHtml } from '../core/sanitize';
 
 export class MiniPlayer {
     private container: HTMLElement | null = null;
@@ -43,7 +44,7 @@ export class MiniPlayer {
                 <button class="st-bg-mini-btn" id="st_mini_next" title="Next Track">
                     <i class="fa-solid fa-forward-step"></i>
                 </button>
-                <div class="st-bg-mini-track" id="st_mini_title" title="${trackTitle}">${trackTitle}</div>
+                <div class="st-bg-mini-track" id="st_mini_title" title="${escapeHtml(trackTitle)}">${escapeHtml(trackTitle)}</div>
                 <button class="st-bg-mini-btn st-bg-mini-mode" id="st_mini_mode" title="Mode: ${mode}">
                     <i class="fa-solid ${this.getModeIcon(mode)}"></i>
                 </button>

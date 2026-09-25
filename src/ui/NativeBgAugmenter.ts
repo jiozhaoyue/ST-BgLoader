@@ -1,4 +1,5 @@
 import { MediaType } from '../types';
+import { detectMediaType } from '../core/mediaType';
 
 export class NativeBgAugmenter {
     private observer: MutationObserver | null = null;
@@ -32,7 +33,7 @@ export class NativeBgAugmenter {
         items.forEach((item) => {
             item.setAttribute('data-st-bg-augmented', 'true');
             const bgFile = item.getAttribute('bgfile') || '';
-            const type = this.detectType(bgFile);
+            const type = detectMediaType(bgFile);
 
             if (type !== 'image') {
                 const badge = document.createElement('span');
@@ -47,15 +48,6 @@ export class NativeBgAugmenter {
                 });
             }
         });
-    }
-
-    private detectType(filename: string): MediaType {
-        const ext = filename.split('.').pop()?.toLowerCase() || '';
-        if (['mp4', 'webm', 'mov', 'ogv'].includes(ext)) return 'video';
-        if (['mp3', 'wav', 'ogg', 'flac'].includes(ext)) return 'audio';
-        if (['html', 'htm'].includes(ext)) return 'html';
-        if (ext === 'svg') return 'svg';
-        return 'image';
     }
 
     public stop(): void {

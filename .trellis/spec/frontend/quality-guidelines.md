@@ -51,3 +51,22 @@ all 24 pass.
 - The settings drawer is keyboard-reachable through SillyTavern's UI; media overlays are
   decorative and `aria-hidden` semantics are not yet systematically applied. Do not make
   this worse; improve when touching the drawer anyway.
+
+---
+
+## HTML injection & shared string utilities (added 2026-09-25 full audit)
+
+- Every user-controlled string interpolated into an `innerHTML` template (media/file
+  names, trigger rule names/patterns, remote URLs — remote-reference items keep the raw
+  URL as their display name) MUST go through `escapeHtml()` from `src/core/sanitize.ts`.
+  Found and fixed: trigger list, media grid, and mini-player title interpolated raw.
+- Media type detection lives ONLY in `src/core/mediaType.ts` (`detectMediaType(name,
+  mimeType?)`). It was duplicated in five files whose extension lists had drifted
+  (NativeBgAugmenter mislabeled m4v/aac/m4a as images); do not re-create local copies.
+- Long imports (file upload, external URL download up to the 60s timeout) must show a
+  busy state and report failure (`SettingsDrawer.setImportBusy` + toastr; before the
+  audit a failed import died as an unhandled rejection with zero UI feedback).
+- High-frequency settings writes are trailing-debounced (~300ms): slider `input` events
+  update labels/subsystems in realtime but persist settings through the debounce
+  (`SettingsDrawer` bindSlider), otherwise each drag step stringifies and writes
+  localStorage synchronously.

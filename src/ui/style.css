@@ -42,6 +42,12 @@
     background: rgba(255, 255, 255, 0.08);
 }
 
+/* Import in progress (large upload / slow external URL) */
+.st-bgloader-dropzone.busy {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
 .st-bgloader-url-import {
     display: flex;
     gap: 8px;
@@ -96,7 +102,7 @@
     position: relative;
     border-radius: 6px;
     overflow: hidden;
-    background: #1e1e24;
+    background: var(--SmartThemeBlurTintColor, #1e1e24);
     border: 1px solid var(--SmartThemeBorderColor, #333);
     cursor: pointer;
     aspect-ratio: 16 / 9;
@@ -113,7 +119,9 @@
 
 .st-bgloader-media-card.active {
     border: 2px solid var(--SmartThemeQuoteColor, #4fa3d1);
+    /* Glow follows the accent color; the fixed rgba line is the color-mix fallback. */
     box-shadow: 0 0 8px rgba(79, 163, 209, 0.5);
+    box-shadow: 0 0 8px color-mix(in srgb, var(--SmartThemeQuoteColor, #4fa3d1) 50%, transparent);
 }
 
 .st-bgloader-media-badge {
@@ -129,6 +137,9 @@
     text-transform: uppercase;
 }
 
+/* Media-type badge colors are semantic (video=red, audio=purple, ...) and deliberately
+   NOT theme variables: they must stay readable on every theme and not drift with it.
+   Same for the black-alpha overlays below — theme-neutral frosted layers. */
 .st-bgloader-media-badge.video { background: #e53935; }
 .st-bgloader-media-badge.audio { background: #8e24aa; }
 .st-bgloader-media-badge.html { background: #fb8c00; }
@@ -152,7 +163,7 @@
     height: 20px;
     border-radius: 50%;
     background: rgba(0, 0, 0, 0.6);
-    color: #ff5252;
+    color: var(--SmartThemeEmColor, #ff5252);
     border: none;
     cursor: pointer;
     display: flex;
@@ -199,7 +210,8 @@
     color: inherit;
 }
 
-/* Mini Player Capsule */
+/* Mini Player Capsule — the capsule keeps its own dark-glass look on every theme
+   (theme-neutral by design): fixed dark rgba backdrop with light text is intentional. */
 .st-bg-mini-player {
     position: fixed;
     bottom: 20px;

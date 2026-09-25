@@ -21,12 +21,17 @@ export class MediaMount {
     private audioEngine: AudioEngine;
     private observer: MutationObserver | null = null;
     private crossfadeTimer: number | null = null;
+    private onHostReady: ((container: HTMLElement) => void) | null;
+    // Serializes concurrent mounts (rapid media double-click): interleaved mounts would
+    // both write the same target layer and race activeLayer bookkeeping.
+    private mountQueue: Promise<void> = Promise.resolve();
 
     private transitionType: TransitionType = 'fade';
     private transitionDurationMs: number = 400;
 
-    constructor(audioEngine: AudioEngine) {
+    constructor(audioEngine: AudioEngine, onHostReady?: (container: HTMLElement) => void) {
         this.audioEngine = audioEngine;
+        this.onHostReady = onHostReady ?? null;
     }
 
     public setTransition(type: TransitionType, durationMs: number = 400): void {
@@ -110,6 +115,7 @@ export class MediaMount {
         this.observer = new MutationObserver(() => this.syncFitting());
         this.observer.observe(this.hostEl, { attributes: true, attributeFilter: ['class'] });
         this.syncFitting();
+        this.onHostReady?.(container);
     }
 
     private setupLayerStyle(layer: HTMLElement): void {
@@ -148,7 +154,14 @@ export class MediaMount {
         // Fitted via CSS cover/contain
     }
 
-    public async mountMedia(item: MediaItem, mediaUrl: string): Promise<void> {
+    public mountMedia(item: MediaItem, mediaUrl: string): Promise<void> {
+        const run = () => this.doMountMedia(item, mediaUrl);
+        // A failed mount must not poison the queue for the next caller.
+        this.mountQueue = this.mountQueue.then(run, run);
+        return this.mountQueue;
+    }
+
+    private async doMountMedia(item: MediaItem, mediaUrl: string): Promise<void> {
         if (!this.containerEl || !this.layerA || !this.layerB) return;
 
         // Cancel pending crossfade and finalize previous state immediately

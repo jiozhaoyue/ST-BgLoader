@@ -46,3 +46,21 @@ media type; do not mount outside the layer system.
   via `setOptions(...)` — never reach into another subsystem's DOM.
 - `setOptions` implementations must not clear styles they do not own (a visualizer
   once wiped `style.filter` set by the filter engine — caught by the E2E suite).
+
+---
+
+## Lazy construction & idempotent mounting (added 2026-09-25 full audit)
+
+- A subsystem whose constructor binds window listeners must NOT be instantiated
+  speculatively: `index.ts` used to create a throwaway `ShortcutManager` (keydown bound
+  in its constructor) and replace it in `init()` — the orphan listener leaked forever.
+  Fields holding such subsystems are `| null = null` and built once in `init()`.
+- Entry points that can be invoked concurrently must serialize themselves:
+  `MediaMount.mountMedia` queues through a promise chain — two interleaved mounts would
+  both target the same layer and race the A/B bookkeeping.
+- Overlay mounting routes through `MediaMount`'s `onHostReady` callback with a
+  mounted-once guard in `index.ts` (`mountOverlays`): when `#bg1` appears after plugin
+  init, FX/visualizer/parallax still mount exactly once (previously they never mounted
+  on that path).
+- `ParallaxController.enable()` is reentrancy-guarded by `listenerAttached` — the
+  attach and setOptions paths may both run.

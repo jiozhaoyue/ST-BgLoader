@@ -17,6 +17,7 @@ import {
     SceneSnapshot,
 } from '../types';
 import type { STBgLoaderExtension } from '../index';
+import { detectMediaType } from '../core/mediaType';
 
 export interface BackgroundOptions {
     type?: MediaType;
@@ -34,6 +35,9 @@ export interface AudioOptions {
 }
 
 export type EventCallback = (...args: any[]) => void;
+
+/** Runtime whitelist mirroring the WeatherType union (see src/types). */
+const WEATHER_TYPES: WeatherType[] = ['off', 'rain', 'snow', 'sakura', 'cyber_motes', 'scanlines'];
 
 export class PublicAPI {
     private ext: STBgLoaderExtension;
@@ -53,7 +57,7 @@ export class PublicAPI {
 
         if (!targetItem) {
             const name = options?.name || urlOrId.split('/').pop()?.split('?')[0] || 'remote_background';
-            const type = options?.type || this.detectType(urlOrId);
+            const type = options?.type || detectMediaType(urlOrId);
 
             if (options?.saveToLibrary) {
                 targetItem = await this.ext.getCacheManager().saveMedia(new Blob([]), name, type, 'url', urlOrId);
@@ -226,6 +230,14 @@ export class PublicAPI {
             };
         } else {
             opts = { ...typeOrOptions };
+        }
+
+        // External callers (agent tools, third-party scripts) are not bound by the TS union;
+        // a bogus type would otherwise be persisted and leave the FX loop spinning on a
+        // type no renderer knows.
+        if (!WEATHER_TYPES.includes(opts.type)) {
+            console.warn(`[ST-BgLoader PublicAPI] Ignored invalid weather type "${String(opts.type)}".`);
+            return;
         }
 
         this.ext.getSettings().weather = opts;
@@ -504,14 +516,5 @@ export class PublicAPI {
                 console.error(`[ST-BgLoader PublicAPI] Error in listener for "${event}":`, err);
             }
         });
-    }
-
-    private detectType(url: string): MediaType {
-        const ext = url.split('.').pop()?.toLowerCase().split('?')[0] || '';
-        if (['mp4', 'webm', 'mov', 'm4v', 'ogv'].includes(ext)) return 'video';
-        if (['mp3', 'wav', 'ogg', 'flac', 'aac', 'm4a'].includes(ext)) return 'audio';
-        if (ext === 'html' || ext === 'htm') return 'html';
-        if (ext === 'svg') return 'svg';
-        return 'image';
     }
 }

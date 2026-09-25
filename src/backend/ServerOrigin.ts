@@ -1,4 +1,5 @@
 import { MediaItem, MediaSource, MediaType } from '../types';
+import { detectMediaType } from '../core/mediaType';
 
 const MANIFEST_NAME = 'st-bg-loader-manifest.json';
 const MANIFEST_VERSION = 1;
@@ -114,7 +115,7 @@ export class ServerOrigin {
             if (response.ok) {
                 const data = await response.json() as { images?: { filename: string }[] };
                 for (const img of data.images ?? []) {
-                    const type = detectType(img.filename);
+                    const type = detectMediaType(img.filename);
                     items.set(img.filename, {
                         id: 'native_' + img.filename,
                         name: img.filename,
@@ -334,15 +335,6 @@ export class ServerOrigin {
     }
 }
 
-function detectType(filename: string): MediaType {
-    const ext = filename.split('.').pop()?.toLowerCase() || '';
-    if (['mp4', 'webm', 'mov', 'm4v', 'ogv'].includes(ext)) return 'video';
-    if (['mp3', 'wav', 'ogg', 'flac', 'aac', 'm4a'].includes(ext)) return 'audio';
-    if (ext === 'html' || ext === 'htm') return 'html';
-    if (ext === 'svg') return 'svg';
-    return 'image';
-}
-
 export function guessMimeType(name: string, type: MediaType): string {
     const ext = name.split('.').pop()?.toLowerCase();
     switch (ext) {
@@ -369,5 +361,8 @@ export function guessMimeType(name: string, type: MediaType): string {
 }
 
 function sanitizeFilename(name: string): string {
-    return (name || 'media').replace(/[^a-zA-Z0-9._ -]/g, '_');
+    // \p{L}\p{N} keeps CJK/unicode names readable (an ASCII-only allowlist turned every
+    // Chinese filename into `______.mp4`); path separators, quotes and angle brackets
+    // still collapse to `_`.
+    return (name || 'media').replace(/[^\p{L}\p{N}._ -]/gu, '_');
 }

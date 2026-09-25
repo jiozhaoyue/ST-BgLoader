@@ -59,3 +59,21 @@
 - Rejecting with non-`Error` values; always `Error` with a message a maintainer can grep.
 - Letting a render/mount promise stay pending forever — tests will hang (this actually
   happened; see `tests/stress.mjs` test 3).
+
+---
+
+## AudioContext gesture unlocking (added 2026-09-25 full audit)
+
+- An `AudioContext` created before the first user gesture stays `suspended`, and
+  `resume()` outside a gesture handler is rejected. Any module that creates a context
+  lazily (e.g. saved "rain" settings on reload) MUST also bind an interaction unlock:
+  `AudioEngine.setupInteractionListener` (self-removing) and
+  `AmbientSoundGenerator.setupInteractionListener` (stays bound until the context is
+  actually `running`, then removes itself; `destroy()` cleans it up). Before the audit
+  the ambient generator had no unlock — saved rain/fire/wind was silently dead for the
+  whole session after a page reload.
+- External-facing API boundaries validate vocabulary values against a runtime whitelist,
+  not the TS union (`PublicAPI.setWeather` checks `WEATHER_TYPES`): agent tools and
+  third-party scripts bypass the type system (`String(a.type)` from the tool arguments),
+  and a bogus value would otherwise be persisted and leave the FX rAF loop spinning on a
+  type no renderer knows.

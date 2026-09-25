@@ -276,11 +276,7 @@ export class AuthorityBridge {
             if (localStorage.getItem(NOTICE_KEY)) return;
             localStorage.setItem(NOTICE_KEY, new Date().toISOString());
             const toastr = (window as unknown as { toastr?: { info(msg: string, title?: string): void } }).toastr;
-            if (reason === 'sdk-missing') {
-                toastr?.info(message, 'ST-BgLoader');
-            } else {
-                toastr?.info(message, 'ST-BgLoader');
-            }
+            toastr?.info(message, 'ST-BgLoader');
         } catch {
             // localStorage/toastr unavailable — console notice above is enough.
         }

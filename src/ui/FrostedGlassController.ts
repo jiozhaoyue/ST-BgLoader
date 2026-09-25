@@ -39,14 +39,18 @@ export class FrostedGlassController {
 
     private updateCss(): void {
         if (!this.styleEl) return;
+        // Bubble tint follows the host theme (--SmartThemeBlurTintColor) with the opacity
+        // slider still applying via color-mix; the fixed rgba line is the fallback for
+        // browsers without color-mix. Both declarations share the !important layer.
         this.styleEl.textContent = `
             .st-bgloader-frosted-active #chat,
             .st-bgloader-frosted-active .mes_text,
             .st-bgloader-frosted-active .mes {
                 background: rgba(18, 18, 24, var(--st-frosted-opacity, 0.75)) !important;
+                background: color-mix(in srgb, var(--SmartThemeBlurTintColor, #121218) calc(var(--st-frosted-opacity, 0.75) * 100%), transparent) !important;
                 backdrop-filter: blur(var(--st-frosted-blur, 10px)) !important;
                 -webkit-backdrop-filter: blur(var(--st-frosted-blur, 10px)) !important;
-                border: 1px solid rgba(255, 255, 255, 0.12) !important;
+                border: 1px solid var(--SmartThemeBorderColor, rgba(255, 255, 255, 0.12)) !important;
                 box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25) !important;
                 transition: background 0.3s ease, backdrop-filter 0.3s ease !important;
             }

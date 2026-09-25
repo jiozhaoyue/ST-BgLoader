@@ -2,6 +2,7 @@ import { MediaItem, MediaType, MediaSource } from '../types';
 import { ServerOrigin, guessMimeType } from '../backend/ServerOrigin';
 import { RemoteImporter } from '../backend/RemoteImporter';
 import { AuthorityBridge } from '../backend/AuthorityBridge';
+import { detectMediaType } from '../core/mediaType';
 
 const CACHE_NAME = 'st-bg-cache-v1';
 const INDEX_DB_NAME = 'st_bg_cache_index';
@@ -173,12 +174,7 @@ export class CacheManager {
     }
 
     public detectMediaType(filename: string): MediaType {
-        const ext = filename.split('.').pop()?.toLowerCase() || '';
-        if (['mp4', 'webm', 'mov', 'm4v', 'ogv'].includes(ext)) return 'video';
-        if (['mp3', 'wav', 'ogg', 'flac', 'aac', 'm4a'].includes(ext)) return 'audio';
-        if (ext === 'html' || ext === 'htm') return 'html';
-        if (ext === 'svg') return 'svg';
-        return 'image';
+        return detectMediaType(filename);
     }
 
     public getMimeType(name: string, type: MediaType): string {

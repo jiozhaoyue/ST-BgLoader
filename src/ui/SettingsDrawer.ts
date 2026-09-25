@@ -18,6 +18,8 @@ import {
 } from '../types';
 import { CacheManager } from '../cache/CacheManager';
 import { AuthorityBridge } from '../backend/AuthorityBridge';
+import { escapeHtml } from '../core/sanitize';
+import { detectMediaType } from '../core/mediaType';
 
 export interface SettingsDrawerCallbacks {
     onSettingsChanged: (settings: BgLoaderSettings) => void;
@@ -364,6 +366,28 @@ export class SettingsDrawer {
                         <div class="st-bgloader-trigger-list" id="st_trigger_list">
                             <!-- Populated dynamically -->
                         </div>
+                        <div class="st-bgloader-trigger-form" id="st_trigger_form" style="display: none;">
+                            <div class="st-bgloader-preset-row">
+                                <label style="font-size: 0.9em; flex: 0 0 90px;">类型:</label>
+                                <select id="st_trigger_type">
+                                    <option value="character">角色名 (Character)</option>
+                                    <option value="chat">聊天 ID (Chat)</option>
+                                    <option value="regex">正则匹配 (Regex)</option>
+                                </select>
+                            </div>
+                            <div class="st-bgloader-preset-row">
+                                <label style="font-size: 0.9em; flex: 0 0 90px;">规则名:</label>
+                                <input type="text" id="st_trigger_name" placeholder="规则名称" />
+                            </div>
+                            <div class="st-bgloader-preset-row">
+                                <label style="font-size: 0.9em; flex: 0 0 90px;">匹配:</label>
+                                <input type="text" id="st_trigger_pattern" placeholder="角色名 / 聊天 ID / 正则表达式" />
+                            </div>
+                            <div class="st-bgloader-btn-row">
+                                <button id="st_trigger_confirm_btn" class="menu_button"><i class="fa-solid fa-check"></i> 添加规则</button>
+                                <button id="st_trigger_cancel_btn" class="menu_button">取消</button>
+                            </div>
+                        </div>
                         <button id="st_trigger_add_btn" class="menu_button" style="width: 100%;">
                             <i class="fa-solid fa-plus"></i> Add Scene Trigger Rule
                         </button>
@@ -639,6 +663,17 @@ export class SettingsDrawer {
         });
 
         // Visual Filter Sliders
+        // Realtime feedback (label + subsystem callbacks) fires on every input; persisting the
+        // whole settings object is trailing-debounced — every input event used to stringify and
+        // write localStorage synchronously (dozens of writes per drag).
+        let saveTimer: number | null = null;
+        const scheduleSettingsSave = () => {
+            if (saveTimer !== null) window.clearTimeout(saveTimer);
+            saveTimer = window.setTimeout(() => {
+                saveTimer = null;
+                this.callbacks.onSettingsChanged(this.settings);
+            }, 300);
+        };
         const bindSlider = (id: string, valId: string, unit: string, onChange: (val: number) => void) => {
             const slider = this.container!.querySelector(id) as HTMLInputElement;
             const label = this.container!.querySelector(valId);
@@ -646,7 +681,7 @@ export class SettingsDrawer {
                 const val = Number(slider.value);
                 if (label) label.textContent = `${val}${unit}`;
                 onChange(val);
-                this.callbacks.onSettingsChanged(this.settings);
+                scheduleSettingsSave();
             });
         };
 
@@ -665,7 +700,8 @@ export class SettingsDrawer {
 
         const weatherDensitySelect = this.container.querySelector('#st_weather_density') as HTMLSelectElement;
         weatherDensitySelect?.addEventListener('change', () => {
-            this.settings.weather.density = weatherDensitySelect.value as any;
+            // Select options are the fixed density vocabulary; narrow instead of `as any`.
+            this.settings.weather.density = weatherDensitySelect.value as WeatherOptions['density'];
             this.callbacks.onWeatherChanged?.(this.settings.weather);
             this.callbacks.onSettingsChanged(this.settings);
         });
@@ -815,9 +851,26 @@ export class SettingsDrawer {
             this.callbacks.onSettingsChanged(this.settings);
         });
 
-        // Smart Trigger Rule Add Button
+        // Smart Trigger Rule Add Button — toggles the inline form (three chained native
+        // prompts was the worst interaction in the drawer).
         this.container.querySelector('#st_trigger_add_btn')?.addEventListener('click', () => {
-            this.promptAddTriggerRule();
+            const form = this.container?.querySelector('#st_trigger_form') as HTMLElement | null;
+            if (form) {
+                const show = form.style.display === 'none';
+                form.style.display = show ? 'block' : 'none';
+                if (show) {
+                    (this.container?.querySelector('#st_trigger_name') as HTMLInputElement | null)?.focus();
+                }
+            }
+        });
+
+        this.container.querySelector('#st_trigger_cancel_btn')?.addEventListener('click', () => {
+            const form = this.container?.querySelector('#st_trigger_form') as HTMLElement | null;
+            if (form) form.style.display = 'none';
+        });
+
+        this.container.querySelector('#st_trigger_confirm_btn')?.addEventListener('click', () => {
+            this.addTriggerRuleFromForm();
         });
 
         // Clear Cache
@@ -866,13 +919,28 @@ export class SettingsDrawer {
         });
     }
 
-    private promptAddTriggerRule(): void {
-        const name = prompt('Enter rule name:');
-        if (!name) return;
-        const typeInput = prompt('Trigger type (character / chat / regex):', 'character')?.toLowerCase().trim();
-        const type = (typeInput === 'chat' || typeInput === 'regex') ? typeInput : 'character';
-        const pattern = prompt(`Enter ${type} matching pattern (e.g. Character name, Chat ID, or Regex text):`);
-        if (!pattern) return;
+    private addTriggerRuleFromForm(): void {
+        const nameInput = this.container?.querySelector('#st_trigger_name') as HTMLInputElement | null;
+        const patternInput = this.container?.querySelector('#st_trigger_pattern') as HTMLInputElement | null;
+        const typeSelect = this.container?.querySelector('#st_trigger_type') as HTMLSelectElement | null;
+        if (!nameInput || !patternInput || !typeSelect) return;
+
+        const name = nameInput.value.trim();
+        const pattern = patternInput.value.trim();
+        if (!name || !pattern) {
+            alert('规则名和匹配内容不能为空。');
+            return;
+        }
+
+        const type = typeSelect.value as TriggerRule['type'];
+        if (type === 'regex') {
+            try {
+                new RegExp(pattern, 'i');
+            } catch (err) {
+                alert(`正则表达式无效：${err instanceof Error ? err.message : String(err)}`);
+                return;
+            }
+        }
 
         const newRule: TriggerRule = {
             id: `rule_${Date.now()}`,
@@ -889,6 +957,11 @@ export class SettingsDrawer {
         this.settings.triggerRules.push(newRule);
         this.callbacks.onSettingsChanged(this.settings);
         this.refreshTriggerList();
+
+        nameInput.value = '';
+        patternInput.value = '';
+        const form = this.container?.querySelector('#st_trigger_form') as HTMLElement | null;
+        if (form) form.style.display = 'none';
     }
 
     public refreshTriggerList(): void {
@@ -909,8 +982,8 @@ export class SettingsDrawer {
                 <div style="display: flex; align-items: center; gap: 6px;">
                     <input type="checkbox" class="st-rule-toggle" ${rule.enabled ? 'checked' : ''} />
                     <div>
-                        <span class="st-bgloader-trigger-badge">${rule.type}</span>
-                        <strong>${rule.name}</strong>: <code>${rule.pattern}</code>
+                        <span class="st-bgloader-trigger-badge">${escapeHtml(rule.type)}</span>
+                        <strong>${escapeHtml(rule.name)}</strong>: <code>${escapeHtml(rule.pattern)}</code>
                     </div>
                 </div>
                 <button class="menu_button menu_button_danger st-rule-del" title="Delete"><i class="fa-solid fa-trash"></i></button>
@@ -968,7 +1041,7 @@ export class SettingsDrawer {
             card.innerHTML = `
                 <div class="st-bgloader-media-badge ${item.type}">${item.type}</div>
                 <button class="st-bgloader-media-delete" title="Delete"><i class="fa-solid fa-trash"></i></button>
-                <div class="st-bgloader-media-card-title" title="${item.name}">${item.name}</div>
+                <div class="st-bgloader-media-card-title" title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</div>
             `;
 
             // Card click to select media
@@ -1014,36 +1087,51 @@ export class SettingsDrawer {
     }
 
     private async handleFileUpload(file: File): Promise<void> {
-        const type = this.detectMediaType(file.name, file.type);
-        const item = await this.cacheManager.saveMedia(file, file.name, type, 'server');
-        await this.refreshMediaGrid();
-        await this.updateCacheStats();
-        this.callbacks.onMediaUploaded(item);
+        this.setImportBusy(true);
+        try {
+            const type = detectMediaType(file.name, file.type);
+            const item = await this.cacheManager.saveMedia(file, file.name, type, 'server');
+            await this.refreshMediaGrid();
+            await this.updateCacheStats();
+            this.callbacks.onMediaUploaded(item);
+        } catch (err) {
+            this.reportImportError(err);
+        } finally {
+            this.setImportBusy(false);
+        }
     }
 
     private async handleUrlImport(url: string): Promise<void> {
-        const filename = url.split('/').pop()?.split('?')[0] || 'remote_media';
-        const type = this.detectMediaType(filename);
-        const item = await this.cacheManager.saveMedia(new Blob([]), filename, type, 'url', url);
-        await this.refreshMediaGrid();
-        await this.updateCacheStats();
-        this.callbacks.onMediaUploaded(item);
+        this.setImportBusy(true);
+        try {
+            const filename = url.split('/').pop()?.split('?')[0] || 'remote_media';
+            const type = detectMediaType(filename);
+            const item = await this.cacheManager.saveMedia(new Blob([]), filename, type, 'url', url);
+            await this.refreshMediaGrid();
+            await this.updateCacheStats();
+            this.callbacks.onMediaUploaded(item);
+        } catch (err) {
+            this.reportImportError(err);
+        } finally {
+            this.setImportBusy(false);
+        }
     }
 
-    private detectMediaType(filename: string, mimeType: string = ''): MediaType {
-        const ext = filename.split('.').pop()?.toLowerCase() || '';
-        if (['mp4', 'webm', 'mov', 'm4v', 'ogv'].includes(ext) || mimeType.startsWith('video/')) {
-            return 'video';
+    /** Busy state for the import controls: a large upload or a slow external URL (up to the
+     *  60s download timeout) previously gave zero visual feedback. */
+    private setImportBusy(busy: boolean): void {
+        this.container?.querySelector('#st_bgloader_dropzone')?.classList.toggle('busy', busy);
+        const urlBtn = this.container?.querySelector('#st_bgloader_url_btn') as HTMLButtonElement | null;
+        if (urlBtn) {
+            urlBtn.disabled = busy;
+            urlBtn.textContent = busy ? 'Importing…' : 'Import URL';
         }
-        if (['mp3', 'wav', 'ogg', 'flac', 'aac', 'm4a'].includes(ext) || mimeType.startsWith('audio/')) {
-            return 'audio';
-        }
-        if (ext === 'html' || ext === 'htm') {
-            return 'html';
-        }
-        if (ext === 'svg') {
-            return 'svg';
-        }
-        return 'image';
+    }
+
+    private reportImportError(err: unknown): void {
+        console.error('[ST-BgLoader] Media import failed:', err);
+        const message = err instanceof Error ? err.message : String(err);
+        const toastr = (window as unknown as { toastr?: { error(msg: string, title?: string): void } }).toastr;
+        toastr?.error(`媒体导入失败：${message}`, 'ST-BgLoader');
     }
 }

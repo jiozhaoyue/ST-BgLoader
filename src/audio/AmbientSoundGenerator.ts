@@ -7,13 +7,45 @@ export class AmbientSoundGenerator {
     private lfoOsc: OscillatorNode | null = null;
     private isRunning = false;
     private crackleTimer: number | null = null;
+    private onInteract: (() => void) | null = null;
 
     private currentOptions: AmbientSoundOptions = {
         type: 'off',
         volume: 0.5,
     };
 
-    constructor() {}
+    constructor() {
+        this.setupInteractionListener();
+    }
+
+    /**
+     * A context created before the first user gesture stays suspended; unlike AudioEngine
+     * (which recreates its graph on interaction), the ambient context would stay silent for
+     * the whole session. Resume it on the first gestures until it is actually running.
+     */
+    private setupInteractionListener(): void {
+        const onInteract = () => {
+            if (!this.ctx) return;
+            if (this.ctx.state === 'suspended') {
+                this.ctx.resume().catch(() => {});
+            }
+            if (this.ctx.state === 'running') {
+                this.teardownInteractionListener();
+            }
+        };
+        this.onInteract = onInteract;
+        window.addEventListener('pointerdown', onInteract, { passive: true });
+        window.addEventListener('keydown', onInteract, { passive: true });
+        window.addEventListener('touchstart', onInteract, { passive: true });
+    }
+
+    private teardownInteractionListener(): void {
+        if (!this.onInteract) return;
+        window.removeEventListener('pointerdown', this.onInteract);
+        window.removeEventListener('keydown', this.onInteract);
+        window.removeEventListener('touchstart', this.onInteract);
+        this.onInteract = null;
+    }
 
     private initContext(): AudioContext | null {
         if (!this.ctx) {
@@ -191,6 +223,7 @@ export class AmbientSoundGenerator {
 
     public destroy(): void {
         this.stop();
+        this.teardownInteractionListener();
         if (this.ctx) {
             this.ctx.close().catch(() => {});
             this.ctx = null;

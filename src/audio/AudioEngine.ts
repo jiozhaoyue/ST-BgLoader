@@ -277,7 +277,9 @@ export class AudioEngine {
         if (this.playbackMode === 'single') {
             return;
         }
-        if (this.playlist.length > 1) {
+        // Loop/shuffle with a single track must replay too (element loop is only set for
+        // 'single' mode, so without this the music stops after one pass).
+        if (this.playlist.length >= 1) {
             this.playNext().catch(err => console.error(err));
         }
     }

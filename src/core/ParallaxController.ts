@@ -16,6 +16,7 @@ export class ParallaxController {
     private currentY = 0;
     private animFrameId: number | null = null;
     private isRunning = false;
+    private listenerAttached = false;
 
     constructor() {}
 
@@ -55,7 +56,10 @@ export class ParallaxController {
     };
 
     private enable(): void {
-        window.addEventListener('mousemove', this.onMouseMove, { passive: true });
+        if (!this.listenerAttached) {
+            window.addEventListener('mousemove', this.onMouseMove, { passive: true });
+            this.listenerAttached = true;
+        }
         if (this.targetEl) {
             this.targetEl.style.willChange = 'transform';
         }
@@ -63,7 +67,10 @@ export class ParallaxController {
     }
 
     private disable(): void {
-        window.removeEventListener('mousemove', this.onMouseMove);
+        if (this.listenerAttached) {
+            window.removeEventListener('mousemove', this.onMouseMove);
+            this.listenerAttached = false;
+        }
         if (this.animFrameId !== null) {
             cancelAnimationFrame(this.animFrameId);
             this.animFrameId = null;
