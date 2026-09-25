@@ -40,6 +40,16 @@
   false and the plugin degrades (`AuthorityBridge.getCapabilities()`,
   `RemoteImporter.import` throws a descriptive error that callers turn into a failed
   `PreloadResult` rather than a crash).
+- **Authority permissions are terminal verdicts (2026-09-25, live-backend integration):**
+  a permission evaluation (e.g. `agent.browser`) ends in granted / pending / blocked —
+  never hot-retry one. Undeclared resources are hard-blocked by the declaration gate
+  (declare exactly what is used: `agent: { browser: ['st-bgloader-main'] }`); pending
+  means the in-page authorization prompt is open (register backs off 2 min, the panel
+  says so); blocked backs off 5 min. The agent claim loop must not run before the
+  registration succeeded — claim evaluates the same permission and would stack an
+  authorization prompt every 2s. Honest capability reporting:
+  `AgentBridge.reportAgentToolsState → AuthorityCapabilities.agentToolsState/note`
+  (the optimistic init-time bit is corrected by the first real registration attempt).
 
 ---
 

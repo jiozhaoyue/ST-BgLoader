@@ -4,9 +4,17 @@
  * Media scenarios run against the REAL SillyTavern native endpoints of the test instance:
  * uploads must land in the server's backgrounds/ directory (same place as native backgrounds),
  * be served with HTTP Range, survive browser-cache clearing, and be visible from a fresh page
- * (manifest + native listing). Authority scenarios (settings sync, agent tool registration)
- * use an in-page mock SDK when no real Authority extension is installed; the mock steps aside
- * automatically when the real one is present. Skips (exit 0) when the instance is unreachable.
+ * (manifest + native listing).
+ *
+ * Authority scenarios run in the mode the instance offers, detected per page:
+ * - real backend (Authority extension installed): assertions read the real KV domain, grant the
+ *   agent.browser permission prompt when it appears (idempotent — persistent grant skips it), and
+ *   expect the bridge's honest capability verdict.
+ * - no real backend: an in-page mock SDK is injected instead (identical surface, Map-backed).
+ *
+ * Degradation coverage (S6) works in BOTH modes: on real-backend instances the page swallows the
+ * window.STAuthority assignment before extension scripts run, so the plugin exercises the same
+ * no-SDK degradation path a bare instance would take. Skips (exit 0) when the instance is unreachable.
  */
 import puppeteer from 'puppeteer-core';
 
@@ -35,8 +43,15 @@ function ok(name, condition, detail = '') {
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
 /** Injected before page scripts on Authority-enhanced pages; no-op if a real SDK is present. */
-function injectAuthorityMock() {
-    if (window.STAuthority) return; // real SDK wins
+/**
+ * Injected before page scripts. MUST stay fully self-contained: evaluateOnNewDocument
+ * serializes the function into a fresh page scope where Node-side bindings do not exist.
+ *
+ * lock=false: natural mock — no-op when a real SDK is already present (real SDK wins).
+ * lock=true (FORCE_MOCK): hold the window.STAuthority slot even against a real backend by
+ * swallowing its later assignment — keeps the mock path testable on an Authority instance.
+ */
+function injectAuthorityMockInPage(lock) {
     const kvStore = new Map();
     const calls = { registerTools: 0 };
     window.__authMockState = { kvStore, calls };
@@ -66,7 +81,8 @@ function injectAuthorityMock() {
         getSession: () => ({ user: 'default-user', mock: true }),
         getCapabilities: () => ({ mock: true }),
     };
-    window.STAuthority = {
+    const mock = {
+        __stbgMock: true, // lets the suite tell the mock from a real backend
         AuthoritySDK: {
             init: async (cfg) => {
                 window.__authMockInitConfig = cfg;
@@ -74,11 +90,44 @@ function injectAuthorityMock() {
             },
         },
     };
+    if (lock) {
+        try {
+            Object.defineProperty(window, 'STAuthority', {
+                configurable: false,
+                get: () => mock,
+                set: () => { /* real SDK assignment swallowed — FORCE_MOCK coverage */ },
+            });
+        } catch {
+            window.STAuthority = mock;
+        }
+    } else {
+        if (window.STAuthority) return; // real SDK wins
+        window.STAuthority = mock;
+    }
 }
 
-async function openPage(browser, { mock = false } = {}) {
+/**
+ * Injected before page scripts to simulate a bare instance on a real-backend host: the
+ * window.STAuthority assignment from the deployed SDK extension is swallowed, so the plugin
+ * takes the same sdk-missing degradation path an instance without Authority would.
+ */
+function injectAuthoritySuppressor() {
+    try {
+        Object.defineProperty(window, 'STAuthority', {
+            configurable: false,
+            get: () => undefined,
+            set: () => { /* swallowed — degradation coverage */ },
+        });
+    } catch {
+        // defineProperty refused — the page runs with the real backend; S6.1 would then be invalid.
+    }
+}
+
+async function openPage(browser, { mock = false, lockMock = false, hideAuthority = false } = {}) {
     const page = await browser.newPage();
-    if (mock) await page.evaluateOnNewDocument(injectAuthorityMock);
+    if (hideAuthority) await page.evaluateOnNewDocument(injectAuthoritySuppressor);
+    if (lockMock) await page.evaluateOnNewDocument(injectAuthorityMockInPage, true);
+    else if (mock) await page.evaluateOnNewDocument(injectAuthorityMockInPage, false);
     await page.goto(TARGET_URL, { waitUntil: 'domcontentloaded', timeout: 30000 });
     await page.waitForFunction(() => window.STBgLoader && window.STBgLoader.isInitialized, { timeout: 35000 });
     return page;
@@ -119,6 +168,9 @@ async function main() {
     });
 
     try {
+        // Backend mode, detected in S5 and reused by S6's degradation coverage.
+        let authorityMode = 'mock';
+
         // ============ S1: upload lands on the server, cataloged, cross-page visible ============
         let uploadedId = '';
         {
@@ -213,42 +265,110 @@ async function main() {
             await page.close();
         }
 
-        // ============ S5: Authority enhancement (mock): settings sync + agent tools ============
+        // ============ S5: Authority enhancement (real backend or mock): settings sync + agent tools ============
         {
-            const page = await openPage(browser, { mock: true });
+            // FORCE_MOCK=1 keeps the mock slot locked against a real backend — exercises the mock
+            // path on an Authority-installed instance; natural runs prefer the real backend.
+            const forceMock = process.env.FORCE_MOCK === '1';
+            const page = await openPage(browser, forceMock ? { mock: true, lockMock: true } : { mock: true });
+            const real = await page.evaluate(() => !!window.STAuthority && !window.STAuthority.__stbgMock);
             const caps = await page.evaluate(() => window.STBgLoader.getAuthorityBridge().getCapabilities());
-            ok('S5.1 Authority enhancement detected', caps.available === true && caps.sync === true && caps.agentTools === true);
+            // agentTools starts optimistic (true); a first-time authorization may leave it 'pending'.
+            const s51ok = real
+                ? caps.available === true && caps.sync === true && (caps.agentTools === true || caps.agentToolsState === 'pending')
+                : caps.available === true && caps.sync === true && caps.agentTools === true;
+            ok('S5.1 Authority enhancement detected', s51ok, real ? 'real backend' : 'mock backend');
 
-            const pushed = await page.evaluate(async () => {
-                window.STBgLoader.getSettings().volume = 0.33;
-                window.STBgLoader.saveSettings();
-                for (let i = 0; i < 10; i++) {
-                    await new Promise(r => setTimeout(r, 500));
-                    const payload = window.__authMockState.kvStore.get('settings:data');
-                    if (payload?.settings?.volume === 0.33) return true;
-                }
-                return false;
-            });
-            ok('S5.2 settings mirrored to Authority KV', pushed);
+            const originalAgentEnabled = await page.evaluate(() => window.STBgLoader.getSettings().agentToolsEnabled);
 
-            const agentOn = await page.evaluate(async () => {
+            if (real) {
+                // Real backend: the payload lands in the extension's isolated KV domain.
+                const pushed = await page.evaluate(async () => {
+                    window.STBgLoader.getSettings().volume = 0.33;
+                    window.STBgLoader.saveSettings();
+                    for (let i = 0; i < 30; i++) {
+                        await new Promise(r => setTimeout(r, 500));
+                        const client = window.STBgLoader.getAuthorityBridge().getClient();
+                        const payload = client ? await client.storage.kv.get('settings:data') : null;
+                        if (payload?.settings?.volume === 0.33) return true;
+                    }
+                    return false;
+                });
+                ok('S5.2 settings mirrored to Authority KV', pushed, 'real backend');
+            } else {
+                const pushed = await page.evaluate(async () => {
+                    window.STBgLoader.getSettings().volume = 0.33;
+                    window.STBgLoader.saveSettings();
+                    for (let i = 0; i < 10; i++) {
+                        await new Promise(r => setTimeout(r, 500));
+                        const payload = window.__authMockState.kvStore.get('settings:data');
+                        if (payload?.settings?.volume === 0.33) return true;
+                    }
+                    return false;
+                });
+                ok('S5.2 settings mirrored to Authority KV', pushed, 'mock backend');
+            }
+
+            if (real) {
+                const agentOn = await page.evaluate(async () => {
+                    const ext = window.STBgLoader;
+                    ext.getSettings().agentToolsEnabled = true;
+                    ext.saveSettings();
+                    ext.syncAgentTools();
+                    // First-ever registration opens the Authority permission prompt; grant it
+                    // persistently. With the grant already stored the prompt never appears and
+                    // the loop just expires (idempotent).
+                    for (let i = 0; i < 24; i++) {
+                        await new Promise(r => setTimeout(r, 500));
+                        const controls = [...document.querySelectorAll('.popup .result-control')];
+                        const allow = controls.find(b => (b.textContent || '').includes('始终允许'));
+                        if (allow) { allow.click(); break; }
+                    }
+                    // The bridge publishes the honest verdict of the registration attempt.
+                    for (let i = 0; i < 60; i++) {
+                        const c = ext.getAuthorityBridge().getCapabilities();
+                        if (c.agentToolsState === 'ok' || c.agentToolsState === 'blocked') {
+                            return { state: c.agentToolsState, note: c.agentToolsNote };
+                        }
+                        await new Promise(r => setTimeout(r, 1000));
+                    }
+                    return { state: 'timeout', note: 'registration verdict never landed' };
+                });
+                ok('S5.3 agent tools registered on enable (opt-in)', agentOn.state === 'ok',
+                    `state=${agentOn.state} ${agentOn.note || ''}`);
+            } else {
+                const agentOn = await page.evaluate(async () => {
+                    const ext = window.STBgLoader;
+                    ext.getSettings().agentToolsEnabled = true;
+                    ext.saveSettings();
+                    ext.syncAgentTools();
+                    for (let i = 0; i < 10; i++) {
+                        await new Promise(r => setTimeout(r, 300));
+                        if (window.__authMockState.calls.registerTools > 0) return true;
+                    }
+                    return false;
+                });
+                ok('S5.3 agent tools registered on enable (opt-in)', agentOn, `calls=${await page.evaluate(() => window.__authMockState.calls.registerTools)}`);
+            }
+
+            // Restore the pre-test agent switch (it persists to the server settings document).
+            await page.evaluate((wasEnabled) => {
                 const ext = window.STBgLoader;
-                ext.getSettings().agentToolsEnabled = true;
+                ext.getSettings().agentToolsEnabled = wasEnabled;
                 ext.saveSettings();
                 ext.syncAgentTools();
-                for (let i = 0; i < 10; i++) {
-                    await new Promise(r => setTimeout(r, 300));
-                    if (window.__authMockState.calls.registerTools > 0) return true;
-                }
-                return false;
-            });
-            ok('S5.3 agent tools registered on enable (opt-in)', agentOn, `calls=${await page.evaluate(() => window.__authMockState.calls.registerTools)}`);
+            }, originalAgentEnabled);
             await page.close();
+            // S6's degradation coverage must mimic a bare instance whenever the real backend is
+            // installed — including a FORCE_MOCK run, whose S5 page was mock but whose instance is not.
+            authorityMode = (real || forceMock) ? 'real' : 'mock';
         }
 
         // ============ S6: degradation without Authority keeps media fully working ============
         {
-            const page = await openPage(browser);
+            // On a real-backend instance the page suppresses window.STAuthority before extension
+            // scripts run, exercising the same sdk-missing degradation path a bare instance takes.
+            const page = await openPage(browser, { hideAuthority: authorityMode === 'real' });
             const caps = await page.evaluate(() => window.STBgLoader.getAuthorityBridge().getCapabilities());
             const media = await page.evaluate(async () => {
                 const items = await window.STBgLoader.cacheManager.listMedia();

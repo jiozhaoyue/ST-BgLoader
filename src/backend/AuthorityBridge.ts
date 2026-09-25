@@ -111,8 +111,22 @@ export interface AuthorityCapabilities {
     serverFetch: boolean;
     /** Agent ambient tools registration (agent.browser); gated separately by a user setting. */
     agentTools: boolean;
+    /** Real verdict of the agent.browser surface: 'unknown' until the first registration attempt. */
+    agentToolsState?: 'unknown' | 'ok' | 'blocked' | 'pending';
+    /** Human-readable note when agentToolsState is 'blocked' (permission/policy verdict). */
+    agentToolsNote?: string;
     degradedReason?: AuthorityDegradedReason;
     degradedMessage?: string;
+}
+
+/** Fixed browserInstanceId this extension registers its ambient tools under. */
+export const AGENT_BROWSER_INSTANCE = 'st-bgloader-main';
+
+/** Permission verdicts (AuthorityPermissionError) need an admin/Security Center change, not retries. */
+export function isAuthorityPermissionError(err: unknown): boolean {
+    if (err && typeof err === 'object' && (err as { name?: string }).name === 'AuthorityPermissionError') return true;
+    const message = err instanceof Error ? err.message : String(err);
+    return /permission|denied|forbidden|封锁/i.test(message);
 }
 
 const SETTINGS_CHANNEL = 'extension:third-party/ST-BgLoader';
@@ -132,10 +146,12 @@ export class AuthorityBridge {
         sync: false,
         serverFetch: false,
         agentTools: false,
+        agentToolsState: 'unknown',
         degradedReason: 'sdk-missing',
     };
     private httpAllow: string[] = [];
     private initPromise: Promise<AuthorityCapabilities> | null = null;
+    private capsListeners: Array<() => void> = [];
 
     public getCapabilities(): AuthorityCapabilities {
         return this.caps;
@@ -143,6 +159,34 @@ export class AuthorityBridge {
 
     public getClient(): AuthorityClientLike | null {
         return this.client;
+    }
+
+    /** Subscribers re-render UI (and re-gate feature wiring) when a capability verdict lands. */
+    public onCapabilitiesChanged(listener: () => void): void {
+        this.capsListeners.push(listener);
+    }
+
+    /**
+     * AgentBridge reports the real verdict of the agent.browser surface: the declaration gate can
+     * block it and a soft-default authorization can stay pending (in-page prompt), so the optimistic
+     * capability bit gets corrected here as soon as a verdict exists.
+     */
+    public reportAgentToolsState(state: 'ok' | 'blocked' | 'pending', note?: string): void {
+        if (!this.caps.available) return;
+        if (this.caps.agentToolsState === state && this.caps.agentToolsNote === note) return;
+        this.caps = { ...this.caps, agentTools: state === 'ok', agentToolsState: state, agentToolsNote: note };
+        if (state === 'blocked') console.warn('[ST-BgLoader] Agent ambient tools unavailable:', note);
+        this.notifyCapsChanged();
+    }
+
+    private notifyCapsChanged(): void {
+        for (const listener of this.capsListeners) {
+            try {
+                listener();
+            } catch {
+                // A broken listener must never take the bridge down.
+            }
+        }
     }
 
     public async detectAndInit(): Promise<AuthorityCapabilities> {
@@ -184,6 +228,9 @@ export class AuthorityBridge {
                     http: { allow: [...this.httpAllow] },
                     jobs: { background: ['delay', 'sql.backup'] },
                     events: { channels: [AuthorityBridge.CHANNEL] },
+                    // Undeclared resources hit the declaration gate (hard 'blocked') even when an
+                    // admin would grant them — declare exactly the one browser instance we register.
+                    agent: { browser: [AGENT_BROWSER_INSTANCE] },
                 },
             });
 
@@ -192,12 +239,13 @@ export class AuthorityBridge {
                 sync: true,
                 serverFetch: true,
                 agentTools: true,
+                agentToolsState: 'unknown',
             };
             console.log('[ST-BgLoader] Authority backend connected:', this.client.getSession());
             return this.caps;
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
-            const denied = /permission|denied|forbidden/i.test(message);
+            const denied = isAuthorityPermissionError(error);
             console.warn('[ST-BgLoader] Authority unavailable, falling back to local mode:', message);
             this.client = null;
             return this.degrade(
@@ -210,9 +258,10 @@ export class AuthorityBridge {
     private degrade(reason: AuthorityDegradedReason, message: string): AuthorityCapabilities {
         this.caps = {
             available: false,
-                sync: false,
+            sync: false,
             serverFetch: false,
             agentTools: false,
+            agentToolsState: 'unknown',
             degradedReason: reason,
             degradedMessage: message,
         };

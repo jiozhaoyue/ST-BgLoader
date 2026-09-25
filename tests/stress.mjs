@@ -8,7 +8,7 @@ const CHROME_PATH = process.env.PUPPETEER_EXECUTABLE_PATH
 
 const TARGET_URL = process.env.TEST_TARGET_URL
     || process.env.TARGET_URL
-    || 'http://localhost:8000';
+    || 'https://127.0.0.1:8003';
 
 async function runStressTests() {
     console.log('⚡ Starting Large File Streaming & Resilience Stress Tests on', TARGET_URL);

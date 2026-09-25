@@ -1,0 +1,2 @@
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "零回归门禁：三套件全绿标准与浏览器控制台无异常要求"}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "验收时核对测试命令与目标地址"}

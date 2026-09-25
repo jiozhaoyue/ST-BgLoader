@@ -1,4 +1,4 @@
-import { AuthorityClientLike } from './AuthorityBridge';
+import { AGENT_BROWSER_INSTANCE, AuthorityClientLike, isAuthorityPermissionError } from './AuthorityBridge';
 
 export interface AgentBrowserToolApi {
     registerTools(request: {
@@ -44,8 +44,28 @@ export interface AgentToolHost {
     applyScene(sceneId: string): boolean;
 }
 
+export type AgentToolsState = 'ok' | 'blocked' | 'pending';
+export type AgentToolsStateReporter = (state: AgentToolsState, note?: string) => void;
+
 const REGISTER_INTERVAL_MS = 30000;
 const CLAIM_INTERVAL_MS = 2000;
+/** Permission 'blocked' verdicts only change by an admin-side action; retrying every 30s is pure noise. */
+const PERMISSION_BACKOFF_MS = 5 * 60 * 1000;
+/**
+ * While an authorization prompt may be open in-page, re-registering stacks another prompt on top
+ * (register AND claim each trigger one per call) — stay quiet for this window instead.
+ */
+const PENDING_WINDOW_MS = 2 * 60 * 1000;
+/** Bounded wait for the registration round-trip (L1-MR-7: no await may hang forever). */
+const REGISTER_TIMEOUT_MS = 15000;
+
+/** Thrown by registerWithTimeout when the registration round-trip exceeds REGISTER_TIMEOUT_MS. */
+class AgentRegisterTimeoutError extends Error {
+    constructor() {
+        super('Agent tool registration timed out');
+        this.name = 'AgentRegisterTimeoutError';
+    }
+}
 
 const TOOL_DEFS = [
     {
@@ -117,6 +137,8 @@ const TOOL_DEFS = [
     },
 ] as const;
 
+export type AgentToolsOutcomeReporter = (ok: boolean, note?: string) => void;
+
 /**
  * Registers read-only ambiance tools into the Authority Agent Runtime via agent.browser,
  * claims pending invocations on a short lease, executes them against the public API, and
@@ -129,15 +151,25 @@ export class AgentBridge {
     private running = false;
     private pendingSubmit: { claimId: string; invocation: { runId: string; callId: string } } | null = null;
     private claimSeq = 0;
+    private reportedState: AgentToolsState | null = null;
+    private permissionBlockedUntil = 0;
+    private registerWaitUntil = 0;
+    private registerInFlight = false;
+    /** Claim calls evaluate the same agent.browser permission — never claim before registration succeeded. */
+    private registrationOk = false;
+    private warnedIssue = false;
 
     constructor(
         private client: AuthorityClientLike,
         private host: AgentToolHost,
+        private reportState: AgentToolsStateReporter = () => {},
     ) {}
 
     public start(): void {
         if (this.running) return;
         this.running = true;
+        this.permissionBlockedUntil = 0;
+        this.registerWaitUntil = 0;
         void this.register();
         this.claimLoop();
         this.registerTimer = window.setInterval(() => void this.register(), REGISTER_INTERVAL_MS);
@@ -149,6 +181,8 @@ export class AgentBridge {
         if (this.registerTimer !== null) window.clearInterval(this.registerTimer);
         this.timer = null;
         this.registerTimer = null;
+        this.reportedState = null;
+        this.registrationOk = false;
     }
 
     private agentApi(): AgentBrowserToolApi | null {
@@ -157,27 +191,82 @@ export class AgentBridge {
     }
 
     private async register(): Promise<void> {
-        if (!this.running) return;
+        if (!this.running || this.registerInFlight) return;
+        if (Date.now() < this.permissionBlockedUntil || Date.now() < this.registerWaitUntil) return;
+        this.registerInFlight = true;
         try {
             const api = this.agentApi();
             if (!api) return;
-            await api.registerTools({
-                browserInstanceId: 'st-bgloader-main',
-                leaseDurationMs: REGISTER_INTERVAL_MS * 2,
-                tools: TOOL_DEFS.map(t => ({
-                    id: t.id,
-                    title: t.title,
-                    description: t.description,
-                    inputSchema: t.inputSchema,
-                    riskLevel: 'low',
-                    approvalPolicy: 'never',
-                    mutatesWorkspace: false,
-                })),
-            });
+            await this.registerWithTimeout(api);
+            this.permissionBlockedUntil = 0;
+            this.registerWaitUntil = 0;
+            this.registrationOk = true;
+            this.warnedIssue = false;
+            this.publishState('ok');
             console.log('[ST-BgLoader] Agent ambient tools registered.');
         } catch (err) {
-            console.warn('[ST-BgLoader] Agent tool registration failed (will retry):', err);
+            this.registrationOk = false;
+            if (isAuthorityPermissionError(err)) {
+                // A permission verdict will not lift by retrying quickly; back off and pick up an
+                // admin-side change (Security Center) on the next slow retry.
+                this.permissionBlockedUntil = Date.now() + PERMISSION_BACKOFF_MS;
+                this.publishState('blocked', err instanceof Error ? err.message : String(err));
+                this.warnOnce('Agent tool registration blocked by permission policy '
+                    + '(retrying every 5 min — adjust in Authority Security Center if intended):', err);
+            } else if (err instanceof AgentRegisterTimeoutError) {
+                // Most likely an authorization prompt is open in-page waiting for the user; do not
+                // stack more prompts on top — stay quiet, report pending, retry after the window.
+                this.registerWaitUntil = Date.now() + PENDING_WINDOW_MS;
+                this.publishState('pending', '等待 agent.browser 授权（若页面出现 Authority 权限弹窗请处理；稍后自动重试）');
+                this.warnOnce('Agent tool registration is waiting for permission (check the Authority prompt / Security Center):', err);
+            } else {
+                console.warn('[ST-BgLoader] Agent tool registration failed (will retry):', err);
+            }
+        } finally {
+            this.registerInFlight = false;
         }
+    }
+
+    private warnOnce(message: string, err: unknown): void {
+        if (!this.warnedIssue) {
+            this.warnedIssue = true;
+            console.warn(`[ST-BgLoader] ${message}`, err);
+        } else {
+            console.debug(`[ST-BgLoader] ${message}`);
+        }
+    }
+
+    private async registerWithTimeout(api: AgentBrowserToolApi): Promise<unknown> {
+        let timeoutHandle: number | undefined;
+        const timeout = new Promise<never>((_, reject) => {
+            timeoutHandle = window.setTimeout(() => reject(new AgentRegisterTimeoutError()), REGISTER_TIMEOUT_MS);
+        });
+        try {
+            return await Promise.race([
+                api.registerTools({
+                    browserInstanceId: AGENT_BROWSER_INSTANCE,
+                    leaseDurationMs: REGISTER_INTERVAL_MS * 2,
+                    tools: TOOL_DEFS.map(t => ({
+                        id: t.id,
+                        title: t.title,
+                        description: t.description,
+                        inputSchema: t.inputSchema,
+                        riskLevel: 'low',
+                        approvalPolicy: 'never',
+                        mutatesWorkspace: false,
+                    })),
+                }),
+                timeout,
+            ]);
+        } finally {
+            if (timeoutHandle !== undefined) window.clearTimeout(timeoutHandle);
+        }
+    }
+
+    private publishState(state: AgentToolsState, note?: string): void {
+        if (this.reportedState === state) return;
+        this.reportedState = state;
+        this.reportState(state, note);
     }
 
     private claimLoop(): void {
@@ -190,6 +279,9 @@ export class AgentBridge {
     private async claimOnce(): Promise<void> {
         const api = this.agentApi();
         if (!api || !this.running) return;
+        // Claim evaluates the same agent.browser permission as register; before a grant exists it
+        // would open one authorization prompt every 2 seconds. Only claim a working registration.
+        if (!this.registrationOk) return;
 
         try {
             // Finish reporting a previous invocation first (idempotent per claimId).
@@ -199,7 +291,7 @@ export class AgentBridge {
             }
 
             const claimId = `stbg-claim-${Date.now()}-${this.claimSeq++}`;
-            const response = await api.claim({ browserInstanceId: 'st-bgloader-main', claimId });
+            const response = await api.claim({ browserInstanceId: AGENT_BROWSER_INSTANCE, claimId });
             const invocation = response.invocation;
             if (!invocation) return;
 
@@ -214,7 +306,7 @@ export class AgentBridge {
             if (error) {
                 await api.submitResult({
                     runId: invocation.runId, callId: invocation.callId, claimId,
-                    browserInstanceId: 'st-bgloader-main', status: 'failed', error,
+                    browserInstanceId: AGENT_BROWSER_INSTANCE, status: 'failed', error,
                 });
                 return;
             }
@@ -222,7 +314,7 @@ export class AgentBridge {
             try {
                 await api.submitResult({
                     runId: invocation.runId, callId: invocation.callId, claimId,
-                    browserInstanceId: 'st-bgloader-main', status: 'completed', result,
+                    browserInstanceId: AGENT_BROWSER_INSTANCE, status: 'completed', result,
                 });
             } catch {
                 // Keep the claim pending so the next tick retries the report idempotently.
@@ -243,7 +335,7 @@ export class AgentBridge {
         if (!api) return;
         await api.submitResult({
             runId: invocation.runId, callId: invocation.callId, claimId,
-            browserInstanceId: 'st-bgloader-main', status, error,
+            browserInstanceId: AGENT_BROWSER_INSTANCE, status, error,
         });
     }
 

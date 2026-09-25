@@ -334,6 +334,7 @@ export class STBgLoaderExtension {
         });
 
         // 11.5 Cross-device settings sync (Authority cloud mirror; no-op in local mode)
+        this.authorityBridge.onCapabilitiesChanged(() => this.settingsDrawer?.updateCloudPanel());
         await this.startSettingsSync();
         this.syncAgentTools();
 
@@ -386,12 +387,15 @@ export class STBgLoaderExtension {
 
     /** Opt-in Agent Runtime ambient tools (AI director mode); requires the cloud backend. */
     public syncAgentTools(): void {
-        const caps = this.authorityBridge.getCapabilities();
         const client = this.authorityBridge.getClient();
-        const want = caps.agentTools && this.settings.agentToolsEnabled && !!client;
+        // Gated by the user setting only: caps.agentTools is an outcome report (may be blocked by
+        // policy after start), not a pre-known fact — the bridge corrects it via reportAgentToolsOutcome.
+        const want = this.settings.agentToolsEnabled && !!client;
 
         if (want && !this.agentBridge && client) {
-            this.agentBridge = new AgentBridge(client, this.buildAgentHost());
+            this.agentBridge = new AgentBridge(client, this.buildAgentHost(), (state, note) => {
+                this.authorityBridge.reportAgentToolsState(state, note);
+            });
             this.agentBridge.start();
             console.log('[ST-BgLoader] Agent ambient tools enabled.');
         } else if (!want && this.agentBridge) {

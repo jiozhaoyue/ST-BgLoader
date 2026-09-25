@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "测试门禁与实例启动约定（TEST_TARGET_URL=8003、零回归标准、authority 套件行为）"}
+{"file": ".trellis/spec/backend/error-handling.md", "reason": "有界等待与降级契约——真后端联调涉及错误分类处置（AuthorityApiError 分类、一次性降级提示）"}
+{"file": ".trellis/spec/backend/directory-structure.md", "reason": "src/backend/ 层定位与源端/缓存/设置三层边界，联调改动不得越过层界"}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "E2E/authority/stress 三套件运行命令与目标地址（https://127.0.0.1:8003）"}

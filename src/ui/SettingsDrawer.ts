@@ -418,7 +418,13 @@ export class SettingsDrawer {
 
         const caps = this.authority?.getCapabilities();
         let authorityLine: string;
-        if (caps?.available) {
+        if (caps?.available && caps.agentToolsState === 'blocked') {
+            authorityLine = '<span style="color:#4fae6b;">● Authority 增强已连接</span>：设置/场景跨端同步 ✓ · CORS 服务端导入 ✓ · '
+                + '<span style="color:#c9a34f;">Agent 氛围工具被权限策略封锁</span>（管理员可在 Authority Security Center 调整）';
+        } else if (caps?.available && caps.agentToolsState === 'pending') {
+            authorityLine = '<span style="color:#4fae6b;">● Authority 增强已连接</span>：设置/场景跨端同步 ✓ · CORS 服务端导入 ✓ · '
+                + '<span style="color:#c9a34f;">Agent 氛围工具等待授权</span>（处理页面上的 Authority 权限弹窗，或到 Security Center 查看）';
+        } else if (caps?.available) {
             authorityLine = '<span style="color:#4fae6b;">● Authority 增强已连接</span>：设置/场景跨端同步 ✓ · Agent 氛围工具可用 · CORS 服务端导入 ✓';
         } else {
             authorityLine = '<span style="color:#c9a34f;">● 未检测到 Authority</span>：媒体功能不受影响（源端始终在服务端），仅跨端同步与 Agent 工具不可用。';
