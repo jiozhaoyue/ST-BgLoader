@@ -395,3 +395,25 @@ Added procedural WebAudio ambient soundscape synthesizer, frosted glass transpar
 [OK] 完成，提交推送并归档
 
 
+
+
+## Session 15: 全仓全面体检：27 文件审查 + 14 项 P1/P2 修复 + UI 优化
+<!-- trellis-session: v=2 fp=30cfe5940b480a5d -->
+
+**Date**: 2026-09-25
+**Task**: 全仓全面体检：27 文件审查 + 14 项 P1/P2 修复 + UI 优化
+**Branch**: `master`
+
+### Summary
+
+全仓体检任务收口：27 个源文件（约 6800 行）逐文件精读 + 机械扫描三通道，产出分级清单 5 P1 / 9 P2 / 14 P3（findings.md 带行号证据与修复回填）。P1/P2 全部当场修复：mountMedia promise 链串行化、ShortcutManager 懒创建消孤儿 window 监听、loop 模式单曲续播、环境音 AudioContext 交互唤醒、innerHTML 注入全量转义（新增 core/sanitize.ts）、滑块设置写去抖、sanitizeFilename Unicode 保留中文名、硬编码色主题化（var + color-mix 双声明回退）、setWeather 运行时白名单、媒体类型检测五合一（新增 core/mediaType.ts）、触发规则三连 prompt 改内联表单、导入 busy 态 + toastr 错误反馈、MediaMount onHostReady 回调（#bg1 延迟出现也可挂载 FX）、视差 enable 防重入。教训沉淀三篇 spec（error-handling / component / quality-guidelines）。回归零失败：tsc ✓、build 165.39KB、e2e 24/24、stress 4/4×2、authority 18/18 真后端、CSS 裸选择器门禁 0；Dev 冒烟六项过（挂载幂等/表单/转义/校验/busy/零插件报错——页面 3 条错误定性为宿主其他扩展噪音）。子代理交叉复核因供应商不可用降级为主脑二次核验（F1/F5 两处修正）。P3 清单含方案与成本待用户决策。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `a0f99d3` | fix: 全仓体检 P1/P2 修复（竞态/泄漏/注入/音频续播）+ UI 体验优化 |
+
+### Status
+
+[OK] **Completed**
