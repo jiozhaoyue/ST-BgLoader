@@ -19,6 +19,7 @@ This directory contains guidelines for frontend development. Fill in each file w
 | [Hook Guidelines](./hook-guidelines.md) | N/A (no framework): settings fan-out + event bus | Filled |
 | [State Management](./state-management.md) | settings object, cloud mirror, media library pointers | Filled |
 | [Quality Guidelines](./quality-guidelines.md) | E2E bar, UI code standards | Filled |
+| [Host-Native UI](./host-native-ui.md) | Stay indistinguishable from the host: use its seams (drawer/theme vars/menu_button), no glow, inline-style policy | Filled |
 | [Type Safety](./type-safety.md) | strict config, central type module, cast boundaries | Filled |
 
 ---
