@@ -476,3 +476,27 @@ Added procedural WebAudio ambient soundscape synthesizer, frosted glass transpar
 ### Next Steps
 
 - 进入子任务 2（全仓体检 + 健壮性 + 裁剪候选清单，清单交付用户逐项拍板）
+
+
+## Session 18: 体检子任务 2 收尾：G2 性能量化 + G6 冒烟 + 归档
+<!-- trellis-session: v=2 fp=ae07c6bc4bd13fe1 -->
+
+**Date**: 2026-09-26
+**Task**: 体检子任务 2 收尾：G2 性能量化 + G6 冒烟 + 归档
+**Branch**: `master`
+
+### Summary
+
+全仓体检与健壮性加固（子任务 2）收尾。三套件在当前 HEAD 重跑全绿（e2e 24/24 · stress 4/4 · authority 18/18，真后端）。新增 probe-perf-e1-e2.mjs 量化 E1/E2：TTL 窗口内 20 次目录调用 → 0 次网络请求（基线 20）；12 次热路径调用 → 0 次全量 IDB 读（基线 12）；TTL 过期后恰好 1 次请求，证明是短时缓存。E2-2 记 SKIP（零写入前提取不到证据，拒绝 preloadUrl 写实例，改以源级证据替代）。新增 probe-smoke-g6.mjs 真实点击 DOM 冒烟 16/16：抽屉开合、切背景、可见性勾选框、迷你播放器、pulse+视差同开，末尾逐项复原并断言。G7/G8 静态核对通过（style.css 相对子任务1定稿仅 +10/-0；唯一删除文件为 ShortcutManager.ts，删行全在获批清单内）。留痕一处探针残留事故：G6 首次运行抛错致 Dev 实例 backgroundVisible 残留 false，且下一次运行把它读作初始值而固化，已用 probe-cleanup-g6residue.mjs 设回并读回确认——教训固化为 quality-guidelines.md 的 Probe hygiene 章节。另订正 2 处与持久化改造同源的表述失真（spec 与 SettingsDrawer 仍写「可见性不持久化」），PRD 验收 9 项回填并附实证，其中删除类判据按用户裁定改写。任务已归档。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `067483a` | docs(spec): 可见性真源订正 + 探针纪律入规范 |
+| `48d156e` | test+docs(audit): Phase G 收尾验证 + 全项复选框回填 |
+| `589785f` | docs(prd): 回填验收标准 + 修订已被用户裁定取代的硬约束 |
+
+### Status
+
+[OK] **Completed**

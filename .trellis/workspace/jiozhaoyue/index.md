@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 17
+- **Total Sessions**: 18
 - **Last Active**: 2026-09-26
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~478 | Active |
+| `journal-1.md` | ~502 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 18 | 2026-09-26 | 体检子任务 2 收尾：G2 性能量化 + G6 冒烟 + 归档 | `067483a`, `48d156e`, `589785f` | `master` |
 | 17 | 2026-09-26 | 子任务 1：折叠修复 + 去溢光 + 原生风格对齐（P3-10 结项） | `ceb9eec`, `6486550`, `8d2f322`, `2023a25` | `master` |
 | 16 | 2026-09-25 | P3 改进批：体检遗留 12 项全部实施 + shell 纪律进 spec | `491b71e` | `master` |
 | 15 | 2026-09-25 | 全仓全面体检：27 文件审查 + 14 项 P1/P2 修复 + UI 优化 | `a0f99d3` | `master` |
