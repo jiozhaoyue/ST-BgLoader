@@ -85,6 +85,20 @@ export interface PreloadResult {
  */
 export const WEATHER_TYPES = ['off', 'rain', 'snow', 'sakura', 'cyber_motes', 'scanlines'] as const;
 export type WeatherType = (typeof WEATHER_TYPES)[number];
+
+/**
+ * Display names for the weather vocabulary. Co-located with WEATHER_TYPES and typed as a total
+ * Record so adding a type without a label is a compile error — the settings dropdown used to be
+ * a fourth, hand-maintained copy of the list and would silently drift.
+ */
+export const WEATHER_LABELS: Record<WeatherType, string> = {
+    off: 'Off (关闭天气)',
+    rain: 'Rain (细雨微涟)',
+    snow: 'Snow (冬日飘雪)',
+    sakura: 'Sakura (落樱缤纷)',
+    cyber_motes: 'Cyber Motes (赛博霓虹微粒)',
+    scanlines: 'Scanlines (复古CRT扫描线)',
+};
 export type VisualizerMode = 'off' | 'pulse' | 'spectrum';
 export type TransitionType = 'fade' | 'zoom_fade' | 'blur_fade' | 'slide_left' | 'slide_right';
 
@@ -145,6 +159,11 @@ export interface BgLoaderSettings {
     activePresetId: string;
     userPresets: Record<string, VisualFilters>;
     interactiveBackground: boolean;
+    /**
+     * Whether the background layer is shown. Persisted since 2026-09-26: it replaced the Alt+B
+     * shortcut, and a panel checkbox that silently forgot its state on reload felt broken.
+     */
+    backgroundVisible: boolean;
     showMiniPlayer: boolean;
     capsuleOnPlayOnly: boolean;
     playbackMode: PlaybackMode;
@@ -293,6 +312,7 @@ export const DEFAULT_SETTINGS: BgLoaderSettings = {
     activePresetId: 'default',
     userPresets: {},
     interactiveBackground: false,
+    backgroundVisible: true,
     showMiniPlayer: true,
     capsuleOnPlayOnly: true,
     playbackMode: 'loop',

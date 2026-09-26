@@ -29,7 +29,14 @@ const C = {
     name: "Monochrome (黑白极简)",
     filters: { blur: 0, brightness: 100, opacity: 100, saturate: 0 }
   }
-}, T = ["off", "rain", "snow", "sakura", "cyber_motes", "scanlines"];
+}, S = ["off", "rain", "snow", "sakura", "cyber_motes", "scanlines"], pe = {
+  off: "Off (关闭天气)",
+  rain: "Rain (细雨微涟)",
+  snow: "Snow (冬日飘雪)",
+  sakura: "Sakura (落樱缤纷)",
+  cyber_motes: "Cyber Motes (赛博霓虹微粒)",
+  scanlines: "Scanlines (复古CRT扫描线)"
+};
 function $(l) {
   return typeof l == "object" && l !== null && !Array.isArray(l);
 }
@@ -104,6 +111,7 @@ const I = {
   activePresetId: "default",
   userPresets: {},
   interactiveBackground: !1,
+  backgroundVisible: !0,
   showMiniPlayer: !0,
   capsuleOnPlayOnly: !0,
   playbackMode: "loop",
@@ -150,11 +158,11 @@ const te = "st-bg-loader-manifest.json", A = 1;
 function v(l) {
   return `backgrounds/${encodeURIComponent(l)}`;
 }
-const pe = /* @__PURE__ */ new Set(["favicon.ico"]);
+const me = /* @__PURE__ */ new Set(["favicon.ico"]);
 function D(l) {
-  return !!l && pe.has(l.toLowerCase());
+  return !!l && me.has(l.toLowerCase());
 }
-function E() {
+function M() {
   try {
     const e = window.SillyTavern?.getContext?.().getRequestHeaders?.({ omitContentType: !0 });
     return e ? { ...e } : {};
@@ -162,7 +170,7 @@ function E() {
     return {};
   }
 }
-async function me(l) {
+async function fe(l) {
   try {
     const e = await fetch(`${v(l)}?t=${Date.now()}`, { cache: "no-store" });
     return e.ok ? JSON.parse(await e.text()) : null;
@@ -170,14 +178,14 @@ async function me(l) {
     return console.warn(`[ST-BgLoader] Server document "${l}" is missing or unreadable:`, e), null;
   }
 }
-async function fe(l, e) {
+async function ye(l, e) {
   const t = new Blob([JSON.stringify(e, null, 2)], { type: "application/json" }), i = new FormData();
   i.append("avatar", new File([t], l, { type: "application/json" }));
-  const s = await fetch("/api/backgrounds/upload", { method: "POST", headers: E(), body: i });
+  const s = await fetch("/api/backgrounds/upload", { method: "POST", headers: M(), body: i });
   if (!s.ok)
     throw new Error(`Server upload failed for "${l}": HTTP ${s.status}`);
 }
-const ye = 6e4;
+const be = 6e4;
 class V {
   manifest = { version: A, items: [] };
   // Serializes manifest writes: manifest mutations are synchronous on this single
@@ -218,7 +226,7 @@ class V {
     try {
       const t = await fetch("/api/backgrounds/all", {
         method: "POST",
-        headers: { ...E(), "Content-Type": "application/json" },
+        headers: { ...M(), "Content-Type": "application/json" },
         body: "{}"
       });
       if (t.ok) {
@@ -322,7 +330,7 @@ class V {
     }
     const s = await fetch("/api/backgrounds/delete", {
       method: "POST",
-      headers: { ...E(), "Content-Type": "application/json" },
+      headers: { ...M(), "Content-Type": "application/json" },
       body: JSON.stringify({ bg: i })
     });
     if (!s.ok)
@@ -345,20 +353,20 @@ class V {
       t = new URL(e, window.location.href);
     } catch {
     }
-    const i = !!t && t.origin !== window.location.origin, s = await fetch(e, i ? { signal: AbortSignal.timeout(ye) } : void 0);
+    const i = !!t && t.origin !== window.location.origin, s = await fetch(e, i ? { signal: AbortSignal.timeout(be) } : void 0);
     if (!s.ok)
       throw new Error(`Failed to fetch media from ${e}: ${s.status} ${s.statusText}`);
     return s.blob();
   }
   async uploadFile(e, t, i) {
-    let s = be(e || "media");
+    let s = ve(e || "media");
     if (await this.filenameExists(s)) {
       const r = s.lastIndexOf("."), c = r > 0 ? s.slice(0, r) : s, h = r > 0 ? s.slice(r) : "";
       s = `${c}_${Date.now()}${h}`;
     }
     const a = new FormData();
     a.append("avatar", new File([t], s, { type: i }));
-    const n = await fetch("/api/backgrounds/upload", { method: "POST", headers: E(), body: a });
+    const n = await fetch("/api/backgrounds/upload", { method: "POST", headers: M(), body: a });
     if (!n.ok)
       throw new Error(`Server upload failed: HTTP ${n.status}`);
     return (await n.text()).trim() || s;
@@ -368,7 +376,7 @@ class V {
     try {
       const t = await fetch("/api/backgrounds/all", {
         method: "POST",
-        headers: { ...E(), "Content-Type": "application/json" },
+        headers: { ...M(), "Content-Type": "application/json" },
         body: "{}"
       });
       if (t.ok)
@@ -387,7 +395,7 @@ class V {
     try {
       const t = new FormData();
       t.append("avatar", new File([e], te, { type: "application/json" }));
-      const i = await fetch("/api/backgrounds/upload", { method: "POST", headers: E(), body: t });
+      const i = await fetch("/api/backgrounds/upload", { method: "POST", headers: M(), body: t });
       if (!i.ok)
         throw new Error(`HTTP ${i.status}`);
     } catch (t) {
@@ -442,19 +450,19 @@ function N(l, e) {
       return e === "video" ? "video/mp4" : e === "audio" ? "audio/mpeg" : e === "svg" ? "image/svg+xml" : e === "html" ? "text/html" : "image/png";
   }
 }
-function be(l) {
+function ve(l) {
   return (l || "media").replace(/[^\p{L}\p{N}._ -]/gu, "_");
 }
-const M = "st-bgloader-main";
+const T = "st-bgloader-main";
 function ge(l) {
   if (l && typeof l == "object" && l.name === "AuthorityPermissionError") return !0;
   const e = l instanceof Error ? l.message : String(l);
   return /permission|denied|forbidden|封锁/i.test(e);
 }
-const ve = "extension:third-party/ST-BgLoader", ie = "st_bgloader_cloud_notice_v1";
+const we = "extension:third-party/ST-BgLoader", ie = "st_bgloader_cloud_notice_v1";
 class R {
   static EXTENSION_ID = "third-party/ST-BgLoader";
-  static CHANNEL = ve;
+  static CHANNEL = we;
   client = null;
   caps = {
     available: !1,
@@ -524,7 +532,7 @@ class R {
           events: { channels: [R.CHANNEL] },
           // Undeclared resources hit the declaration gate (hard 'blocked') even when an
           // admin would grant them — declare exactly the one browser instance we register.
-          agent: { browser: [M] }
+          agent: { browser: [T] }
         }
       }), this.caps = {
         available: !0,
@@ -562,18 +570,18 @@ class R {
     }
   }
 }
-function we(l) {
+function Se(l) {
   const e = atob(l), t = new ArrayBuffer(e.length), i = new Uint8Array(t);
   for (let s = 0; s < e.length; s++)
     i[s] = e.charCodeAt(s);
   return i;
 }
-class Se {
+class _e {
   constructor(e) {
     this.bridge = e;
   }
   async import(e) {
-    const t = _e(e);
+    const t = Ee(e);
     if (!t)
       throw new Error(`Cannot import from invalid URL: ${e}`);
     if (!await this.bridge.ensureHttpAllowed(t))
@@ -584,19 +592,19 @@ class Se {
     const s = await i.http.fetch({ url: e, method: "GET" });
     if (!s.ok)
       throw new Error(`Server fetch failed with HTTP ${s.status} for ${e}`);
-    const a = we(s.body);
+    const a = Se(s.body);
     return new Blob([a], { type: s.contentType || "application/octet-stream" });
   }
 }
-function _e(l) {
+function Ee(l) {
   try {
     return new URL(l).hostname;
   } catch {
     return null;
   }
 }
-const U = "st-bg-cache-v1", Ee = "st_bg_cache_index", b = "entries";
-class Me {
+const U = "st-bg-cache-v1", Me = "st_bg_cache_index", b = "entries";
+class Te {
   origin;
   remoteImporter = null;
   l1 = null;
@@ -615,7 +623,7 @@ class Me {
     this.origin = new V();
   }
   async init(e) {
-    "caches" in window && (this.l1 = await caches.open(U)), await this.openIndex(), e && (await e.detectAndInit()).available && e.getClient() && (this.remoteImporter = new Se(e)), await this.origin.init(), console.log("[ST-BgLoader] Media library source of truth: server backgrounds/ directory (browser keeps cache only).");
+    "caches" in window && (this.l1 = await caches.open(U)), await this.openIndex(), e && (await e.detectAndInit()).available && e.getClient() && (this.remoteImporter = new _e(e)), await this.origin.init(), console.log("[ST-BgLoader] Media library source of truth: server backgrounds/ directory (browser keeps cache only).");
   }
   async listMedia() {
     return this.origin.listCatalog();
@@ -733,7 +741,7 @@ class Me {
   }
   async openIndex() {
     this.indexDb = await new Promise((e, t) => {
-      const i = indexedDB.open(Ee, 1);
+      const i = indexedDB.open(Me, 1);
       i.onupgradeneeded = (s) => {
         const a = s.target.result;
         a.objectStoreNames.contains(b) || a.createObjectStore(b, { keyPath: "cacheKey" });
@@ -774,8 +782,8 @@ class Me {
     }), this.indexMirror = /* @__PURE__ */ new Map();
   }
 }
-const Te = 1e4;
-class xe {
+const xe = 1e4;
+class ke {
   audioElement = null;
   attachedVideo = null;
   volume = 0.8;
@@ -956,7 +964,7 @@ class xe {
           this.audioElement.play().catch((i) => {
             console.warn("[ST-BgLoader AudioEngine] Autoplay was prevented by browser policy:", i);
           }),
-          new Promise((i) => window.setTimeout(i, Te))
+          new Promise((i) => window.setTimeout(i, xe))
         ]);
       } catch (i) {
         console.warn("[ST-BgLoader AudioEngine] Autoplay was prevented by browser policy:", i);
@@ -1002,7 +1010,7 @@ class xe {
     }), this.audioContext = null), this.attachedVideo = null, this.playlist = [];
   }
 }
-const ke = 15e3;
+const Ce = 15e3;
 class se {
   videoElement = null;
   container;
@@ -1018,7 +1026,7 @@ class se {
       let a = !1;
       const n = () => {
         a || (a = !0, window.clearTimeout(r), this.pendingSettle = null, i.removeEventListener("canplay", c), s(i));
-      }, r = window.setTimeout(n, ke);
+      }, r = window.setTimeout(n, Ce);
       this.pendingSettle = n;
       const c = async () => {
         try {
@@ -1054,7 +1062,7 @@ class se {
     this.videoElement && (this.pendingSettle?.(), this.audioEngine.attachVideo(null), this.videoElement.pause(), this.videoElement.removeAttribute("src"), this.videoElement.load(), this.videoElement.remove(), this.videoElement = null);
   }
 }
-const Ce = 8e3;
+const Ae = 8e3;
 class ae {
   iframeElement = null;
   container;
@@ -1069,7 +1077,7 @@ class ae {
       let a = !1;
       const n = () => {
         a || (a = !0, window.clearTimeout(r), this.pendingSettle = null, s(i));
-      }, r = window.setTimeout(n, Ce);
+      }, r = window.setTimeout(n, Ae);
       this.pendingSettle = n, i.onload = () => {
         i.style.opacity = "1", n();
       }, t ? i.src = e : i.srcdoc = e;
@@ -1079,7 +1087,7 @@ class ae {
     this.iframeElement && (this.pendingSettle?.(), this.iframeElement.srcdoc = "", this.iframeElement.src = "about:blank", this.iframeElement.remove(), this.iframeElement = null);
   }
 }
-const Ae = 15e3;
+const Ie = 15e3;
 class ne {
   imageElement = null;
   container;
@@ -1094,7 +1102,7 @@ class ne {
       let a = !1;
       const n = () => {
         a || (a = !0, window.clearTimeout(r), this.pendingSettle = null, s(i));
-      }, r = window.setTimeout(n, Ae);
+      }, r = window.setTimeout(n, Ie);
       this.pendingSettle = n, i.onload = () => {
         i.style.opacity = "1", n();
       }, i.onerror = () => {
@@ -1123,8 +1131,8 @@ class ne {
     this.imageElement && (this.pendingSettle?.(), this.imageElement.remove(), this.imageElement = null);
   }
 }
-const Ie = 3e4;
-class Le {
+const Le = 3e4;
+class Re {
   hostEl = null;
   containerEl = null;
   // Sits between the container and the A/B layers: the visualizer's pulse pump scales
@@ -1187,7 +1195,7 @@ class Le {
         i && (window.clearTimeout(t), e.disconnect(), this.hostEl = i, this.setupContainer());
       });
       e.observe(document.body, { childList: !0, subtree: !0 });
-      const t = window.setTimeout(() => e.disconnect(), Ie);
+      const t = window.setTimeout(() => e.disconnect(), Le);
       return;
     }
     this.setupContainer();
@@ -1264,7 +1272,7 @@ class Le {
     this.crossfadeTimer !== null && (clearTimeout(this.crossfadeTimer), this.crossfadeTimer = null), this.layerA && (this.layerA.style.opacity = "0", this.layerA.style.transform = "none", this.layerA.style.filter = "none"), this.layerB && (this.layerB.style.opacity = "0", this.layerB.style.transform = "none", this.layerB.style.filter = "none"), this.videoRendererA?.destroy(), this.videoRendererB?.destroy(), this.iframeRendererA?.destroy(), this.iframeRendererB?.destroy(), this.imageRendererA?.destroy(), this.imageRendererB?.destroy();
   }
 }
-const Re = {
+const Be = {
   "&": "&amp;",
   "<": "&lt;",
   ">": "&gt;",
@@ -1272,9 +1280,9 @@ const Re = {
   "'": "&#39;"
 };
 function w(l) {
-  return String(l).replace(/[&<>"']/g, (e) => Re[e]);
+  return String(l).replace(/[&<>"']/g, (e) => Be[e]);
 }
-class Be {
+class Pe {
   container = null;
   settings;
   cacheManager;
@@ -1421,12 +1429,10 @@ class Be {
                         <div class="st-bgloader-preset-row">
                             <label class="st-bgloader-label-md">Weather:</label>
                             <select id="st_weather_type">
-                                <option value="off" ${this.settings.weather.type === "off" ? "selected" : ""}>Off (关闭天气)</option>
-                                <option value="rain" ${this.settings.weather.type === "rain" ? "selected" : ""}>Rain (细雨微涟)</option>
-                                <option value="snow" ${this.settings.weather.type === "snow" ? "selected" : ""}>Snow (冬日飘雪)</option>
-                                <option value="sakura" ${this.settings.weather.type === "sakura" ? "selected" : ""}>Sakura (落樱缤纷)</option>
-                                <option value="cyber_motes" ${this.settings.weather.type === "cyber_motes" ? "selected" : ""}>Cyber Motes (赛博霓虹微粒)</option>
-                                <option value="scanlines" ${this.settings.weather.type === "scanlines" ? "selected" : ""}>Scanlines (复古CRT扫描线)</option>
+                                <!-- Derived from WEATHER_TYPES so the list cannot drift from the
+                                     type union (it was a fourth hand-maintained copy). -->
+                                ${S.map((a) => `<option value="${a}" ${this.settings.weather.type === a ? "selected" : ""}>${pe[a]}</option>`).join(`
+                                `)}
                             </select>
                         </div>
 
@@ -1716,7 +1722,7 @@ class Be {
     }), this.container.querySelector("#st_scene_save_btn")?.addEventListener("click", () => {
       const o = prompt("Enter a name for this custom audiovisual scene:");
       if (o && o.trim()) {
-        const d = `scene_${Date.now()}`, _ = {
+        const d = `scene_${Date.now()}`, E = {
           id: d,
           name: o.trim(),
           mediaId: this.settings.activeMediaId || void 0,
@@ -1728,7 +1734,7 @@ class Be {
           ambientSound: { ...this.settings.ambientSound },
           frostedChat: this.settings.frostedChat.enabled
         };
-        this.settings.scenes[d] = _, this.settings.activeSceneId = d, this.populateScenes(), this.callbacks.onSettingsChanged(this.settings);
+        this.settings.scenes[d] = E, this.settings.activeSceneId = d, this.populateScenes(), this.callbacks.onSettingsChanged(this.settings);
       }
     }), this.container.querySelector("#st_scene_del_btn")?.addEventListener("click", () => {
       const o = a?.value;
@@ -1766,11 +1772,11 @@ class Be {
       r !== null && window.clearTimeout(r), r = window.setTimeout(() => {
         r = null, this.callbacks.onSettingsChanged(this.settings);
       }, 300);
-    }, h = (o, d, _, k) => {
+    }, h = (o, d, E, k) => {
       const J = this.container.querySelector(o), Z = this.container.querySelector(d);
       J?.addEventListener("input", () => {
         const ee = Number(J.value);
-        Z && (Z.textContent = `${ee}${_}`), k(ee), c();
+        Z && (Z.textContent = `${ee}${E}`), k(ee), c();
       });
     };
     h("#st_filter_blur", "#st_filter_blur_val", "px", (o) => this.settings.filters.blur = o), h("#st_filter_brightness", "#st_filter_brightness_val", "%", (o) => this.settings.filters.brightness = o), h("#st_filter_opacity", "#st_filter_opacity_val", "%", (o) => this.settings.filters.opacity = o), h("#st_filter_saturate", "#st_filter_saturate_val", "%", (o) => this.settings.filters.saturate = o);
@@ -1812,9 +1818,9 @@ class Be {
     }), h("#st_frosted_opacity", "#st_frosted_opacity_val", "%", (o) => {
       this.settings.frostedChat.opacity = o, this.callbacks.onFrostedChatChanged?.(this.settings.frostedChat);
     });
-    const W = this.container.querySelector("#st_transition_effect");
-    W?.addEventListener("change", () => {
-      this.settings.transitionEffect = W.value, this.callbacks.onTransitionChanged?.(this.settings.transitionEffect, this.settings.transitionDurationMs), this.callbacks.onSettingsChanged(this.settings);
+    const G = this.container.querySelector("#st_transition_effect");
+    G?.addEventListener("change", () => {
+      this.settings.transitionEffect = G.value, this.callbacks.onTransitionChanged?.(this.settings.transitionEffect, this.settings.transitionDurationMs), this.callbacks.onSettingsChanged(this.settings);
     }), h("#st_transition_dur", "#st_transition_dur_val", "ms", (o) => {
       this.settings.transitionDurationMs = o, this.callbacks.onTransitionChanged?.(this.settings.transitionEffect, this.settings.transitionDurationMs);
     }), h("#st_audio_volume", "#st_audio_volume_val", "%", (o) => this.settings.volume = o / 100);
@@ -1871,21 +1877,21 @@ class Be {
     }), this.container.querySelector("#st_cache_clear_btn")?.addEventListener("click", async () => {
       confirm("Are you sure you want to clear all cached media files?") && (await this.cacheManager.clearAll(), await this.refreshMediaGrid(), await this.updateCacheStats());
     }), this.container.querySelector("#st_backup_export_btn")?.addEventListener("click", () => {
-      const o = JSON.stringify(this.settings, null, 2), d = new Blob([o], { type: "application/json" }), _ = URL.createObjectURL(d), k = document.createElement("a");
-      k.href = _, k.download = `st-bgloader-settings-${Date.now()}.json`, k.click(), URL.revokeObjectURL(_);
+      const o = JSON.stringify(this.settings, null, 2), d = new Blob([o], { type: "application/json" }), E = URL.createObjectURL(d), k = document.createElement("a");
+      k.href = E, k.download = `st-bgloader-settings-${Date.now()}.json`, k.click(), URL.revokeObjectURL(E);
     });
-    const S = this.container.querySelector("#st_backup_import_file");
+    const _ = this.container.querySelector("#st_backup_import_file");
     this.container.querySelector("#st_backup_import_btn")?.addEventListener("click", () => {
-      S?.click();
-    }), S?.addEventListener("change", async () => {
-      if (S.files && S.files[0]) {
+      _?.click();
+    }), _?.addEventListener("change", async () => {
+      if (_.files && _.files[0]) {
         try {
-          const o = await S.files[0].text(), d = JSON.parse(o);
+          const o = await _.files[0].text(), d = JSON.parse(o);
           d && typeof d == "object" && (this.settings = z(d), this.callbacks.onSettingsChanged(this.settings), this.render(), alert("Settings successfully imported!"));
         } catch (o) {
           alert(`Failed to import settings JSON: ${o}`);
         }
-        S.value = "";
+        _.value = "";
       }
     });
   }
@@ -2037,7 +2043,7 @@ class Be {
     window.toastr?.error(`媒体导入失败：${t}`, "ST-BgLoader");
   }
 }
-class Pe {
+class Oe {
   observer = null;
   onNativeMediaSelect;
   constructor(e) {
@@ -2073,7 +2079,7 @@ class Pe {
     this.observer && (this.observer.disconnect(), this.observer = null);
   }
 }
-class Oe {
+class Fe {
   container = null;
   audioEngine;
   isVisible = !0;
@@ -2165,7 +2171,7 @@ class Oe {
     this.hideTimer !== null && (clearTimeout(this.hideTimer), this.hideTimer = null), this.unsubscribeTrack?.(), this.unsubscribeTrack = null, this.unsubscribePlayState?.(), this.unsubscribePlayState = null, this.container && (this.container.remove(), this.container = null);
   }
 }
-class Fe {
+class $e {
   ext;
   eventListeners = /* @__PURE__ */ new Map();
   constructor(e) {
@@ -2295,7 +2301,7 @@ class Fe {
       ...this.ext.getSettings().weather,
       type: e,
       ...t || {}
-    } : i = { ...e }, !T.includes(i.type)) {
+    } : i = { ...e }, !S.includes(i.type)) {
       console.warn(`[ST-BgLoader PublicAPI] Ignored invalid weather type "${String(i.type)}".`);
       return;
     }
@@ -2411,7 +2417,7 @@ class Fe {
    * Quick cycle through weather types
    */
   cycleWeather() {
-    const e = this.ext.getSettings().weather.type, t = (T.indexOf(e) + 1) % T.length, i = T[t];
+    const e = this.ext.getSettings().weather.type, t = (S.indexOf(e) + 1) % S.length, i = S[t];
     return this.setWeather(i), i;
   }
   getPlaybackState() {
@@ -2481,7 +2487,7 @@ class Fe {
     });
   }
 }
-class $e {
+class De {
   canvas;
   ctx = null;
   parentEl = null;
@@ -2656,7 +2662,7 @@ class $e {
     this.stop(), window.removeEventListener("resize", this.onWindowResize), this.resizeObserver && (this.resizeObserver.disconnect(), this.resizeObserver = null), this.canvas.parentElement && this.canvas.parentElement.removeChild(this.canvas), this.particles = [], this.ripples = [];
   }
 }
-class De {
+class Ue {
   canvas;
   ctx = null;
   parentEl = null;
@@ -2748,7 +2754,7 @@ class De {
     this.stop(), window.removeEventListener("resize", this.onResize), this.canvas.parentElement && this.canvas.parentElement.removeChild(this.canvas), this.pumpTargetEl && (this.pumpTargetEl.style.transform = "", this.pumpTargetEl.style.transition = "", this.pumpTargetEl = null);
   }
 }
-class Ue {
+class qe {
   targetEl = null;
   options = {
     enabled: !1,
@@ -2802,7 +2808,7 @@ class Ue {
     this.disable(), this.targetEl = null;
   }
 }
-class qe {
+class ze {
   rules = [];
   onTriggerCallback;
   eventSourceUnlisteners = [];
@@ -2896,7 +2902,7 @@ class qe {
     this.unbindEvents(), this.rules = [], this.regexCache.clear(), this.onTriggerCallback = void 0;
   }
 }
-class ze {
+class Ne {
   ctx = null;
   gainNode = null;
   activeSource = null;
@@ -3016,7 +3022,7 @@ class ze {
     }), this.ctx = null), this.gainNode = null;
   }
 }
-class Ne {
+class Ve {
   styleEl = null;
   options = {
     enabled: !1,
@@ -3060,7 +3066,7 @@ class Ne {
     document.body.classList.remove("st-bgloader-frosted-active"), this.styleEl && this.styleEl.parentElement && (this.styleEl.parentElement.removeChild(this.styleEl), this.styleEl = null);
   }
 }
-class Ve {
+class We {
   userScenes = {};
   onApplySceneCallback;
   constructor(e = {}, t) {
@@ -3092,8 +3098,8 @@ class Ve {
     return t ? (console.log(`[ST-BgLoader SceneManager] Applying scene: "${t.name}"`), this.onApplySceneCallback?.(t), !0) : (console.warn(`[ST-BgLoader SceneManager] Scene "${e}" not found.`), !1);
   }
 }
-const re = "settings:rev", oe = "settings:data", Ge = 2e3, We = 1e4;
-class je {
+const re = "settings:rev", oe = "settings:data", Ge = 2e3, je = 1e4;
+class He {
   constructor(e, t, i) {
     this.client = e, this.onRemoteSettings = t, this.hasServerDocument = i;
   }
@@ -3129,7 +3135,7 @@ class je {
     } catch (t) {
       console.warn("[ST-BgLoader] Failed to read cloud settings mirror:", t);
     }
-    this.pollTimer = window.setInterval(() => void this.pollOnce(), We);
+    this.pollTimer = window.setInterval(() => void this.pollOnce(), je);
   }
   stop() {
     this.pollTimer !== null && window.clearInterval(this.pollTimer), this.pushTimer !== null && window.clearTimeout(this.pushTimer), this.pollTimer = null, this.pushTimer = null, this.running = !1;
@@ -3141,7 +3147,7 @@ class je {
   }
   async push(e) {
     try {
-      const t = JSON.stringify(e), i = await He(t);
+      const t = JSON.stringify(e), i = await Ke(t);
       if (i === this.lastPushedFingerprint) return;
       const s = this.localRevision + 1, a = {
         revision: s,
@@ -3183,7 +3189,7 @@ class je {
     return typeof t.revision != "number" || !t.settings || typeof t.fingerprint != "string" ? null : t;
   }
 }
-async function He(l) {
+async function Ke(l) {
   try {
     if (crypto?.subtle) {
       const t = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(l));
@@ -3196,8 +3202,8 @@ async function He(l) {
     e = (e << 5) + e + l.charCodeAt(t) | 0;
   return "djb2:" + (e >>> 0).toString(16);
 }
-const le = "st-bg-loader-settings.json", Ke = 1, Xe = 800;
-class Ye {
+const le = "st-bg-loader-settings.json", Xe = 1, Ye = 800;
+class Qe {
   saveTimer = null;
   pending = null;
   writing = !1;
@@ -3206,13 +3212,13 @@ class Ye {
   onRemoteNewer = null;
   /** Returns the server document, or null when it is missing/unparsable (first run). */
   async load() {
-    const e = await me(le);
+    const e = await fe(le);
     return !e || typeof e != "object" || !e.settings || typeof e.revision != "number" ? null : e;
   }
   scheduleSave(e, t) {
     this.pending = { settings: e, revision: t }, this.saveTimer !== null && window.clearTimeout(this.saveTimer), this.saveTimer = window.setTimeout(() => {
       this.saveTimer = null, this.flush();
-    }, Xe);
+    }, Ye);
   }
   /** Resolves once every scheduled write has been attempted (test hook). */
   async flush() {
@@ -3228,7 +3234,7 @@ class Ye {
               this.onRemoteNewer?.(t);
               break;
             }
-            await fe(le, this.toDoc(e)), this.warnedAboutWriteFailure = !1;
+            await ye(le, this.toDoc(e)), this.warnedAboutWriteFailure = !1;
           } catch (t) {
             this.warnedAboutWriteFailure || (this.warnedAboutWriteFailure = !0, console.warn("[ST-BgLoader] Server settings write failed; localStorage stays the durable copy:", t));
             break;
@@ -3241,20 +3247,20 @@ class Ye {
   }
   toDoc(e) {
     return {
-      version: Ke,
+      version: Xe,
       revision: e.revision,
       updatedTimestamp: Date.now(),
       settings: e.settings
     };
   }
 }
-const ce = 3e4, Qe = 2e3, Je = 5 * 60 * 1e3, Ze = 2 * 60 * 1e3, et = 15e3;
+const ce = 3e4, Je = 2e3, Ze = 5 * 60 * 1e3, et = 2 * 60 * 1e3, tt = 15e3;
 class he extends Error {
   constructor() {
     super("Agent tool registration timed out"), this.name = "AgentRegisterTimeoutError";
   }
 }
-const tt = [
+const it = [
   {
     id: "stbg_set_background",
     title: "设置背景媒体",
@@ -3281,11 +3287,11 @@ const tt = [
     // Fourth copy of the weather vocabulary used to live here as a literal, which silently
     // drifted whenever a weather type was added. Referencing the shared constant keeps the
     // AI-facing tool schema in step with the runtime validator in PublicAPI.
-    description: `Set the atmospheric weather FX (${T.join(", ")}).`,
+    description: `Set the atmospheric weather FX (${S.join(", ")}).`,
     inputSchema: {
       type: "object",
       properties: {
-        type: { type: "string", enum: T },
+        type: { type: "string", enum: S },
         density: { type: "string", enum: ["low", "medium", "high"] }
       },
       required: ["type"]
@@ -3326,7 +3332,7 @@ const tt = [
     }
   }
 ];
-class it {
+class st {
   constructor(e, t, i = () => {
   }) {
     this.client = e, this.host = t, this.reportState = i;
@@ -3360,7 +3366,7 @@ class it {
         if (!e) return;
         await this.registerWithTimeout(e), this.permissionBlockedUntil = 0, this.registerWaitUntil = 0, this.registrationOk = !0, this.warnedIssue = !1, this.publishState("ok"), console.log("[ST-BgLoader] Agent ambient tools registered.");
       } catch (e) {
-        this.registrationOk = !1, ge(e) ? (this.permissionBlockedUntil = Date.now() + Je, this.publishState("blocked", e instanceof Error ? e.message : String(e)), this.warnOnce("Agent tool registration blocked by permission policy (retrying every 5 min — adjust in Authority Security Center if intended):", e)) : e instanceof he ? (this.registerWaitUntil = Date.now() + Ze, this.publishState("pending", "等待 agent.browser 授权（若页面出现 Authority 权限弹窗请处理；稍后自动重试）"), this.warnOnce("Agent tool registration is waiting for permission (check the Authority prompt / Security Center):", e)) : console.warn("[ST-BgLoader] Agent tool registration failed (will retry):", e);
+        this.registrationOk = !1, ge(e) ? (this.permissionBlockedUntil = Date.now() + Ze, this.publishState("blocked", e instanceof Error ? e.message : String(e)), this.warnOnce("Agent tool registration blocked by permission policy (retrying every 5 min — adjust in Authority Security Center if intended):", e)) : e instanceof he ? (this.registerWaitUntil = Date.now() + et, this.publishState("pending", "等待 agent.browser 授权（若页面出现 Authority 权限弹窗请处理；稍后自动重试）"), this.warnOnce("Agent tool registration is waiting for permission (check the Authority prompt / Security Center):", e)) : console.warn("[ST-BgLoader] Agent tool registration failed (will retry):", e);
       } finally {
         this.registerInFlight = !1;
       }
@@ -3372,14 +3378,14 @@ class it {
   async registerWithTimeout(e) {
     let t;
     const i = new Promise((s, a) => {
-      t = window.setTimeout(() => a(new he()), et);
+      t = window.setTimeout(() => a(new he()), tt);
     });
     try {
       return await Promise.race([
         e.registerTools({
-          browserInstanceId: M,
+          browserInstanceId: T,
           leaseDurationMs: ce * 2,
-          tools: tt.map((s) => ({
+          tools: it.map((s) => ({
             id: s.id,
             title: s.title,
             description: s.description,
@@ -3401,14 +3407,14 @@ class it {
   claimLoop() {
     this.running && (this.timer = window.setTimeout(() => {
       this.claimOnce().finally(() => this.claimLoop());
-    }, Qe));
+    }, Je));
   }
   async claimOnce() {
     const e = this.agentApi();
     if (!(!e || !this.running) && this.registrationOk)
       try {
         this.pendingSubmit && (await this.reportResult(this.pendingSubmit.claimId, this.pendingSubmit.invocation, "completed", void 0), this.pendingSubmit = null);
-        const t = `stbg-claim-${Date.now()}-${this.claimSeq++}`, s = (await e.claim({ browserInstanceId: M, claimId: t })).invocation;
+        const t = `stbg-claim-${Date.now()}-${this.claimSeq++}`, s = (await e.claim({ browserInstanceId: T, claimId: t })).invocation;
         if (!s) return;
         let a, n;
         try {
@@ -3421,7 +3427,7 @@ class it {
             runId: s.runId,
             callId: s.callId,
             claimId: t,
-            browserInstanceId: M,
+            browserInstanceId: T,
             status: "failed",
             error: n
           });
@@ -3432,7 +3438,7 @@ class it {
             runId: s.runId,
             callId: s.callId,
             claimId: t,
-            browserInstanceId: M,
+            browserInstanceId: T,
             status: "completed",
             result: a
           });
@@ -3448,7 +3454,7 @@ class it {
       runId: t.runId,
       callId: t.callId,
       claimId: e,
-      browserInstanceId: M,
+      browserInstanceId: T,
       status: i,
       error: s
     });
@@ -3479,11 +3485,11 @@ class it {
   }
 }
 const q = "st_bgloader_settings", de = "st_bgloader_settings_rev";
-class st {
+class at {
   isInitialized = !1;
   settings = { ...L };
   settingsRevision = 0;
-  serverSettings = new Ye();
+  serverSettings = new Qe();
   cacheManager;
   audioEngine;
   mediaMount;
@@ -3505,7 +3511,7 @@ class st {
   agentBridge = null;
   publicApi;
   constructor() {
-    this.cacheManager = new Me(), this.audioEngine = new xe(), this.mediaMount = new Le(this.audioEngine, (e) => this.mountOverlays(e)), this.atmosphereFX = new $e(), this.audioVisualizer = new De(), this.parallaxController = new Ue(), this.triggerManager = new qe(), this.ambientSoundGenerator = new ze(), this.frostedGlassController = new Ne(), this.publicApi = new Fe(this);
+    this.cacheManager = new Te(), this.audioEngine = new ke(), this.mediaMount = new Re(this.audioEngine, (e) => this.mountOverlays(e)), this.atmosphereFX = new De(), this.audioVisualizer = new Ue(), this.parallaxController = new qe(), this.triggerManager = new ze(), this.ambientSoundGenerator = new Ne(), this.frostedGlassController = new Ve(), this.publicApi = new $e(this);
   }
   getCacheManager() {
     return this.cacheManager;
@@ -3564,30 +3570,30 @@ class st {
     await this.applyMedia(e, t);
   }
   async init() {
-    console.log("[ST-BgLoader] Initializing Rich Media Background Plugin..."), await this.reconcileSettings(), await this.cacheManager.init(this.authorityBridge), this.mediaMount.init(), this.mediaMount.applyFilters(this.settings.filters), this.mediaMount.setInteractive(this.settings.interactiveBackground), this.mediaMount.setTransition(this.settings.transitionEffect, this.settings.transitionDurationMs), this.mountOverlaysIfHostReady(), this.atmosphereFX.setWeather(this.settings.weather), this.audioVisualizer.setOptions(this.settings.visualizer), this.parallaxController.setOptions(this.settings.parallax), this.ambientSoundGenerator.setSound(this.settings.ambientSound), this.frostedGlassController.setOptions(this.settings.frostedChat), this.audioEngine.setUrlResolver((i) => this.cacheManager.getMediaBlobUrl(i)), this.audioEngine.setVolume(this.settings.volume), this.audioEngine.setMuted(this.settings.muted), this.audioEngine.setMuffled(this.settings.muffleBGM), this.audioEngine.setPlaybackMode(this.settings.playbackMode), this.audioEngine.onAnalyserReady = (i) => {
+    console.log("[ST-BgLoader] Initializing Rich Media Background Plugin..."), await this.reconcileSettings(), await this.cacheManager.init(this.authorityBridge), this.mediaMount.init(), this.mediaMount.applyFilters(this.settings.filters), this.mediaMount.setInteractive(this.settings.interactiveBackground), this.mediaMount.setVisible(this.settings.backgroundVisible), this.mediaMount.setTransition(this.settings.transitionEffect, this.settings.transitionDurationMs), this.mountOverlaysIfHostReady(), this.atmosphereFX.setWeather(this.settings.weather), this.audioVisualizer.setOptions(this.settings.visualizer), this.parallaxController.setOptions(this.settings.parallax), this.ambientSoundGenerator.setSound(this.settings.ambientSound), this.frostedGlassController.setOptions(this.settings.frostedChat), this.audioEngine.setUrlResolver((i) => this.cacheManager.getMediaBlobUrl(i)), this.audioEngine.setVolume(this.settings.volume), this.audioEngine.setMuted(this.settings.muted), this.audioEngine.setMuffled(this.settings.muffleBGM), this.audioEngine.setPlaybackMode(this.settings.playbackMode), this.audioEngine.onAnalyserReady = (i) => {
       this.audioVisualizer.setAnalyser(i);
     };
     const t = (await this.cacheManager.listMedia()).filter((i) => i.type === "audio");
-    if (this.audioEngine.setPlaylist(t), this.miniPlayer = new Oe(this.audioEngine), this.miniPlayer.render(this.settings.showMiniPlayer, this.settings.capsuleOnPlayOnly), this.audioEngine.addTrackListener((i) => {
+    if (this.audioEngine.setPlaylist(t), this.miniPlayer = new Fe(this.audioEngine), this.miniPlayer.render(this.settings.showMiniPlayer, this.settings.capsuleOnPlayOnly), this.audioEngine.addTrackListener((i) => {
       this.publicApi.emit("track-change", i);
     }), this.audioEngine.addPlayStateListener((i) => {
       this.publicApi.emit("play-state-change", i);
     }), this.triggerManager.setRules(this.settings.triggerRules || []), this.triggerManager.setTriggerCallback(async (i, s) => {
       console.log(`[ST-BgLoader] Executing trigger rule: "${s.name}"`), i.mediaIdOrUrl && await this.publicApi.setBackground(i.mediaIdOrUrl), i.bgmUrl && await this.publicApi.playBGM(i.bgmUrl), i.weather && this.publicApi.setWeather(i.weather), i.preset && this.publicApi.applyPreset(i.preset), i.filters && this.publicApi.setFilters(i.filters);
-    }), this.sceneManager = new Ve(this.settings.scenes || {}, async (i) => {
+    }), this.sceneManager = new We(this.settings.scenes || {}, async (i) => {
       if (i.mediaId) {
         const s = await this.cacheManager.getMedia(i.mediaId);
         s && await this.applyMedia(s);
       } else i.mediaUrl && await this.publicApi.setBackground(i.mediaUrl);
       i.bgmUrl && await this.publicApi.playBGM(i.bgmUrl), i.presetId && this.publicApi.applyPreset(i.presetId), i.filters && this.publicApi.setFilters(i.filters), i.weather && this.publicApi.setWeather(i.weather), i.visualizer && this.publicApi.setVisualizer(i.visualizer), i.parallax && this.publicApi.setParallax(i.parallax.enabled, i.parallax.intensity), i.ambientSound && this.publicApi.setAmbientSound(i.ambientSound), typeof i.frostedChat == "boolean" && this.publicApi.setFrostedChat(i.frostedChat);
-    }), this.settingsDrawer = new Be(this.settings, this.cacheManager, {
+    }), this.settingsDrawer = new Pe(this.settings, this.cacheManager, {
       onSettingsChanged: (i) => {
         this.settings = i, this.saveSettings(), this.applySettingsToSubsystems(), this.enforceQuotaIfChanged();
       },
       // Replaces the removed Alt+B shortcut: visibility is MediaMount's controlled state
       // (finding A1), and routing the panel through the PublicAPI keeps one write path and
       // one event for third-party callers.
-      getBackgroundVisible: () => this.mediaMount.isVisible(),
+      getBackgroundVisible: () => this.settings.backgroundVisible,
       onBackgroundVisibilityChanged: (i) => {
         this.publicApi.setBackgroundVisible(i);
       },
@@ -3640,7 +3646,7 @@ class st {
         }
         await this.applyMedia(i);
       }
-    }, this.authorityBridge), this.settingsDrawer.render(), this.nativeAugmenter = new Pe(async (i, s, a) => {
+    }, this.authorityBridge), this.settingsDrawer.render(), this.nativeAugmenter = new Oe(async (i, s, a) => {
       const n = {
         id: "native_" + a,
         name: a,
@@ -3679,14 +3685,16 @@ class st {
     t && (this.atmosphereFX.mount(t), this.audioVisualizer.mount(t, this.mediaMount.getPumpWrapperElement() ?? e)), this.parallaxController.attach(e);
   }
   applySettingsToSubsystems() {
-    this.mediaMount.applyFilters(this.settings.filters), this.mediaMount.setInteractive(this.settings.interactiveBackground), this.mediaMount.setTransition(this.settings.transitionEffect, this.settings.transitionDurationMs), this.audioEngine.setVolume(this.settings.volume), this.audioEngine.setMuted(this.settings.muted), this.audioEngine.setMuffled(this.settings.muffleBGM), this.audioEngine.setPlaybackMode(this.settings.playbackMode), this.atmosphereFX.setWeather(this.settings.weather), this.audioVisualizer.setOptions(this.settings.visualizer), this.parallaxController.setOptions(this.settings.parallax), this.ambientSoundGenerator.setSound(this.settings.ambientSound), this.frostedGlassController.setOptions(this.settings.frostedChat), this.triggerManager.setRules(this.settings.triggerRules || []), this.sceneManager?.setUserScenes(this.settings.scenes || {}), this.syncAgentTools();
+    this.mediaMount.applyFilters(this.settings.filters), this.mediaMount.setInteractive(this.settings.interactiveBackground), this.mediaMount.setVisible(this.settings.backgroundVisible), this.mediaMount.setTransition(this.settings.transitionEffect, this.settings.transitionDurationMs), this.audioEngine.setVolume(this.settings.volume), this.audioEngine.setMuted(this.settings.muted), this.audioEngine.setMuffled(this.settings.muffleBGM), this.audioEngine.setPlaybackMode(this.settings.playbackMode), this.atmosphereFX.setWeather(this.settings.weather), this.audioVisualizer.setOptions(this.settings.visualizer), this.parallaxController.setOptions(this.settings.parallax), this.ambientSoundGenerator.setSound(this.settings.ambientSound), this.frostedGlassController.setOptions(this.settings.frostedChat), this.triggerManager.setRules(this.settings.triggerRules || []), this.sceneManager?.setUserScenes(this.settings.scenes || {}), this.syncAgentTools();
   }
   /**
-   * Shows/hides the background layer (MediaMount owns the state — finding A1). The panel
-   * checkbox calls this through PublicAPI so both entry points share one write path.
+   * Shows/hides the background layer. MediaMount owns the applied state (finding A1) while
+   * `settings.backgroundVisible` is the durable intent — the setting replaced the Alt+B
+   * shortcut, so unlike its first incarnation this one persists across reloads. The panel
+   * checkbox and PublicAPI both come through here, so there is a single write path.
    */
   setBackgroundVisible(e) {
-    this.mediaMount.setVisible(e), this.settingsDrawer?.syncBackgroundVisible(e);
+    this.settings.backgroundVisible = e, this.mediaMount.setVisible(e), this.saveSettings(), this.settingsDrawer?.syncBackgroundVisible(e);
   }
   /**
    * Applies a changed cache quota immediately (S2: the slider used to write the setting and
@@ -3704,7 +3712,7 @@ class st {
   /** Opt-in Agent Runtime ambient tools (AI director mode); requires the cloud backend. */
   syncAgentTools() {
     const e = this.authorityBridge.getClient(), t = this.settings.agentToolsEnabled && !!e;
-    t && !this.agentBridge && e ? (this.agentBridge = new it(e, this.buildAgentHost(), (i, s) => {
+    t && !this.agentBridge && e ? (this.agentBridge = new st(e, this.buildAgentHost(), (i, s) => {
       this.authorityBridge.reportAgentToolsState(i, s);
     }), this.agentBridge.start(), console.log("[ST-BgLoader] Agent ambient tools enabled.")) : !t && this.agentBridge && (this.agentBridge.stop(), this.agentBridge = null, console.log("[ST-BgLoader] Agent ambient tools disabled."));
   }
@@ -3725,7 +3733,7 @@ class st {
   }
   async startSettingsSync() {
     const e = this.authorityBridge.getClient();
-    e && (this.settingsSync = new je(e, (t) => {
+    e && (this.settingsSync = new He(e, (t) => {
       this.settings = t;
       try {
         localStorage.setItem(q, JSON.stringify(this.settings));
@@ -3800,10 +3808,10 @@ class st {
     this.settingsRevision += 1, this.persistLocalSettings(), this.serverSettings.scheduleSave(this.settings, this.settingsRevision), this.settingsSync?.schedulePush(this.settings);
   }
 }
-const G = new st(), ue = () => G.init().catch((l) => console.error("[ST-BgLoader] Initialization failed:", l));
+const W = new at(), ue = () => W.init().catch((l) => console.error("[ST-BgLoader] Initialization failed:", l));
 document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", ue) : ue();
-window.STBgLoader = G;
-window.stBgLoader = G.getAPI();
+window.STBgLoader = W;
+window.stBgLoader = W.getAPI();
 export {
-  st as STBgLoaderExtension
+  at as STBgLoaderExtension
 };

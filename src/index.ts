@@ -109,6 +109,7 @@ export class STBgLoaderExtension {
         this.mediaMount.init();
         this.mediaMount.applyFilters(this.settings.filters);
         this.mediaMount.setInteractive(this.settings.interactiveBackground);
+        this.mediaMount.setVisible(this.settings.backgroundVisible);
         this.mediaMount.setTransition(this.settings.transitionEffect, this.settings.transitionDurationMs);
 
         // 3. Mount FX & Controllers to host — happens via MediaMount's onHostReady callback
@@ -218,7 +219,7 @@ export class STBgLoaderExtension {
             // Replaces the removed Alt+B shortcut: visibility is MediaMount's controlled state
             // (finding A1), and routing the panel through the PublicAPI keeps one write path and
             // one event for third-party callers.
-            getBackgroundVisible: () => this.mediaMount.isVisible(),
+            getBackgroundVisible: () => this.settings.backgroundVisible,
             onBackgroundVisibilityChanged: (visible) => {
                 this.publicApi.setBackgroundVisible(visible);
             },
@@ -378,6 +379,7 @@ export class STBgLoaderExtension {
     private applySettingsToSubsystems(): void {
         this.mediaMount.applyFilters(this.settings.filters);
         this.mediaMount.setInteractive(this.settings.interactiveBackground);
+        this.mediaMount.setVisible(this.settings.backgroundVisible);
         this.mediaMount.setTransition(this.settings.transitionEffect, this.settings.transitionDurationMs);
         this.audioEngine.setVolume(this.settings.volume);
         this.audioEngine.setMuted(this.settings.muted);
@@ -394,11 +396,15 @@ export class STBgLoaderExtension {
     }
 
     /**
-     * Shows/hides the background layer (MediaMount owns the state — finding A1). The panel
-     * checkbox calls this through PublicAPI so both entry points share one write path.
+     * Shows/hides the background layer. MediaMount owns the applied state (finding A1) while
+     * `settings.backgroundVisible` is the durable intent — the setting replaced the Alt+B
+     * shortcut, so unlike its first incarnation this one persists across reloads. The panel
+     * checkbox and PublicAPI both come through here, so there is a single write path.
      */
     public setBackgroundVisible(visible: boolean): void {
+        this.settings.backgroundVisible = visible;
         this.mediaMount.setVisible(visible);
+        this.saveSettings();
         // Reflect API-driven changes back into the panel (the checkbox does not emit an event
         // when written programmatically, so there is no feedback loop).
         this.settingsDrawer?.syncBackgroundVisible(visible);

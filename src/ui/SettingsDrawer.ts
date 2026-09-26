@@ -14,6 +14,8 @@ import {
     VisualizerOptions,
     WeatherOptions,
     WeatherType,
+    WEATHER_LABELS,
+    WEATHER_TYPES,
     AmbientSoundOptions,
     AmbientSoundType,
 } from '../types';
@@ -212,12 +214,9 @@ export class SettingsDrawer {
                         <div class="st-bgloader-preset-row">
                             <label class="st-bgloader-label-md">Weather:</label>
                             <select id="st_weather_type">
-                                <option value="off" ${this.settings.weather.type === 'off' ? 'selected' : ''}>Off (关闭天气)</option>
-                                <option value="rain" ${this.settings.weather.type === 'rain' ? 'selected' : ''}>Rain (细雨微涟)</option>
-                                <option value="snow" ${this.settings.weather.type === 'snow' ? 'selected' : ''}>Snow (冬日飘雪)</option>
-                                <option value="sakura" ${this.settings.weather.type === 'sakura' ? 'selected' : ''}>Sakura (落樱缤纷)</option>
-                                <option value="cyber_motes" ${this.settings.weather.type === 'cyber_motes' ? 'selected' : ''}>Cyber Motes (赛博霓虹微粒)</option>
-                                <option value="scanlines" ${this.settings.weather.type === 'scanlines' ? 'selected' : ''}>Scanlines (复古CRT扫描线)</option>
+                                <!-- Derived from WEATHER_TYPES so the list cannot drift from the
+                                     type union (it was a fourth hand-maintained copy). -->
+                                ${WEATHER_TYPES.map((t) => `<option value="${t}" ${this.settings.weather.type === t ? 'selected' : ''}>${WEATHER_LABELS[t]}</option>`).join('\n                                ')}
                             </select>
                         </div>
 
@@ -845,9 +844,9 @@ export class SettingsDrawer {
             this.callbacks.onSettingsChanged(this.settings);
         });
 
-        // Background layer visibility (replaces the removed Alt+B shortcut). Visibility is
-        // MediaMount's controlled runtime state, not a settings field, so this deliberately
-        // does NOT go through onSettingsChanged — nothing is persisted and no save is needed.
+        // Background layer visibility (the control that replaced the removed Alt+B shortcut).
+        // Routed through the extension (not written to this.settings here) so the panel and the
+        // PublicAPI share one write path that persists `settings.backgroundVisible`.
         const bgVisibleCb = this.container.querySelector('#st_bg_visible') as HTMLInputElement;
         bgVisibleCb?.addEventListener('change', () => {
             this.callbacks.onBackgroundVisibilityChanged?.(bgVisibleCb.checked);
