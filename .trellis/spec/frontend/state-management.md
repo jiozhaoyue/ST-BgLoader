@@ -19,8 +19,26 @@ private settings: BgLoaderSettings = { ...DEFAULT_SETTINGS };
   so new fields default cleanly and settings survive browser-cache clears.
 - Writes go through `saveSettings()`; every mutation path ends in
   `applySettingsToSubsystems()` (the fan-out — see hook-guidelines.md).
-- `settings.activeMediaId` is the mounted media pointer; every `applyMedia` updates it
-  first, so a page reload restores the last background.
+- `settings.activeMediaId` is the mounted media pointer; `applyMedia(item, persist)` writes it
+  first when `persist` is true (the default), so a page reload restores the last background.
+  Transient backgrounds (`PublicAPI.setBackground` WITHOUT `saveToLibrary`, `persist = false`)
+  deliberately do not record it — see the Runtime-only state section below.
+
+---
+
+## Runtime-only state (not in `settings`)
+
+Some state is genuinely per-session and must NOT be persisted, because persisting it created
+dangling references:
+
+| State | Owner | Why it is not persisted |
+| --- | --- | --- |
+| Transient background | `MediaMount` mount + `applyMedia(item, persist = false)` | Its item id (`custom_<ts>`) exists nowhere in the catalog, so a persisted `activeMediaId` could never be resolved on reload (audit A2). `PublicAPI.setBackground` opts in with `saveToLibrary: true`. |
+| Background visibility | `MediaMount.visible` (`setVisible()` / `isVisible()`) | Not a stray inline `display` on the container any more: writing `display` from outside meant mounts into a hidden container and a background that never came back (audit A1). Rendering never touches it; `PublicAPI.setBackgroundVisible/isBackgroundVisible` and the panel checkbox route through it. |
+
+`init()` self-heals the one dangling case that IS persisted: if `activeMediaId` no longer
+resolves (`CacheManager.getMedia` returns null), it is cleared and saved instead of being
+carried forever.
 
 ---
 
@@ -43,11 +61,33 @@ reconfigured from settings. They never persist anything themselves.
 - On remote apply: settings are replaced, persisted to localStorage (quota errors are
   tolerated — cloud stays authoritative), and `applyRemoteSettings` refreshes the UI.
 
+### Startup priority (audit A5, 2026-09-26)
+
+Three settings stores coexist and their revision counters are **independent**, so they cannot be
+ordered against each other (observed 41 in KV vs 202 in the server document). Precedence is
+therefore explicit rather than by counter:
+
+1. `localStorage` and the server settings document are reconciled by revision in
+   `index.reconcileSettings()` — higher revision wins, the server wins ties.
+2. The KV mirror is a cross-device **backup**, not a third source of truth:
+   `SettingsSync.start()` adopts it only when the server document is missing/unreadable, which
+   the caller reports through the `hasServerDocument` port
+   (`index.hasServerSettingsDocument()` → `ServerSettings.load() !== null`). It used to be
+   applied unconditionally, which let a stale mirror resurrect state the server document had
+   already corrected on every page load (a deleted background came back as a dangling id).
+
+**Known consequence — it does not self-heal.** When the server document wins, the stale mirror
+is neither corrected nor deleted: it is only overwritten by the next local write
+(`saveSettings()` → `SettingsSync.schedulePush`). The reverse case is the same: with the server
+document missing, the mirror is adopted as-is and pushed back as the current state. No
+reconciliation between the two counters is attempted, by design — the counters are not
+comparable, so any such attempt would be a guess.
+
 ---
 
 ## Media library state
 
 The library itself is NOT in settings: it is the server manifest + native listing
 (see backend/database-guidelines.md). `CacheManager.listMedia()` is always re-read,
-never cached in settings. Chat-scoped bindings live in `settings.chatBindings[chatId]`
-and re-apply on SillyTavern's `CHAT_CHANGED` event.
+never cached in settings. On SillyTavern's `CHAT_CHANGED` event the active background is
+re-applied from `settings.activeMediaId`.

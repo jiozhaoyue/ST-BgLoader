@@ -72,31 +72,35 @@
 
 ### Phase E — P0/P1 修复（定稿）
 
-- [ ] E1 **A1**：`MediaMount` 新增 `visible` 受控状态 + `setVisible()/isVisible()`；`setupContainer()` 末尾应用；`doMountMedia()` **不触碰** `display`；`index.ts` 的 `onToggleBackground` 改为调用 `setVisible()`
-- [ ] E2 **A2**：`PublicAPI.setBackground` 在 `saveToLibrary` 非真时**不写** `settings.activeMediaId`（仅设内存态）；`index.ts` `init()` 恢复背景时若 `getMedia(activeMediaId)` 为 `null` → 置 `null` 并保存（自愈）
-- [ ] E3 **A3**：`NativeBgAugmenter` 非 `image` 项点击处理加 `preventDefault()` + `stopPropagation()`，消除双写；**注释须写明「本处理将被子任务 3 的 `NativeBackgroundController` 取代」**
-- [ ] E4 **A4**（子任务 1 转交）：`refreshMediaGrid` 的守卫改为**元素级**（`grid.dataset.gridSignature`），并在 `await` 之后复核 `this.container` 里的栅格是否仍是同一个（否则 return，交给那次渲染自己填充）；删除 `private lastGridSignature` 字段及 `render()` 中对它的重置
-- [ ] E5 **A5**：`SettingsSync.start()` 不再无条件套用 KV 镜像。改为**先比对服务端文档**：仅当服务端文档缺失/不可读时才用 KV 回退。`SettingsSync` 需要能读到服务端文档的存在性与 revision（经 `ServerSettings.load()`），并据此决定是否套用
-- [ ] E6 每项修复后 `npx tsc --noEmit` 快验；**每个发现独立提交**（提交信息含编号）
+- [x] E1 **A1**：`MediaMount` 新增 `visible` 受控状态 + `setVisible()/isVisible()`；`setupContainer()` 末尾应用；`doMountMedia()` **不触碰** `display`；`index.ts` 的 `onToggleBackground` 改为调用 `setVisible()`
+- [x] E2 **A2**：`PublicAPI.setBackground` 在 `saveToLibrary` 非真时**不写** `settings.activeMediaId`（仅设内存态）；`index.ts` `init()` 恢复背景时若 `getMedia(activeMediaId)` 为 `null` → 置 `null` 并保存（自愈）
+- [x] E3 **A3**：`NativeBgAugmenter` 非 `image` 项点击处理加 `preventDefault()` + `stopPropagation()`，消除双写；**注释须写明「本处理将被子任务 3 的 `NativeBackgroundController` 取代」**
+- [x] E4 **A4**（子任务 1 转交）：`refreshMediaGrid` 的守卫改为**元素级**（`grid.dataset.gridSignature`），并在 `await` 之后复核 `this.container` 里的栅格是否仍是同一个（否则 return，交给那次渲染自己填充）；删除 `private lastGridSignature` 字段及 `render()` 中对它的重置
+- [x] E5 **A5**：`SettingsSync.start()` 不再无条件套用 KV 镜像。改为**先比对服务端文档**：仅当服务端文档缺失/不可读时才用 KV 回退。`SettingsSync` 需要能读到服务端文档的存在性与 revision（经 `ServerSettings.load()`），并据此决定是否套用
+- [x] E6 每项修复后 `npx tsc --noEmit` 快验；**每个发现独立提交**（提交信息含编号）
 
 ### Phase F — P2 修复与已批准的裁剪/整理（定稿）
 
 **性能**
-- [ ] F1 **E1**：`ServerOrigin` 目录短时缓存（TTL 2000ms）+ 写操作（`putMedia`/`deleteMedia`）成功后失效 + 公开 `invalidateCatalog()` 钩子供子任务 3 调用
-- [ ] F2 **E2**：`CacheManager.touchCache` 去全量 `indexAll()`——维护内存索引镜像，首次 `init()` 读一次 IDB，其后读写走内存 + 异步落盘；`clearAll`/`cleanLRU` 前强制重读
-- [ ] F3 **E3**：`objectUrls` 保守有界化——随 cache 条目淘汰同步 `revokeObjectURL`（只释放不再被 LRU 追踪的条目）
+- [x] F1 **E1**：`ServerOrigin` 目录短时缓存（TTL 2000ms）+ 写操作（`putMedia`/`deleteMedia`）成功后失效 + 公开 `invalidateCatalog()` 钩子供子任务 3 调用
+- [x] F2 **E2**：`CacheManager.touchCache` 去全量 `indexAll()`——维护内存索引镜像，首次 `init()` 读一次 IDB，其后读写走内存 + 异步落盘；`clearAll`/`cleanLRU` 前强制重读
+- [x] F3 **E3**：`objectUrls` 保守有界化——随 cache 条目淘汰同步 `revokeObjectURL`（只释放不再被 LRU 追踪的条目）
 
 **一致性 / 去重**
-- [ ] F4 **D1**：天气类型收敛为单一真源——`types/index.ts` 导出 `WEATHER_TYPES` 常量，`PublicAPI` 的两处（常量与 `cycleWeather` 字面量）改为引用它
-- [ ] F5 **D2**：原生徽章按类型配色补齐——在 `style.css` 补 `.st-bg-native-badge.video/.audio/.html/.svg`，复用面板作用域的 `--st-bg-badge-*`（与媒体库徽章一致）
-- [ ] F6 **D3**：`AudioEngine.playMediaItem` 与 `playCurrentTrack` 的重复逻辑合并为单一内部实现；**对外行为与事件发射次数不得改变**
-- [ ] F7 **F1**：`IframeRenderer` sandbox 注释修正——明确「`allow-scripts allow-same-origin` 组合下，从 URL 导入的第三方 HTML 同样可访问 `parent.document` 与宿主 API」，把风险讲清楚（**sandbox 收紧不在本轮**）
+- [x] F4 **D1**：天气类型收敛为单一真源——`types/index.ts` 导出 `WEATHER_TYPES` 常量，`PublicAPI` 的两处（常量与 `cycleWeather` 字面量）改为引用它
+- [x] F5 **D2**：原生徽章按类型配色补齐——在 `style.css` 补 `.st-bg-native-badge.video/.audio/.html/.svg`，复用面板作用域的 `--st-bg-badge-*`（与媒体库徽章一致）
+- [x] F6 **D3**：`AudioEngine.playMediaItem` 与 `playCurrentTrack` 的重复逻辑合并为单一内部实现；**对外行为与事件发射次数不得改变**
+- [x] F7 **F1**：`IframeRenderer` sandbox 注释修正——明确「`allow-scripts allow-same-origin` 组合下，从 URL 导入的第三方 HTML 同样可访问 `parent.document` 与宿主 API」，把风险讲清楚（**sandbox 收紧不在本轮**）
 
 **已批准的裁剪（B4 + 死字段 + 死代码）**
-- [ ] F8 **B4**：砍掉 `chatBindings`——删 `types` 字段与默认值、删 `index.ts` 中不可达的 CHAT_CHANGED 绑定分支
-- [ ] F9 **B1/B2/B3**：砍掉 `enabled` / `muffleOnDrawer` / `playlist` 三个死字段（类型 + 默认值）
-- [ ] F10 **C1–C7**：砍掉 7 处死代码——`CacheManager.touchMedia`、`ServerOrigin.touchMedia`、`SceneManager.setApplyCallback`、`AudioEngine.isWaitingForUnmute`、`AudioEngine.getAnalyserNode`、`IframeRenderer.postMessage`、`MediaMount.syncFitting` **连同**为它存在的 `#bg1` class observer、`AudioVisualizer` pulse 分支未使用的 `brightness`
-- [ ] F11 **B5**：补 `cacheQuotaMB`（滑块，建议范围 128–8192 MB）+ `lruAutoClean`（勾选框）两个控件，按子任务 1 落盘的 `host-native-ui.md` 规范实现（**用现有类，不加行内样式，不加溢光**），接线到 `onSettingsChanged`
+- [x] F8 **B4**：砍掉 `chatBindings`——删 `types` 字段与默认值、删 `index.ts` 中不可达的 CHAT_CHANGED 绑定分支
+- [x] F9 **B1/B2/B3**：砍掉 `enabled` / `muffleOnDrawer` / `playlist` 三个死字段（类型 + 默认值）
+- [x] F10 **C1–C7**：砍掉 7 处死代码——`CacheManager.touchMedia`、`ServerOrigin.touchMedia`、`SceneManager.setApplyCallback`、`AudioEngine.isWaitingForUnmute`、`AudioEngine.getAnalyserNode`、`IframeRenderer.postMessage`、`MediaMount.syncFitting` **连同**为它存在的 `#bg1` class observer、`AudioVisualizer` pulse 分支未使用的 `brightness`
+      > **执行时订正（2026-09-26 重做）**：本条清单文本已过时，两点未按其字面执行——
+      > ① `AudioEngine.isWaitingForUnmute` **保留**（它是 `tests/e2e.mjs:404-410` 的观测面，删了 e2e 必挂），以「重做范围」F10 为准；
+      > ② `ServerOrigin.touchMedia` **在 `11977b4` 就不存在**（`git show HEAD:src/backend/ServerOrigin.ts | grep touchMedia` 无输出），`findings.md` 的 `ServerOrigin.ts:240` 行号引用有误，故实际只删了 `CacheManager.touchMedia` 一处。
+      > 其余 5 处按字面删除：`setApplyCallback`、`getAnalyserNode`、`postMessage`、`syncFitting`+observer、pulse 未使用的 `brightness`。
+- [x] F11 **B5**：补 `cacheQuotaMB`（滑块，建议范围 128–8192 MB）+ `lruAutoClean`（勾选框）两个控件，按子任务 1 落盘的 `host-native-ui.md` 规范实现（**用现有类，不加行内样式，不加溢光**），接线到 `onSettingsChanged`
 
 **明确不做（记录在案）**
 - [ ] F12 **不做** C8（`NativeBgAugmenter` 处置）—— 处置权归子任务 3
@@ -120,34 +124,35 @@
 
 ## Phase E：实施 P0/P1 修复（已由上方定稿清单取代，保留原条目作对照）
 
-- [ ] E1 A1：`MediaMount` 新增 `visible` 状态 + `setVisible()/isVisible()`；`setupContainer` 应用；`doMountMedia` 不触碰 display；`index.ts` 改调用
-- [ ] E2 A2：非持久化背景不写 `activeMediaId`（按 A2-a）+ `init()` 恢复时清理悬空 id 自愈
-- [ ] E3 A3：`NativeBgAugmenter` 非图片项点击 `stopPropagation/preventDefault`，消除双写（并注明将被子任务 3 取代）
-- [ ] E4 其余 P0/P1 项按 `findings.md` 逐个实施
-- [ ] E5 每项修复后 `npx tsc --noEmit` 快验
+- [x] E1 A1：`MediaMount` 新增 `visible` 状态 + `setVisible()/isVisible()`；`setupContainer` 应用；`doMountMedia` 不触碰 display；`index.ts` 改调用
+- [x] E2 A2：非持久化背景不写 `activeMediaId`（按 A2-a）+ `init()` 恢复时清理悬空 id 自愈
+- [x] E3 A3：`NativeBgAugmenter` 非图片项点击 `stopPropagation/preventDefault`，消除双写（并注明将被子任务 3 取代）
+- [x] E4 其余 P0/P1 项按 `findings.md` 逐个实施
+- [x] E5 每项修复后 `npx tsc --noEmit` 快验
 
 ## Phase F：实施 P2 修复
 
-- [ ] F1 E1：`ServerOrigin` 目录短时缓存（TTL 2s）+ 写操作失效 + `invalidateCatalog()` 公开钩子
-- [ ] F2 E2：按 §2.5 评估——实施内存索引镜像，或给出「不做」的书面理由
-- [ ] F3 E3：`objectUrls` 保守有界化（随 cache 条目淘汰同步释放）
-- [ ] F4 D1：天气类型收敛为单一真源（`types` 导出，`PublicAPI` 引用）
-- [ ] F5 D2：原生徽章按类型配色补齐（或统一无类型色，二选一并在 findings 记录理由）
-- [ ] F6 D3：`playMediaItem`/`playCurrentTrack` 重复逻辑合并
-- [ ] F7 F1：复核 iframe sandbox 注释表述是否覆盖「URL 导入的第三方 HTML」；修正表述（sandbox 收紧需用户裁定，不在本轮）
-- [ ] F8 其余 P2 项逐个实施或给出不做理由
-- [ ] F9 `npx tsc --noEmit` 快验
+- [x] F1 E1：`ServerOrigin` 目录短时缓存（TTL 2s）+ 写操作失效 + `invalidateCatalog()` 公开钩子
+- [x] F2 E2：按 §2.5 评估——实施内存索引镜像，或给出「不做」的书面理由
+- [x] F3 E3：`objectUrls` 保守有界化（随 cache 条目淘汰同步释放）
+- [x] F4 D1：天气类型收敛为单一真源（`types` 导出，`PublicAPI` 引用）
+- [x] F5 D2：原生徽章按类型配色补齐（或统一无类型色，二选一并在 findings 记录理由）
+- [x] F6 D3：`playMediaItem`/`playCurrentTrack` 重复逻辑合并
+- [x] F7 F1：复核 iframe sandbox 注释表述是否覆盖「URL 导入的第三方 HTML」；修正表述（sandbox 收紧需用户裁定，不在本轮）
+- [x] F8 其余 P2 项逐个实施或给出不做理由
+- [x] F9 `npx tsc --noEmit` 快验
 
 ## Phase G：回归与收尾
 
 - [ ] G1 A1/A2/A3 修复前证据 + 修复后验证（按 `design.md` §5 的验证表）
 - [ ] G2 E1/E2 性能验证（请求数 / IDB 调用数前后对比）
-- [ ] G3 `npm run type-check && npm run build`
-- [ ] G4 CSS 裸选择器门禁为 0
+- [x] G3 `npm run type-check && npm run build`
+- [x] G4 CSS 裸选择器门禁为 0
 - [ ] G5 e2e + stress + authority 三套件
 - [ ] G6 Dev 冒烟：抽屉开合、切背景、Alt+B、迷你播放器、pulse+视差同开
 - [ ] G7 **未越界核对**：`git diff --stat` 确认未修改 SettingsDrawer 视觉区与原生接管接缝（子任务 1/3 范围）
 - [ ] G8 **未删除核对**：清单比对，确认本轮零删除
+      > **本条已被重做范围取代**：本轮**确有获准删除**（F8 `chatBindings`、F9 三个死字段、F10 6 处死代码、K1 `src/core/ShortcutManager.ts`）。判据改为「删除只出现在获批清单内、无超范围删除」，而不是「零删除」。
 - [ ] G9 更新 `dist/` 并按发现编号分组提交、推送 `origin master`
 - [ ] G10 归档子任务
 
@@ -213,37 +218,55 @@ git diff --stat HEAD -- src/ui/SettingsDrawer.ts src/ui/style.css
 ### 需重做清单（19 项 + 3 处订正）
 
 **第一组（P1 缺陷，来自「Phase E/F 定稿清单」）**
-- [ ] A1 `MediaMount` 受控可见性 + `index.ts` 接线
-- [ ] A2 瞬时背景不写 `activeMediaId` + `init()` 悬空 id 自愈
-- [ ] A3 `NativeBgAugmenter` 阻止冒泡（消除双写）
-- [ ] A4 `refreshMediaGrid` 元素级守卫 + await 后栅格身份复核；删 `lastGridSignature`
-- [ ] A5′ `index.ts` 的 `hasServerDocument` 探测接线（**本体已在，只接线**）
+- [x] A1 `MediaMount` 受控可见性 + `index.ts` 接线
+- [x] A2 瞬时背景不写 `activeMediaId` + `init()` 悬空 id 自愈
+- [x] A3 `NativeBgAugmenter` 阻止冒泡（消除双写）
+- [x] A4 `refreshMediaGrid` 元素级守卫 + await 后栅格身份复核；删 `lastGridSignature`
+- [x] A5′ `index.ts` 的 `hasServerDocument` 探测接线（**本体已在，只接线**）
 
 **第二组（P2 与裁剪，同一清单）**
-- [ ] F2 `CacheManager` 索引内存镜像
-- [ ] F3 `objectUrls` 有界化
-- [ ] F4 天气单一真源（`types` 导出 `WEATHER_TYPES`，`PublicAPI` 两处引用）
-- [ ] F5 原生徽章按类型配色（**仅追加** CSS 规则，勿动子任务 1 已定稿的折叠/去溢光规则）
-- [ ] F6 `playMediaItem`/`playCurrentTrack` 合并为 `startTrack`（**事件发射次数不得变**）
-- [ ] F7 `IframeRenderer` sandbox 注释订正（同源能力表述）
-- [ ] F8 删 `chatBindings`（字段 + `index.ts` 不可达分支）
-- [ ] F9 删 `enabled` / `muffleOnDrawer` / `playlist` 三字段
-- [ ] F10 删 6 处死代码（`touchMedia`×2 / `setApplyCallback` / `getAnalyserNode` / `postMessage` / `syncFitting`+其 observer / `brightness`）。**C3 `isWaitingForUnmute` 必须保留**——它是 `tests/e2e.mjs:404-410` 的观测面
-- [ ] F11 补 `cacheQuotaMB` 滑块 + `lruAutoClean` 勾选框
+- [x] F2 `CacheManager` 索引内存镜像
+- [x] F3 `objectUrls` 有界化
+- [x] F4 天气单一真源（`types` 导出 `WEATHER_TYPES`，`PublicAPI` 两处引用）
+- [x] F5 原生徽章按类型配色（**仅追加** CSS 规则，勿动子任务 1 已定稿的折叠/去溢光规则）
+- [x] F6 `playMediaItem`/`playCurrentTrack` 合并为 `startTrack`（**事件发射次数不得变**）
+- [x] F7 `IframeRenderer` sandbox 注释订正（同源能力表述）
+- [x] F8 删 `chatBindings`（字段 + `index.ts` 不可达分支）
+- [x] F9 删 `enabled` / `muffleOnDrawer` / `playlist` 三字段
+- [x] F10 删 6 处死代码（`touchMedia`×2 / `setApplyCallback` / `getAnalyserNode` / `postMessage` / `syncFitting`+其 observer / `brightness`）。**C3 `isWaitingForUnmute` 必须保留**——它是 `tests/e2e.mjs:404-410` 的观测面
+- [x] F11 补 `cacheQuotaMB` 滑块 + `lruAutoClean` 勾选框
 
 **第三组（快捷键与收尾，来自「追加裁定（第二轮）」）**
-- [ ] K1–K5 移除五个 Alt 快捷键（删 `src/core/ShortcutManager.ts`；清 `index.ts`/`types`/`SettingsDrawer` 的接线与 `shortcutsEnabled`）
-- [ ] K6–K8 背景可见性：面板勾选框 + `index.ts` 回调 + `PublicAPI.setBackgroundVisible()/isBackgroundVisible()`
-- [ ] S1 网格刷新票据（`grid.dataset.refreshSeq`；await 前预约、await 后**相等判定**）
-- [ ] S2 配额变化即时 `cleanLRU`（门控 `lruAutoClean`，仅配额真变时触发）
+- [x] K1–K5 移除五个 Alt 快捷键（删 `src/core/ShortcutManager.ts`；清 `index.ts`/`types`/`SettingsDrawer` 的接线与 `shortcutsEnabled`）
+- [x] K6–K8 背景可见性：面板勾选框 + `index.ts` 回调 + `PublicAPI.setBackgroundVisible()/isBackgroundVisible()`
+- [x] S1 网格刷新票据（`grid.dataset.refreshSeq`；await 前预约、await 后**相等判定**）
+- [x] S2 配额变化即时 `cleanLRU`（门控 `lruAutoClean`，仅配额真变时触发）
 
 **第四组（复核订正）**
-- [ ] 订正 1 `CacheManager.evictCacheEntry` 注释（"挂载项是最后候选"论据不成立；如实写 LRU 不保证 + BGM 残留窗口）
-- [ ] 订正 2 `.trellis/spec/frontend/host-native-ui.md` §3 门禁 → `grep -c 'box-shadow:'`
-- [ ] 订正 3 `.trellis/spec/frontend/state-management.md`：删 `chatBindings` 段；加 A5「启动优先级」与「已知后果（不自愈）」
+- [x] 订正 1 `CacheManager.evictCacheEntry` 注释（"挂载项是最后候选"论据不成立；如实写 LRU 不保证 + BGM 残留窗口）
+- [x] 订正 2 `.trellis/spec/frontend/host-native-ui.md` §3 门禁 → `grep -c 'box-shadow:'`
+- [x] 订正 3 `.trellis/spec/frontend/state-management.md`：删 `chatBindings` 段；加 A5「启动优先级」与「已知后果（不自愈）」
 
 ### 提交纪律（本次事故的直接教训）
 
 **每完成一组立即提交，不攒到最后。** 事故正是因为改动长期留在工作树未提交而全数丢失。
 - 提交信息含编号，如 `fix(audit): A1 受控可见性 …`
 - 组间不要跨文件混提交
+
+### 执行记录（重做，2026-09-26）
+
+- **动手前复核「已存活项」**：F1 / S4 / A5 本体 / D4 / S7.3 / e2e Test14 六条特征串计数分别为 7 / 2 / 2 / 3 / 1 / 1，**全部命中** → 未重做，未改动 `src/backend/ServerOrigin.ts`、`SettingsSync.ts`、`AgentBridge.ts`、`tests/*.mjs`。
+- **第一组 A1–A5′**：全部落地（`MediaMount` 受控可见性；`applyMediaItem(item, persist)` + `init()` 悬空 id 自愈；`NativeBgAugmenter` 阻止冒泡；`refreshMediaGrid` 元素级守卫 + 栅格身份复核并删 `lastGridSignature`；`index.ts` 接 `hasServerSettingsDocument`）。
+  - A1 的 `index.ts` 接线**由 K6 承担**：Alt+B 已随 K1 移除，可见性入口改为面板勾选框 → `PublicAPI.setBackgroundVisible()`。
+- **第二组 F2–F11**：全部落地。F10 见上方执行时订正（`isWaitingForUnmute` 保留 / `ServerOrigin.touchMedia` 本就不存在）。
+  - F6 合并形态：`startTrack(item, mediaUrl?)` 为两个公开方法的唯一入口，src/loop/unmute/play 序列复用既有 `playTrack()`（避免把它变成第三处死代码），`emitTrackChange` 仍是每次成功调用恰好一次。
+  - F4 采用**派生式单一真源**：`types` 的 `WEATHER_TYPES` 常量是唯一真源，`WeatherType` 由它派生（`typeof WEATHER_TYPES[number]`），漂移在编译期即暴露。（`AgentBridge` 的 D4 已直接引用该常量，故 F4 是编译通过的前置条件。）
+  - F5 采用 `var(--st-bg-badge-*, #字面量)` 兜底：原生徽章位于 `.st-bgloader-panel` 作用域**之外**，面板级自定义属性不解析，故必须带字面量回退；**仅追加**规则，未触碰子任务 1 定稿的折叠/去溢光规则。
+- **第三组 K1–K8 / S1–S2**：全部落地。`src/core/ShortcutManager.ts` 已删除；`PublicAPI` 净增 2 个方法、0 删除；A4 与 S1 的守卫状态均落在栅格元素 `dataset` 上（`refreshSeq` / `gridSignature`）。
+- **第四组 3 处订正**：全部落地。
+  - 订正 3 除清单所列两项外，**另同步了一处已失真的表述**：`activeMediaId` 那条「每次 `applyMedia` 均写入」在 A2 后不再成立，已改为「`persist` 为真时写入（默认）」并加「Runtime-only state」小节——否则该 spec 会诱导后来者重新引入 A2。此额外改动已在此显式记录。
+- **静态验证**：`npx tsc --noEmit` 全程绿；`npm run type-check && npm run build` 双绿（`dist/index.js` 177.26 kB、`dist/style.css` 7.41 kB，`dist` 已随构建更新）；CSS 裸选择器门禁 0；`grep -c 'box-shadow:'` 0。
+- **K8 契约面的源级模拟**（照 `probe-k-s-verify.mjs` 的解析规则跑）：wiki 文档化方法 27 个，`src/api/PublicAPI.ts` 声明 40 个，**文档化方法缺失 0 个**，声明集 = 既有 38 + 新增 `setBackgroundVisible` / `isBackgroundVisible`（无删除）。
+- **⚠️ 运行期验证被环境阻塞（需用户处置）**：Dev 实例 `https://127.0.0.1:8003` 上，**ST-BgLoader 处于停用状态**——`SillyTavern.getContext().extensionSettings.disabledExtensions` 含 `"third-party/ST-BgLoader"`，页面无该扩展的 script 标签，故 `window.STBgLoader` 为 `undefined`、`isInitialized` 永不为真；`probe-k-s-verify.mjs` 在等 `isInitialized` 40s 后超时（0 passed / 1 failed）。扩展文件本身在位（实例经 `manifest.json` 的 `js: dist/index.js` 提供本仓 `dist/`，服务端字节数 178523 = 本地 `dist/index.js` 字节数，特征串命中）。
+  → **待用户在实例中重新启用扩展后**，G1/G2/G6 与 `probe-k-s-verify.mjs` / `probe-verify-fixes.mjs` 才能取得运行期证据；G5 三套件按主会话指示本轮未跑。
+- **G7 越界核对的读法需更新**：`git diff --stat HEAD -- src/ui/SettingsDrawer.ts src/ui/style.css` 现在**必然非空**，因为 F11（配额控件）与 F5/K6/S1/A4 本就落在两个文件里——判据应是「只有本子任务获准的那几处改动」，而非「无改动」。已人工核对：样式表只有**追加**的类型徽章规则，折叠规则（`display`/`height` 相关）与去溢光既定规则一字未动。

@@ -85,7 +85,10 @@ a `box-shadow` glow is not part of the host's visual language, and geometric hov
 (`transform: scale()`) make the grid jitter in a way the host never does.
 
 **Rule: no `box-shadow` anywhere in the extension's stylesheet.** Elevation is expressed with a
-border. `grep -c box-shadow src/ui/style.css` must be 0.
+border. `grep -c 'box-shadow:' src/ui/style.css` must be 0.
+
+(The pattern includes the colon on purpose: a bare `grep -c box-shadow` also matches the
+comments that explain *why* there is no shadow, and a false red gate is worse than none.)
 
 ## 4. Exceptions: semantic colours that must NOT follow the theme
 
