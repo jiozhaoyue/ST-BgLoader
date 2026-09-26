@@ -1,0 +1,27 @@
+Dev instance backgrounds/ test-artifact cleanup
+timestamp: 20260926-084638
+reason: user approved "clean both families" (e2e/stress test-animation*, session probe visual-check*)
+manifest before: 20 entries -> after: 2
+manifest backup: manifest-backup-20260926-084638.json
+
+DELETED ENTRIES:
+  test-animation.html	bg_1789286650166_o2aok6j	type=html	src=local
+  test-animation_1789286677837.html	bg_1789286677837_4zm6uzm	type=html	src=local
+  test-animation_1789286692326.html	bg_1789286692325_9azn9wd	type=html	src=local
+  test-animation_1789286812144.html	bg_1789286812143_saxl6g7	type=html	src=local
+  test-animation_1789286825045.html	bg_1789286825044_iveb7y0	type=html	src=local
+  test-animation_1789287043075.html	bg_1789287043074_e03zb3w	type=html	src=local
+  test-animation_1789287057178.html	bg_1789287057177_jt5ry9s	type=html	src=local
+  test-animation_1789806967754.html	bg_1789806967754_e81dqh3	type=html	src=server
+  test-animation_1789808940812.html	bg_1789808940812_yw5feey	type=html	src=server
+  test-animation_1789811170936.html	bg_1789811170935_0lldb30	type=html	src=server
+  test-animation_1790332978530.html	bg_1790332978529_u041d6t	type=html	src=server
+  test-animation_1790335263413.html	bg_1790335263413_7z0nv67	type=html	src=server
+  test-animation_1790341797407.html	bg_1790341797407_rbbuhj6	type=html	src=server
+  test-animation_1790345061770.html	bg_1790345061770_njf6kye	type=html	src=server
+  test-animation_1790359126754.html	bg_1790359126753_oqeptuc	type=html	src=server
+  visual-check.svg	bg_1790359426395_f6gcrhn	type=svg	src=server
+  visual-check_1790359463100.svg	bg_1790359463099_f7oqq6n	type=svg	src=server
+  visual-check_1790359542971.svg	bg_1790359542970_fu0rooy	type=svg	src=server
+
+PROTECTED (untouched): st-bg-loader-manifest.json, st-bg-loader-settings.json, favicon.ico (manifest entry kept), legacy-seed.html, all user backgrounds

@@ -58,7 +58,67 @@
 - A2 复核留下悬空 `activeMediaId` → 已跨**三套存储**清理并实测三方一致（`localStorage` / 服务端文档 / KV 镜像均为 `null`）。
 - 探针在服务端 `backgrounds/` 留下了 `visual-check*.svg` 与既有 e2e/stress 产物（`test-animation*.html` 等）。**未擅自删除这些文件**——删除属不可逆操作，已列入待用户确认事项。
 
-## Phase E：实施 P0/P1 修复
+
+## 用户裁定（2026-09-26）与 Phase E/F 定稿清单
+
+> 四项决策**全部采用推荐项**。以下为本任务获准执行的完整工作集，其余一切不改。
+
+| 决策点 | 裁定 |
+| --- | --- |
+| 冗余清理与一致性整理 | **全部执行** —— 砍 3 个死字段 + 7 处死代码；并做 D1 天气真源收敛、D2 原生徽章配色补齐、D3 播放逻辑合并 |
+| 半接线字段 | **B4 砍掉 + B5 补控件** |
+| A5 修复方向 | **KV 降为回退** —— KV 仅在服务端文档缺失/不可读时用作回退；服务端文档为本机真源 |
+| Dev 实例测试产物 | **两类都清** —— 已执行（见下） |
+
+### Phase E — P0/P1 修复（定稿）
+
+- [ ] E1 **A1**：`MediaMount` 新增 `visible` 受控状态 + `setVisible()/isVisible()`；`setupContainer()` 末尾应用；`doMountMedia()` **不触碰** `display`；`index.ts` 的 `onToggleBackground` 改为调用 `setVisible()`
+- [ ] E2 **A2**：`PublicAPI.setBackground` 在 `saveToLibrary` 非真时**不写** `settings.activeMediaId`（仅设内存态）；`index.ts` `init()` 恢复背景时若 `getMedia(activeMediaId)` 为 `null` → 置 `null` 并保存（自愈）
+- [ ] E3 **A3**：`NativeBgAugmenter` 非 `image` 项点击处理加 `preventDefault()` + `stopPropagation()`，消除双写；**注释须写明「本处理将被子任务 3 的 `NativeBackgroundController` 取代」**
+- [ ] E4 **A4**（子任务 1 转交）：`refreshMediaGrid` 的守卫改为**元素级**（`grid.dataset.gridSignature`），并在 `await` 之后复核 `this.container` 里的栅格是否仍是同一个（否则 return，交给那次渲染自己填充）；删除 `private lastGridSignature` 字段及 `render()` 中对它的重置
+- [ ] E5 **A5**：`SettingsSync.start()` 不再无条件套用 KV 镜像。改为**先比对服务端文档**：仅当服务端文档缺失/不可读时才用 KV 回退。`SettingsSync` 需要能读到服务端文档的存在性与 revision（经 `ServerSettings.load()`），并据此决定是否套用
+- [ ] E6 每项修复后 `npx tsc --noEmit` 快验；**每个发现独立提交**（提交信息含编号）
+
+### Phase F — P2 修复与已批准的裁剪/整理（定稿）
+
+**性能**
+- [ ] F1 **E1**：`ServerOrigin` 目录短时缓存（TTL 2000ms）+ 写操作（`putMedia`/`deleteMedia`）成功后失效 + 公开 `invalidateCatalog()` 钩子供子任务 3 调用
+- [ ] F2 **E2**：`CacheManager.touchCache` 去全量 `indexAll()`——维护内存索引镜像，首次 `init()` 读一次 IDB，其后读写走内存 + 异步落盘；`clearAll`/`cleanLRU` 前强制重读
+- [ ] F3 **E3**：`objectUrls` 保守有界化——随 cache 条目淘汰同步 `revokeObjectURL`（只释放不再被 LRU 追踪的条目）
+
+**一致性 / 去重**
+- [ ] F4 **D1**：天气类型收敛为单一真源——`types/index.ts` 导出 `WEATHER_TYPES` 常量，`PublicAPI` 的两处（常量与 `cycleWeather` 字面量）改为引用它
+- [ ] F5 **D2**：原生徽章按类型配色补齐——在 `style.css` 补 `.st-bg-native-badge.video/.audio/.html/.svg`，复用面板作用域的 `--st-bg-badge-*`（与媒体库徽章一致）
+- [ ] F6 **D3**：`AudioEngine.playMediaItem` 与 `playCurrentTrack` 的重复逻辑合并为单一内部实现；**对外行为与事件发射次数不得改变**
+- [ ] F7 **F1**：`IframeRenderer` sandbox 注释修正——明确「`allow-scripts allow-same-origin` 组合下，从 URL 导入的第三方 HTML 同样可访问 `parent.document` 与宿主 API」，把风险讲清楚（**sandbox 收紧不在本轮**）
+
+**已批准的裁剪（B4 + 死字段 + 死代码）**
+- [ ] F8 **B4**：砍掉 `chatBindings`——删 `types` 字段与默认值、删 `index.ts` 中不可达的 CHAT_CHANGED 绑定分支
+- [ ] F9 **B1/B2/B3**：砍掉 `enabled` / `muffleOnDrawer` / `playlist` 三个死字段（类型 + 默认值）
+- [ ] F10 **C1–C7**：砍掉 7 处死代码——`CacheManager.touchMedia`、`ServerOrigin.touchMedia`、`SceneManager.setApplyCallback`、`AudioEngine.isWaitingForUnmute`、`AudioEngine.getAnalyserNode`、`IframeRenderer.postMessage`、`MediaMount.syncFitting` **连同**为它存在的 `#bg1` class observer、`AudioVisualizer` pulse 分支未使用的 `brightness`
+- [ ] F11 **B5**：补 `cacheQuotaMB`（滑块，建议范围 128–8192 MB）+ `lruAutoClean`（勾选框）两个控件，按子任务 1 落盘的 `host-native-ui.md` 规范实现（**用现有类，不加行内样式，不加溢光**），接线到 `onSettingsChanged`
+
+**明确不做（记录在案）**
+- [ ] F12 **不做** C8（`NativeBgAugmenter` 处置）—— 处置权归子任务 3
+- [ ] F13 **不做** iframe sandbox 收紧（需另行裁定）
+- [ ] F14 **不做** 设置面板「保存场景」改调 `PublicAPI.saveCurrentScene`（未批准）
+
+### 执行纪律
+
+- **一次都不许删除** unapproved 项；F8–F10 是**唯一**获准的删除动作。
+- 每项独立提交，提交信息含编号（`fix(audit): A1 …` / `chore(audit): prune B1-B3 …`）。
+- 所有改动须遵守 `.trellis/spec/frontend/host-native-ui.md`（子任务 1 落盘）：不加行内结构样式、不加 `box-shadow`、不自建宿主已提供的机制。
+- **不修改** `Wiki`/`README`（归子任务 4）。
+
+### 实例侧清理（已执行，用户已批准）
+
+- Dev 实例 `data/default-user/backgrounds/` 中的测试产物已清理：**18 个文件**（15 个 `test-animation*.html` + 3 个 `visual-check*.svg`），并同步移除 manifest 中对应的 18 条登记（20 → 2 条），避免留下指向已删文件的幽灵条目。
+- 当时实例未运行，故采用**磁盘层等价操作**（删文件 + 同步改 manifest），而非扩展的 `deleteMedia`。
+- **manifest 已备份**：`research/manifest-backup-20260926-084638.json`；操作清单留痕 `research/instance-cleanup-20260926-084638.txt`。
+- **未触碰**：`st-bg-loader-manifest.json`、`st-bg-loader-settings.json`、用户真实背景、`legacy-seed.html`。
+- **附带发现（未处理，仅记录）**：manifest 中登记了 `favicon.ico`（`src=url`，type=image）——即宿主自身的 favicon 被扩展当成了媒体条目，会在媒体库里显示为一张垃圾卡；另有早期条目的 `source` 值为 `local`，越出 `MediaSource = 'url' | 'server'` 联合类型（老版本遗留）。
+
+## Phase E：实施 P0/P1 修复（已由上方定稿清单取代，保留原条目作对照）
 
 - [ ] E1 A1：`MediaMount` 新增 `visible` 状态 + `setVisible()/isVisible()`；`setupContainer` 应用；`doMountMedia` 不触碰 display；`index.ts` 改调用
 - [ ] E2 A2：非持久化背景不写 `activeMediaId`（按 A2-a）+ `init()` 恢复时清理悬空 id 自愈
