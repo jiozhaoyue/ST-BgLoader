@@ -140,11 +140,26 @@ set chatMetadata(value) { updateChatMetadata(value, true); },
 
 ---
 
-## 三、仍未决（执行时实测裁定）
+## 三、U-1 结案：`stop()` 能否不刷新页面恢复原生背景图
 
-| 编号 | 内容 | 裁定方式 |
-| --- | --- | --- |
-| U-1 | `stop()`（关接管开关）后**能否在不刷新页面的前提下**完全恢复原生背景图（`design.md` §5 的已知粗糙点） | 执行 Phase F 时实测；若不能完全恢复，写进接管开关的 UI 文案 |
+**结论：可以恢复，不需要刷新页面，因此不加 UI 文案。**
+
+实现方式：`install()` 时把 `#bg1` 的内联 `background-image` 快照到 `savedNativeBgImage`，
+`stop()` 时写回（值相同则跳过）。宿主自己的 loader（`setBackground` / `onChatChanged`）不可调用，
+所以走快照回写。
+
+**实测证据**（`research/probe-takeover-matrix.mjs` F 组）：接管期间 `#bg1` 为 `""`，
+切到 `off` 后变回 `url("/backgrounds/__transparent.png")` —— 即接管开始时的值。同组还验证了
+关闭后宿主重新接管点击（其 `.selected-background` 正常移动到被点的缩略图）。
+
+**残留窗口（如实记录，不修）**：快照取自**接管开始时刻**，而接管期间宿主无法更新全局背景
+（那些点击都被我们拦了），所以宿主的自我认知仍与快照一致 —— 唯一对不上的是**接管期间切换了聊天**：
+宿主本想在 `CHAT_CHANGED` 时显示新聊天的锁定/默认背景，而我们回写的是旧快照。表现是关闭接管后
+**短暂**显示旧背景，直到下一次原生动作（点缩略图或再切聊天）自愈。
+
+不进一步处理的原因：要修就得在接管期间持续跟读宿主**想要**的值，而那个值在 `background_settings`
+（不可达）与 chat 元数据之间，且宿主自己的写入已被我们拦掉 —— 为一个「关闭开关后短暂显示旧背景」
+的窗口引入持续跟踪不值得。已在 `NativeBackgroundController.restoreNativeBackgroundImage()` 的注释里写明。
 
 ## 四、Phase A 基线（2026-09-26）
 

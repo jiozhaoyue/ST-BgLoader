@@ -222,6 +222,11 @@ try {
             if (init.activeMediaId) {
                 const item = await ext.getCacheManager().getMedia(init.activeMediaId);
                 if (item) await ext.applyMedia(item);
+            } else {
+                // S2 deliberately mounts a background to exercise the click path, so with an
+                // initially empty state there is something to undo. (Without this the probe
+                // leaves the instance changed — the residue class flagged in the audit.)
+                window.stBgLoader.clearBackground();
             }
             // saveSettings() is debounced — give the write time to land before the page closes,
             // otherwise the next run starts from this run's state (observed once).
