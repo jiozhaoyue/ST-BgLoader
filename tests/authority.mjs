@@ -262,11 +262,25 @@ async function main() {
             const page = await openPage(browser);
             const urlImport = await page.evaluate(async () => {
                 const api = window.stBgLoader;
-                const testUrl = window.location.origin + '/favicon.ico';
+                // Fixture note (2026-09-26): this used to preload the host's own /favicon.ico,
+                // which S4 now deliberately keeps OUT of the library (a host-owned favicon.ico
+                // was surfacing as a junk media card) — so it would never be found here. A
+                // self-contained blob URL exercises the same URL-import + dedupe path without
+                // depending on a host file, and is removed again below.
+                const payload = new Blob([new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])], { type: 'image/png' });
+                const testUrl = URL.createObjectURL(payload);
                 const first = (await api.preloadMedia([testUrl], { concurrency: 1 }))[0];
                 const second = (await api.preloadMedia(testUrl))[0];
                 const list = await api.getMediaList();
-                return { firstSuccess: first?.success, secondCached: second?.cached, found: list.some(i => i.url === testUrl) };
+                const found = list.find(i => i.url === testUrl);
+                const result = { firstSuccess: first?.success, secondCached: second?.cached, found: !!found };
+                try {
+                    if (found) await window.STBgLoader.getCacheManager().deleteMedia(found.id);
+                } catch (e) {
+                    result.cleanupError = String(e);
+                }
+                URL.revokeObjectURL(testUrl);
+                return result;
             });
             ok('S4.1 URL import stored server-side + dedupe', urlImport.firstSuccess && urlImport.secondCached && urlImport.found,
                 JSON.stringify(urlImport));

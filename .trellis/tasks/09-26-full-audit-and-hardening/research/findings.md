@@ -9,7 +9,24 @@
 
 ## 一、确认的用户可见缺陷
 
-### A1 — Alt+B 隐藏背景后，新选中的背景永不显示（P1 · 实测）
+### A1 — Alt+B 隐藏背景后的可见性**状态管理**缺陷（**P2 · 原定性 P1 已复核下调**）
+
+> **⚠️ 本项结论经 `trellis-check` 复核后更正**（原记录在事故中丢失，此处重述）。原标题把
+> 「隐藏后切背景不显示」当作用户可见缺陷（P1）。复核指出并**经复盘确认**：修复前后
+> **可观测行为完全一致**——都是「隐藏后切背景仍隐藏」。因为**原实现的 `display` 切换本身
+> 就是全局开关语义**（`display === 'none' ? 'block' : 'none'`，按两次即恢复）。
+>
+> 因此**「隐藏后切背景不显示」不是缺陷，而是既定行为**；把它当缺陷是原报告的定性错误。
+>
+> **本项中真正成立、且已修复的两点**：
+> 1. **按键意图被吞（真实修复）**：旧代码 `if (cont) { … }` —— 若 `#bg1`/容器尚未出现，
+>    按键被静默吞掉、意图永久丢失。新实现先把状态落进 `MediaMount.visible`，容器创建时
+>    由 `setupContainer()` 补写。
+> 2. **可见性由 DOM 行内样式迁为受控状态**：成为单一真源（`MediaMount` 持有 + 设置字段持久化）。
+>
+> **后续演进**：Alt+B 已随 K1 移除（Alt+F 撞浏览器主菜单、Ctrl+Alt 为 Windows 保留组合），
+> 改为面板勾选框 + `PublicAPI.setBackgroundVisible/isBackgroundVisible`，并**持久化**
+> `settings.backgroundVisible`（见 §十二 A1 组实测）。
 
 **证据**（`probe-verify-seeds.mjs`）：
 
@@ -119,14 +136,16 @@ public async start(): Promise<void> {
 
 | 编号 | 位置 | 说明 |
 | --- | --- | --- |
-| C1 | `CacheManager.ts:110` / `ServerOrigin.ts:240` | `touchMedia` 两处均空实现，无调用者 |
-| C2 | `SceneManager.ts:12` | `setApplyCallback` 无调用者（回调经构造函数传入） |
-| C3 | `AudioEngine.ts:74` | `isWaitingForUnmute` 无调用者 |
-| C4 | `AudioEngine.ts:125` | `getAnalyserNode` 无调用者（分析器经 `onAnalyserReady` 下发） |
-| C5 | `IframeRenderer.ts:59` | `postMessage` 无调用者 |
-| C6 | `MediaMount.ts:145-147,183-185` | `syncFitting()` 空实现；为它存在的 `#bg1` class observer 每次类变化唤醒却什么也不做 |
-| C7 | `AudioVisualizer.ts:140` | pulse 分支 `const brightness = 100 + pump * 25` 计算后从未使用 |
-| **C8** | `NativeBgAugmenter.ts:41-52` | **实测**：当前宿主上仅对 `.svg` 生效（原生网格 27 项全为图片扩展名，其中 3 个 `.svg` 被判为 `'svg'` 类型）。即该组件的「非图片徽章 + 点击接管」功能面对 `MediaType` 中的 video/audio/html 实际为空——因为原生网格不列这些文件。**其价值集中在子任务 3 的接管上，独占存在意义薄弱。** |
+| C1 | `CacheManager.ts:110` | `touchMedia` 空实现，无调用者。**执行时订正**：原记录写的 `ServerOrigin.ts:240` 有误——该文件在 `11977b4` 里根本没有 `touchMedia`（更早的任务已删）。已删除（F10） |
+| C2 | `SceneManager.ts:12` | `setApplyCallback` 无调用者（回调经构造函数传入）。已删除（F10） |
+| C3 | `AudioEngine.ts:74` | ~~`isWaitingForUnmute` 无调用者~~ → **本项结论错误，已推翻**：`tests/e2e.mjs:404-410` 用 `engine.isWaitingForUnmute()` 作为**第 13 项（autoplay 解锁）的观测面**，删除它 e2e 必挂。原结论来自只扫 `src/` 的交叉引用，**漏扫了 `tests/`**。→ **保留**，源码处已加注释标明「回归套件观测面」 |
+| C4 | `AudioEngine.ts:125` | `getAnalyserNode` 无调用者（分析器经 `onAnalyserReady` 下发）。已删除（F10） |
+| C5 | `IframeRenderer.ts:59` | `postMessage` 无调用者。已删除（F10） |
+| C6 | `MediaMount.ts:145-147,183-185` | `syncFitting()` 空实现；为它存在的 `#bg1` class observer 每次类变化唤醒却什么也不做。已删除（F10，观察者一并移除） |
+| C7 | `AudioVisualizer.ts:140` | pulse 分支 `const brightness = 100 + pump * 25` 计算后从未使用。已删除（F10） |
+| **C8** | `NativeBgAugmenter.ts:41-52` | **实测**：当前宿主上仅对 `.svg` 生效（原生网格 27 项全为图片扩展名，其中 3 个 `.svg` 被判为 `'svg'` 类型）。即该组件的「非图片徽章 + 点击接管」功能面对 `MediaType` 中的 video/audio/html 实际为空——因为原生网格不列这些文件。**其价值集中在子任务 3 的接管上，独占存在意义薄弱。** 处置权归子任务 3（用户裁定） |
+
+> **C3 的教训（值得沉淀）**：交叉引用式死代码检测**必须把 `tests/` 纳入扫描范围**。本仓三套件把插件内部状态当作观测面（`window.STBgLoader` 上的实例与其子系统直接暴露），因此「仓内无调用者」不等于「无人使用」。下轮体检的检测命令应形如 `grep -rn "<symbol>" src/ tests/`。
 
 ## 四、一致性
 
@@ -157,3 +176,117 @@ public async start(): Promise<void> {
 - **`NativeBgAugmenter` 会在宿主渲染后正确补标**：`augmentedAnchors: 27`，说明 MutationObserver 重施逻辑工作正常，子任务 3 的选中态重施可复用同一机制。
 - **`/api/backgrounds/all` 只返回图片**（27 项，非图片 0），响应字段 `images`/`config`，**已实测确认**。
 - 因此子任务 3 的 T2 是唯一有实质效果的层级（T1 近乎空操作）；T3（把扩展非图片媒体注入原生网格）的动机被加强（扩展自有 19 个非图片条目在原生网格中完全不可见），但其成本/风险不变，用户已裁定不做。
+
+---
+
+## 十二、重做后的运行期验收结果（2026-09-26，Dev Luker :8003）
+
+> 前置：实例上本扩展曾被停用（`disabledExtensions`），经用户授权从实例
+> `data/default-user/settings.json` 移除该条目并重启后恢复加载。停用的事实与证据见
+> `probe-ext-state.mjs` / `probe-ext-state2.mjs`。
+
+| 套件 / 探针 | 结果 |
+| --- | --- |
+| `npm run test:e2e` | **24/24 通过** |
+| `node tests/stress.mjs` | **4/4 通过** |
+| `node tests/authority.mjs` | **18/18 通过**（真后端；含修好的 S4.1 与 S7.3） |
+| A1–A5 专项探针 `probe-verify-fixes.mjs` | **18/18 通过** |
+| 子任务 1 折叠回归 `probe-fold.mjs` | **全通过**（未打坏上一轮成果） |
+| `npm run type-check` + `npm run build` | 双绿 |
+| 裸选择器 / `box-shadow` 声明 | 0 / 0 |
+
+### A1–A5 逐条结论
+
+- **A1（7 项）**：`PublicAPI.setBackgroundVisible(false)` 隐藏容器、面板勾选框同步、
+  API 回报一致、随后切背景**保持隐藏**（受控状态不丢）、`true` 恢复可见；
+  **隐藏态跨全新页面加载保持**（经服务端设置文档往返，新页面 localStorage 为空故
+  只能来自文档）；勾选框在重载后正确回显。**持久化已实测生效。**
+- **A2（3 项）**：瞬时背景不产生 `custom_*` 虚拟 id（运行态与 localStorage 均保持原值）；
+  背景仍正常挂载渲染。
+- **A3（3 项）**：临时上传 SVG 使其进入原生网格 → 点击它：**宿主不再改写 `#bg1` 的
+  `background-image`**（双写消除），扩展自身背景正常切换；临时文件已删除。
+- **A4（2 项）**：**10/10 次**全新加载栅格均有内容（修复前实测 3 次中 2 次为空）；
+  刻意逆序（第 2 次 `listMedia` 延迟 900ms）下同样有内容。
+- **A5（3 项）**：植入陈旧 KV 标记（`volume=0.11`、KV revision 76，服务端文档
+  `0.33`/revision 365）→ 全新加载后**服务端文档胜出（0.33）**，陈旧值未复活；
+  KV 已复原为服务端文档内容。
+
+### 验收探针的两处自身缺陷（已修，非产品问题）
+
+1. **A1 原本用 Alt+B 驱动** —— 该快捷键已随 K1 移除，探针随之失效。已改为
+   `PublicAPI.setBackgroundVisible` + 面板勾选框，并补上持久化断言。
+2. **同页再导航会挂起** —— 探针在改动状态后用 `page.goto`/`reload` 重载同一页面时
+   导航超时（SillyTavern 注册了 `beforeunload`，自动化下会拦住）。已改为**开新页面**
+   验证，这同时是更严格的持久化证明（新页面无旧 localStorage）。
+
+### 两处测试素材修复（因批准的行为变更而适配，断言一字未动）
+
+- `tests/e2e.mjs` Test 14 与 `tests/authority.mjs` S4.1 原以宿主自身的
+  `/favicon.ico` 作测试素材；S4 批准把 `favicon.ico` 排除出媒体库后，该素材必然找不到。
+  改为**自包含 blob URL** 并让用例**自清理**（此前每次运行都会往服务端库塞一个
+  `favicon.ico` 副本——这正是 M1 垃圾卡片的来源）。
+
+### 仍未处理（留待后续）
+
+- `tests/authority.mjs` 的 `openPageWithClearedLocalSettings` 的 `window.top === window`
+  修复已在位（事故中存活回填）。
+- `wiki/` 仍宣传已移除的 Alt 快捷键，`Public-API-Reference.md` 缺 3 个新条目
+  （`setBackgroundVisible` / `isBackgroundVisible` / `background-visibility-change`）
+  → 归子任务 4。
+
+---
+
+## 十三、`trellis-check` 复核提出的残留项与处置
+
+> 本节在事故中丢失后重述。复核结论：**无 P0**；无越界、无契约破坏、无确定性缺陷。
+
+### 已在重做中随项解决
+
+| 编号 | 内容 | 处置 |
+| --- | --- | --- |
+| RES-1 | A4 同栅格并发残留：较旧快照可能后落地覆盖较新内容（表现为「新导入卡片暂时不显示」，自愈） | ✅ **由 S1 解决**——刷新票据存 `grid.dataset.refreshSeq`，await 前预约、await 后相等判定 |
+| RES-2 | 配额滑块不即时生效（要等下次上传才清理） | ✅ **由 S2 解决**——`enforceQuotaIfChanged()`，门控 `lruAutoClean`，仅配额真变时触发 |
+| RES-3 | F3 的 BGM 残留风险：正在播放的音乐，其 objectURL 可能被上传触发的 cleanLRU revoke | ✅ **实测结案：不成立，不加固**（详下） |
+| 复核订正 1 | `CacheManager.evictCacheEntry` 注释「挂载项是最后候选」的论据不成立 | ✅ 已如实改写（LRU 不保证 + 写明真实残留窗口） |
+| 复核订正 2 | `host-native-ui.md` 门禁命令会被说明性注释假红 | ✅ 已改为 `grep -c 'box-shadow:'` |
+| 复核订正 3 | `state-management.md` 未同步 `chatBindings` 移除与 A5 优先级 | ✅ 已同步（另加「Runtime-only state」小节） |
+
+### RES-3 的实测结案（`probe-s3-evict-during-playback.mjs`，25/25 通过）
+
+淘汰**确实发生**（objectURL 实测 `REVOKED`、索引条目清零），但媒体元素**全部存活**：
+
+| 场景 | 观测 |
+| --- | --- |
+| BGM 已缓冲 + `cleanLRU(1)` | currentTime 正常推进、`paused=false`、`error=null` |
+| BGM 已缓冲 + `clearAll()` | 同上 |
+| BGM **曲中**（blob 源在播）+ `cleanLRU(1)` | currentTime 推进、淘汰瞬间 `readyState=4` |
+| 已挂载 image 背景 + `cleanLRU(1)` | `complete=true`、`naturalWidth=64`、图层 opacity=1 |
+| 已挂载 svg(iframe) 背景 + `clearAll()` | iframe 文档仍在；冷缓存重挂返回服务端直连 |
+
+**结构性理由**：缓存命中路径是「CacheStorage 取 Blob → `createObjectURL`」，objectURL 指向
+**已在内存的 Blob**，revoke 不中断已开始的资源加载；未命中路径元素直接用服务端相对 URL，
+**根本没有 objectURL 可 revoke**。「网络流被 revoke 掐断」这一时序不可达。
+附带：淘汰若抢在 URL 解析前落地（上传路径真实时序），`getMediaBlobUrl` 会**自愈**回服务端直连。
+
+### 仍未处理（记录在案）
+
+| 编号 | 内容 | 归属 |
+| --- | --- | --- |
+| RES-4 | `ServerOrigin.invalidateCatalog()` 目前无外部调用者（为子任务 3 预留）。若子任务 3 不落地它即为新死代码 | 子任务 3 决断 |
+| RES-5 | `listCatalog()` 返回浅拷贝（只复制数组、共享 `MediaItem`）；当前调用方只读 | 仅记录 |
+| RES-6 | A3 的 `stopPropagation()` 会拦掉**所有** document 冒泡阶段 click，不只宿主的 `onSelectBackgroundClick`。现实影响很小（仅 `.svg` 受影响） | Dev 冒烟 + 子任务 3 |
+| RES-7 | F2 的内存镜像与 IDB 为**最终一致、非强一致**（两处有界小窗口，下次 reload 自愈） | 仅记录，不再投入 |
+
+---
+
+## 十四、其他新发现（复核阶段报出，记录在案）
+
+| 编号 | 内容 | 处置 |
+| --- | --- | --- |
+| D4 | 天气词汇**第 4 处**真源：`AgentBridge.ts` 的工具描述与 JSON-schema `enum` | ✅ 已收敛（引用 `WEATHER_TYPES`）；**第 5 处**（设置面板 `<option>`）也已收敛为派生（`WEATHER_LABELS` + `Record<WeatherType,string>`，漏标签即编译错误） |
+| E4 | `--noUnusedLocals` 下暴露 4 处**既有**未用声明（`index.ts`/`SettingsDrawer` 的 `MediaType` 导入、`forEach` 的 `filters`、`AudioVisualizer` 的 `VisualizerMode`）。**HEAD 即存在，非本轮引入**；`tsconfig` 未开该选项故 `type-check` 不报 | 仅记录（不扩大删除面） |
+| M1 | manifest 把宿主自身 `favicon.ico` 登记为媒体条目 → 媒体库出现垃圾卡片 | ✅ **根因查明即测试素材**：`tests/e2e.mjs` Test 14 与 `authority.mjs` S4.1 都以 `/favicon.ico` 作预载素材，每次运行都往服务端库塞一份。双管齐下：S4 读侧过滤 + 两处素材改自包含 blob URL 并自清理 |
+| M2 | manifest 中早期条目的 `source` 值为 `'local'`，越出 `MediaSource = 'url' \| 'server'` | 仅记录（老版本遗留，当前代码不再写入该值） |
+| M3 | 媒体库存在指向已失效外部 URL 的条目（实测 `files.catbox.moe/...` 404） | 仅记录（属用户数据） |
+| — | 设置面板「保存场景」按钮另有一套内联实现，未复用 `PublicAPI.saveCurrentScene` | 未获批准，未动 |
+| — | `PublicAPI.setBackgroundVisible` 未接入 `buildAgentHost`，AI 导演模式暂无法开关背景 | 下一轮小增量 |

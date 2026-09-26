@@ -26,36 +26,73 @@ async function freshPage() {
 
 try {
     // ══════════ A1：Alt+B 隐藏后切背景应恢复可见 ══════════
-    console.log('\n===== A1: Alt+B hide then switch background =====');
+    console.log('\n===== A1: background visibility is a controlled, persisted state =====');
     {
         const p = await freshPage();
         const r = await p.evaluate(async () => {
             const ext = window.STBgLoader;
             const disp = () => ext.getMediaMount().getContainerElement()?.style.display || '(unset)';
             const vis = () => ext.getMediaMount().isVisible();
-            const before = { disp: disp(), vis: vis() };
-            window.dispatchEvent(new KeyboardEvent('keydown', { key: 'b', altKey: true, bubbles: true }));
+            const apiVis = () => window.stBgLoader.isBackgroundVisible();
+            const setting = () => ext.getSettings().backgroundVisible;
+            const cb = () => document.querySelector('#st_bg_visible')?.checked;
+
+            const before = { disp: disp(), vis: vis(), apiVis: apiVis(), setting: setting() };
+            // Alt+B is gone (removed 2026-09-26); visibility is now driven by the panel checkbox
+            // and PublicAPI, both routing through one write path.
+            window.stBgLoader.setBackgroundVisible(false);
             await new Promise(r => setTimeout(r, 250));
-            const hidden = { disp: disp(), vis: vis() };
+            const hidden = { disp: disp(), vis: vis(), apiVis: apiVis(), setting: setting(), cb: cb() };
+
             const items = await ext.getCacheManager().listMedia();
             const other = items.find(i => i.id !== ext.getSettings().activeMediaId) || items[0];
             await ext.applyMedia(other);
             await new Promise(r => setTimeout(r, 900));
             const afterSwitch = { disp: disp(), vis: vis(), otherName: other?.name };
-            // 再按一次应恢复隐藏
-            window.dispatchEvent(new KeyboardEvent('keydown', { key: 'b', altKey: true, bubbles: true }));
+
+            window.stBgLoader.setBackgroundVisible(true);
             await new Promise(r => setTimeout(r, 250));
-            const toggledBack = { disp: disp(), vis: vis() };
-            return { before, hidden, afterSwitch, toggledBack };
+            const restored = { disp: disp(), vis: vis(), apiVis: apiVis(), setting: setting(), cb: cb() };
+
+            // Leave it hidden so the reload below can prove the setting persists.
+            window.stBgLoader.setBackgroundVisible(false);
+            await new Promise(r => setTimeout(r, 1400));   // let the debounced settings write land
+            return { before, hidden, afterSwitch, restored };
         });
         console.log('  ', JSON.stringify(r));
-        check('A1-1 Alt+B hides container', r.hidden.disp === 'none' && r.hidden.vis === false);
-        check('A1-2 switching background keeps it hidden (visibility is a controlled state, not lost)',
+        check('A1-1 setBackgroundVisible(false) hides container and records the setting',
+            r.hidden.disp === 'none' && r.hidden.vis === false && r.hidden.setting === false,
+            `display=${r.hidden.disp} setting=${r.hidden.setting}`);
+        check('A1-2 panel checkbox reflects the state', r.hidden.cb === false, `checked=${r.hidden.cb}`);
+        check('A1-3 PublicAPI reports the same state', r.hidden.apiVis === false);
+        check('A1-4 switching background keeps it hidden (controlled state, not lost)',
             r.afterSwitch.disp === 'none' && r.afterSwitch.vis === false, `display=${r.afterSwitch.disp}`);
-        check('A1-3 Alt+B again restores visibility',
-            r.toggledBack.disp === 'block' && r.toggledBack.vis === true, `display=${r.toggledBack.disp}`);
-        check('A1-4 MediaMount state matches the DOM (single source of truth)',
-            (r.afterSwitch.vis === (r.afterSwitch.disp !== 'none')) && (r.toggledBack.vis === (r.toggledBack.disp !== 'none')));
+        check('A1-5 setBackgroundVisible(true) restores visibility',
+            r.restored.disp === 'block' && r.restored.vis === true && r.restored.setting === true,
+            `display=${r.restored.disp}`);
+
+        // A1-6: persistence — the whole point of the 2026-09-26 follow-up.
+        // Persistence is proved on a BRAND NEW page (empty localStorage, so the value can only
+        // have come back through the server settings document). Navigating the same page is
+        // avoided deliberately: SillyTavern registers a beforeunload handler and an in-place
+        // navigation can hang behind it under automation.
+        await sleep(1200);   // let the debounced settings write reach the server document
+        const p2 = await freshPage();
+        const after = await p2.evaluate(() => ({
+            disp: window.STBgLoader.getMediaMount().getContainerElement()?.style.display || '(unset)',
+            setting: window.STBgLoader.getSettings().backgroundVisible,
+            cb: document.querySelector('#st_bg_visible')?.checked,
+        }));
+        console.log('   fresh page:', JSON.stringify(after));
+        check('A1-6 hidden state survives a fresh page load (persisted via the settings document)',
+            after.setting === false && after.disp === 'none',
+            `setting=${after.setting} display=${after.disp}`);
+        check('A1-7 checkbox reflects the persisted state after reload', after.cb === false, `checked=${after.cb}`);
+
+        // Restore the default so the probe leaves no visible change behind.
+        await p2.evaluate(() => window.stBgLoader.setBackgroundVisible(true));
+        await sleep(1400);
+        await p2.close();
         await p.close();
     }
 
@@ -91,7 +128,7 @@ try {
     // ══════════ A3：原生 SVG 缩略图点击不得双写 ══════════
     console.log('\n===== A3: no double-write when clicking a native SVG thumbnail =====');
     {
-        const p = await freshPage();
+        let p = await freshPage();
         // 临时上传一个 SVG，使其出现在原生网格中
         const uploaded = await p.evaluate(async () => {
             const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="68"><rect width="120" height="68" fill="#204060"/></svg>';
@@ -100,9 +137,11 @@ try {
         });
         console.log('   临时上传:', JSON.stringify(uploaded));
         await sleep(1500);
-        // 重新加载，让原生网格包含该文件
-        await p.goto(TARGET_URL, { waitUntil: 'domcontentloaded', timeout: 30000 });
-        await p.waitForFunction(() => window.STBgLoader?.isInitialized, { timeout: 40000 });
+        // Reopen on a FRESH page (an in-place navigation can hang behind SillyTavern's
+        // beforeunload guard once the probe has mutated state) so the native grid is rebuilt
+        // and now includes the new file.
+        await p.close();
+        p = await freshPage();
         await sleep(1500);
         await p.evaluate(() => {
             document.querySelectorAll('.closedDrawer').forEach(el => el.classList.replace('closedDrawer', 'openDrawer'));
