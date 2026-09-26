@@ -6,3 +6,13 @@ Thumbs.db
 .env
 .env.*
 *.local
+
+# Instance / user data must never enter this repo.
+# 2026-09-26: a 22.8 MB SillyTavern settings.json dump (containing api_key / secret /
+# password / token fields) was accidentally committed and pushed to this PUBLIC repo.
+# It was purged from the tip commit via amend + force-push, but the lesson is: keep
+# local safety backups OUTSIDE the repository, and let these patterns catch mistakes.
+settings-backup-*.json
+*settings*backup*.json
+instance-backup/
+*.pre-enable-backup.json
