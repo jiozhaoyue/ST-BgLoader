@@ -500,3 +500,31 @@ Added procedural WebAudio ambient soundscape synthesizer, frosted glass transpar
 ### Status
 
 [OK] **Completed**
+
+
+## Session 19: 子任务 3：接管原生背景选择器（T2）
+<!-- trellis-session: v=2 fp=ba6b5ed5e9e9534c -->
+
+**Date**: 2026-09-26
+**Task**: 子任务 3：接管原生背景选择器（T2）
+**Branch**: `master`
+
+### Summary
+
+子任务 3 完成并归档。接管 ST 原生背景选择器（用户裁定 T2：原生面板点任何缩略图都经扩展渲染管线）。执行前接缝复核发现宿主已漂移（backgrounds.js 1865→2039 行，行号全失配但接缝全存活），并发现规划遗漏的第三条分支——onSelectBackgroundClick 实为三分支（多选/聊天锁定或专属/全局），据此新增裁定 D-1：锁定期间放行给原生（点击与 #bg1 压制两处共用同一判定，否则会与宿主抢写）。新增 src/ui/NativeBackgroundController.ts 合并探测/装饰/拦截/叠层四职责，删除 NativeBgAugmenter.ts（元素级监听在捕获阶段 stopPropagation 下永不触发），机制为 document 捕获阶段单一拦截 + 五条放行规则。订正两处接缝结论：background_settings 已是 export let 但扩展不可达（真因非「模块私有」）；getContext().chatMetadata 是公开 getter（故锁定态有公开读法）。实施后按实测收紧三处：只在挂了媒体时清 #bg1、只在 all 档清、清空背景时归还宿主图层。验收：接管矩阵 35/35（拦截+单写者证明、B5 网格重渲染重施、D-1 两处落点、降级、开关装卸）+ 冒烟 16/16 + 三套件 e2e 24/24 · stress 4/4 · authority 18/18。U-1 结案：stop() 可不刷新页面恢复原生背景图（快照回写）。规范沉淀：host-native-ui.md 新增 §8「接管宿主界面」八小节。另留痕 authority 偶发一次 16/18（连 4 轮未复现）与一处探针残留修复。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `c0eab8e` | docs(task-3): 执行期裁定 D-1/D-2 + 宿主漂移复核（接缝全存活） |
+| `5ac14e2` | docs(task-3): 源码证据校正到实测版本 + 两处接缝结论订正 |
+| `7009fb3` | feat: 接管 ST 原生背景选择器（T2 全部选择） |
+| `f0a7d22` | fix: 接管期间的三处收紧（空态/档位/清空后归还） |
+| `763fcd9` | docs(spec): 新增「接管宿主界面」规范 + 三处结构同步 |
+| `d79bc81` | test+docs(task-3): 接管验收 35/35 + 实施清单回填 |
+| `fb2e675` | docs(prd): 回填子任务 3 验收标准（12 项，含证据与一处有意偏离） |
+
+### Status
+
+[OK] **Completed**
