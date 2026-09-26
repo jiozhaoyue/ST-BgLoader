@@ -432,7 +432,15 @@ async function runE2ETests() {
         console.log('🧪 Test 14: Testing preloadMedia API & CacheStorage Warming...');
         const preloadResult = await page.evaluate(async () => {
             const api = window.stBgLoader;
-            const testUrl = window.location.origin + '/favicon.ico';
+            // Fixture note (2026-09-26): this used to preload the host's own /favicon.ico. That
+            // coupled the test to a host file which the plugin now deliberately keeps OUT of the
+            // library (2026-09-26 audit, S4: a host-owned favicon.ico was surfacing as a junk
+            // media card) — and on every run it also uploaded a favicon.ico copy into the server
+            // library, which is exactly how that junk entry got there. A self-contained blob URL
+            // keeps every assertion below identical without depending on any host file, and is
+            // removed again at the end so the run leaves no residue behind.
+            const payload = new Blob([new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])], { type: 'image/png' });
+            const testUrl = URL.createObjectURL(payload);
 
             let progressFired = false;
             let completeFired = false;
@@ -455,7 +463,7 @@ async function runE2ETests() {
             const list = await api.getMediaList();
             const cachedItem = list.find(i => i.url === testUrl);
 
-            return {
+            const result = {
                 firstSuccess: firstResult?.success,
                 firstCached: firstResult?.cached,
                 secondSuccess: secondResult?.success,
@@ -465,6 +473,17 @@ async function runE2ETests() {
                 completeFired,
                 success: firstResult?.success && secondResult?.cached === true && !!cachedItem && progressFired && completeFired,
             };
+
+            // Self-cleanup: preloading uploaded a copy into the server library. Remove it (and its
+            // manifest entry) so repeated runs do not accumulate fixtures there.
+            try {
+                if (cachedItem) await window.STBgLoader.getCacheManager().deleteMedia(cachedItem.id);
+            } catch (e) {
+                result.cleanupError = String(e);
+            }
+            URL.revokeObjectURL(testUrl);
+
+            return result;
         });
         console.log('   Preload test result:', preloadResult);
         if (!preloadResult.success) {

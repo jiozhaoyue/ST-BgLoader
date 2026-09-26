@@ -1,0 +1,23 @@
+ M tests/e2e.mjs
+ M tests/stress.mjs
+ M tsconfig.json
+ M vite.config.ts
+?? .trellis/spec/frontend/host-native-ui.md
+?? .trellis/spec/guides/trellis-shell-discipline.md
+?? .trellis/tasks/09-26-feature-documentation/
+?? .trellis/tasks/09-26-full-audit-and-hardening/
+?? .trellis/tasks/09-26-native-alignment-and-hardening/
+?? .trellis/tasks/09-26-native-bg-selector-takeover/
+?? .trellis/tasks/archive/2026-09/00-bootstrap-guidelines/
+?? .trellis/tasks/archive/2026-09/09-13-authority-integration/
+?? .trellis/tasks/archive/2026-09/09-13-remove-legacy-compat/
+?? .trellis/tasks/archive/2026-09/09-13-server-native-storage/
+?? .trellis/tasks/archive/2026-09/09-19-server-settings-persistence/
+?? .trellis/tasks/archive/2026-09/09-25-authority-live-integration/
+?? .trellis/tasks/archive/2026-09/09-25-full-audit-ui-logic/
+?? .trellis/tasks/archive/2026-09/09-25-p3-batch-improvements/
+?? .trellis/tasks/archive/2026-09/09-26-native-style-and-fold-fix/
+?? src/backend/
+?? src/core/mediaType.ts
+?? src/core/sanitize.ts
+?? tests/authority.mjs

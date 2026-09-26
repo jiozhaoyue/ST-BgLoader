@@ -1,0 +1,119 @@
+warning: in the working copy of 'tests/e2e.mjs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tests/stress.mjs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tsconfig.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'vite.config.ts', LF will be replaced by CRLF the next time Git touches it
+diff --git a/tests/e2e.mjs b/tests/e2e.mjs
+index 0f2a0c4..2c26eeb 100644
+--- a/tests/e2e.mjs
++++ b/tests/e2e.mjs
+@@ -102,7 +102,7 @@ async function runE2ETests() {
+                 </body>
+                 </html>
+             `;
+-            const item = await ext.cacheManager.saveMedia(sampleHtml, 'test-animation.html', 'html', 'local');
++            const item = await ext.cacheManager.saveMedia(sampleHtml, 'test-animation.html', 'html', 'server');
+             await ext.applyMedia(item);
+ 
+             // Wait for crossfade
+@@ -229,7 +229,7 @@ async function runE2ETests() {
+                 id: 'bg_track_1',
+                 name: 'Ambient Track 1.mp3',
+                 type: 'audio',
+-                source: 'local',
++                source: 'server',
+                 url: 'blob:fake-url-1',
+                 cacheKey: '/fake/1',
+                 size: 1024,
+@@ -241,7 +241,7 @@ async function runE2ETests() {
+                 id: 'bg_track_2',
+                 name: 'Ambient Track 2.mp3',
+                 type: 'audio',
+-                source: 'local',
++                source: 'server',
+                 url: 'blob:fake-url-2',
+                 cacheKey: '/fake/2',
+                 size: 2048,
+@@ -432,7 +432,15 @@ async function runE2ETests() {
+         console.log('🧪 Test 14: Testing preloadMedia API & CacheStorage Warming...');
+         const preloadResult = await page.evaluate(async () => {
+             const api = window.stBgLoader;
+-            const testUrl = window.location.origin + '/favicon.ico';
++            // Fixture note (2026-09-26): this used to preload the host's own /favicon.ico. That
++            // coupled the test to a host file which the plugin now deliberately keeps OUT of the
++            // library (2026-09-26 audit, S4: a host-owned favicon.ico was surfacing as a junk
++            // media card) — and on every run it also uploaded a favicon.ico copy into the server
++            // library, which is exactly how that junk entry got there. A self-contained blob URL
++            // keeps every assertion below identical without depending on any host file, and is
++            // removed again at the end so the run leaves no residue behind.
++            const payload = new Blob([new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])], { type: 'image/png' });
++            const testUrl = URL.createObjectURL(payload);
+ 
+             let progressFired = false;
+             let completeFired = false;
+@@ -455,7 +463,7 @@ async function runE2ETests() {
+             const list = await api.getMediaList();
+             const cachedItem = list.find(i => i.url === testUrl);
+ 
+-            return {
++            const result = {
+                 firstSuccess: firstResult?.success,
+                 firstCached: firstResult?.cached,
+                 secondSuccess: secondResult?.success,
+@@ -465,6 +473,17 @@ async function runE2ETests() {
+                 completeFired,
+                 success: firstResult?.success && secondResult?.cached === true && !!cachedItem && progressFired && completeFired,
+             };
++
++            // Self-cleanup: preloading uploaded a copy into the server library. Remove it (and its
++            // manifest entry) so repeated runs do not accumulate fixtures there.
++            try {
++                if (cachedItem) await window.STBgLoader.getCacheManager().deleteMedia(cachedItem.id);
++            } catch (e) {
++                result.cleanupError = String(e);
++            }
++            URL.revokeObjectURL(testUrl);
++
++            return result;
+         });
+         console.log('   Preload test result:', preloadResult);
+         if (!preloadResult.success) {
+diff --git a/tests/stress.mjs b/tests/stress.mjs
+index 27bb697..a57750c 100644
+--- a/tests/stress.mjs
++++ b/tests/stress.mjs
+@@ -8,7 +8,7 @@ const CHROME_PATH = process.env.PUPPETEER_EXECUTABLE_PATH
+ 
+ const TARGET_URL = process.env.TEST_TARGET_URL
+     || process.env.TARGET_URL
+-    || 'http://localhost:8000';
++    || 'https://127.0.0.1:8003';
+ 
+ async function runStressTests() {
+     console.log('⚡ Starting Large File Streaming & Resilience Stress Tests on', TARGET_URL);
+@@ -67,7 +67,7 @@ async function runStressTests() {
+                 largeBlob,
+                 'extreme-4k-bg-105mb.mp4',
+                 'video',
+-                'local'
++                'server'
+             );
+             const saveDurationMs = Math.round(performance.now() - startTime);
+ 
+@@ -166,7 +166,7 @@ async function runStressTests() {
+ 
+             // 1. Zero-byte blob
+             const emptyBlob = new Blob([], { type: 'video/mp4' });
+-            const emptyItem = await ext.cacheManager.saveMedia(emptyBlob, 'corrupted_zero_byte.mp4', 'video', 'local');
++            const emptyItem = await ext.cacheManager.saveMedia(emptyBlob, 'corrupted_zero_byte.mp4', 'video', 'server');
+             let zeroByteHandled = true;
+             try {
+                 await ext.applyMedia(emptyItem);
+@@ -212,7 +212,7 @@ async function runStressTests() {
+ 
+             // Save and mount a test item
+             const sampleBlob = new Blob(['sample-test-content'], { type: 'text/html' });
+-            const item = await ext.cacheManager.saveMedia(sampleBlob, 'temp-revoke-test.html', 'html', 'local');
++            const item = await ext.cacheManager.saveMedia(sampleBlob, 'temp-revoke-test.html', 'html', 'server');
+             const blobUrl = await ext.cacheManager.getMediaBlobUrl(item);
+ 
+             // Delete item and verify revoke was invoked

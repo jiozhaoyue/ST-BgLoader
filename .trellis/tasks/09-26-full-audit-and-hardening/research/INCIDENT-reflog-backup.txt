@@ -1,0 +1,30 @@
+11977b4 HEAD@{0}: commit: docs(task-3): 补充实测结论——T1 层级近乎空操作，T2 是唯一有效层级
+067b7c4 HEAD@{1}: commit: docs(task-3): 留档 ST 原生背景管线源码证据（含宿主升级比对清单）
+cbac853 HEAD@{2}: commit: docs(audit): 记录用户四项裁定 + Phase E/F 定稿清单 + 实例清理留痕
+81c1773 HEAD@{3}: commit: docs(audit): 子任务 2 体检发现 + 裁剪候选清单（待用户逐项拍板）
+ed1288b HEAD@{4}: commit: chore: record journal
+2023a25 HEAD@{5}: commit: chore(task): archive 09-26-native-style-and-fold-fix
+8d2f322 HEAD@{6}: commit: chore(task): 建父任务 + 四子任务规划，子任务 1 执行完毕
+6486550 HEAD@{7}: commit: docs(spec): 新增宿主原生 UI 规范（fe/frontend/host-native-ui）
+ceb9eec HEAD@{8}: commit: fix(ui): 修复设置面板无法折叠 + 去除溢光特效 + 原生风格对齐
+cad4935 HEAD@{9}: commit: rules: 同步统一规则块 v1.4.0（L0-7 多会话提交边界 · L0-8 子代理纪律重写 · 新增 P-18）
+3f603ae HEAD@{10}: commit: rules: 同步统一规则块 v1.3.0（新增 P-17 坑条目）
+66e24b6 HEAD@{11}: commit: chore: record journal
+c56d4d8 HEAD@{12}: commit: chore(task): archive 09-25-p3-batch-improvements
+491b71e HEAD@{13}: commit: feat: P3 改进批——体检遗留 12 项全部实施 + shell 纪律进 spec
+2dc83b0 HEAD@{14}: commit: chore: record journal
+566d3e1 HEAD@{15}: commit: chore(task): archive 09-25-full-audit-ui-logic
+a0f99d3 HEAD@{16}: commit: fix: 全仓体检 P1/P2 修复（竞态/泄漏/注入/音频续播）+ UI 体验优化
+6e6bb2c HEAD@{17}: commit: chore(task): archive 09-25-authority-live-integration
+73a87ba HEAD@{18}: commit: feat: integrate with the real Authority backend (live-verified on Dev Luker)
+4be5c86 HEAD@{19}: commit: chore(task): archive 00-bootstrap-guidelines
+2d17f79 HEAD@{20}: commit: chore(agents): 同步统一规则块 v1.2.0（新增 L0-17 Trellis 工程纪律）
+5350870 HEAD@{21}: commit: chore(agents): 同步统一规则块 v1.1.0+（L0-16 端口段位 / L1-MF-15/16 / P-14/15/16）
+5d24842 HEAD@{22}: commit: chore(agents): 更新统一规则块（新增符号链接坑的实证条目）
+112373e HEAD@{23}: commit: chore(agents): 同步酒馆仓群统一开发规则块 v1.1.0
+9c0aa22 HEAD@{24}: commit: chore(agents): 删除前作腐烂的 UNIFIED-RULES 残留块（284 行）
+98bb6a7 HEAD@{25}: commit: chore(task): archive 09-19-server-settings-persistence
+cfa6cb4 HEAD@{26}: commit: feat: persist the full settings object on the server (fully backend-stored)
+a611e6a HEAD@{27}: commit: docs(spec): fill all backend/frontend guidelines with real project conventions
+9c18f45 HEAD@{28}: commit: fix: bound all mount-chain waits so hung loads can never stall the plugin
+6703276 HEAD@{29}: commit: chore(task): archive 09-13-remove-legacy-compat

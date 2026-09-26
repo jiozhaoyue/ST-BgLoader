@@ -188,3 +188,62 @@ git diff --stat HEAD -- src/ui/SettingsDrawer.ts src/ui/style.css
 - 每项修复独立提交，提交信息含发现编号（`fix(audit): A1 …`）。
 - 发现的问题若落在子任务 1 / 子任务 3 范围内 → **只记录、转交**，不在本子任务修改。
 - 裁剪动作**本轮一次都不执行**，即使清单条目看起来毫无争议。
+
+---
+
+## 重做范围（2026-09-26 事故后，用户裁定「现在重做，逐项提交」）
+
+> **背景**：工作树曾被外部工具覆写到 2026-09-06 状态，未提交的改动丢失。master 已恢复到 `11977b4`。完整事故记录见 `research/INCIDENT-repo-reverted.md`，损失清单见 `research/INCIDENT-lost-work-inventory.md`。
+>
+> **重做依据**：本文件上方的「Phase E/F 定稿清单」与「追加裁定（第二轮）」即为逐条施工说明，本节只界定**范围**。
+
+### ⚠️ 已存活、**绝对不要重做**（已回填，重复施加会出错）
+
+| 项 | 落在哪个文件 | 核验特征（应已存在） |
+| --- | --- | --- |
+| **F1** 目录 TTL 缓存 + `invalidateCatalog` | `src/backend/ServerOrigin.ts` | `CATALOG_TTL` / `invalidateCatalog` |
+| **S4** favicon 等宿主自有文件过滤 | `src/backend/ServerOrigin.ts` | `HOST_OWNED_FILENAMES` / `isHostOwnedFilename` |
+| **A5 本体** KV 降为回退 | `src/backend/SettingsSync.ts` | `hasServerDocument` |
+| **D4** 天气常量收敛 | `src/backend/AgentBridge.ts` | `WEATHER_TYPES` |
+| **S7.3 测试修复** | `tests/authority.mjs` | `window.top === window` |
+| **e2e Test 14 素材修复** | `tests/e2e.mjs` | `self-contained blob URL` |
+
+→ 动手前**先 grep 上表特征确认它们仍在**；若某项不见了，说明又被覆写，先报告再继续。
+
+### 需重做清单（19 项 + 3 处订正）
+
+**第一组（P1 缺陷，来自「Phase E/F 定稿清单」）**
+- [ ] A1 `MediaMount` 受控可见性 + `index.ts` 接线
+- [ ] A2 瞬时背景不写 `activeMediaId` + `init()` 悬空 id 自愈
+- [ ] A3 `NativeBgAugmenter` 阻止冒泡（消除双写）
+- [ ] A4 `refreshMediaGrid` 元素级守卫 + await 后栅格身份复核；删 `lastGridSignature`
+- [ ] A5′ `index.ts` 的 `hasServerDocument` 探测接线（**本体已在，只接线**）
+
+**第二组（P2 与裁剪，同一清单）**
+- [ ] F2 `CacheManager` 索引内存镜像
+- [ ] F3 `objectUrls` 有界化
+- [ ] F4 天气单一真源（`types` 导出 `WEATHER_TYPES`，`PublicAPI` 两处引用）
+- [ ] F5 原生徽章按类型配色（**仅追加** CSS 规则，勿动子任务 1 已定稿的折叠/去溢光规则）
+- [ ] F6 `playMediaItem`/`playCurrentTrack` 合并为 `startTrack`（**事件发射次数不得变**）
+- [ ] F7 `IframeRenderer` sandbox 注释订正（同源能力表述）
+- [ ] F8 删 `chatBindings`（字段 + `index.ts` 不可达分支）
+- [ ] F9 删 `enabled` / `muffleOnDrawer` / `playlist` 三字段
+- [ ] F10 删 6 处死代码（`touchMedia`×2 / `setApplyCallback` / `getAnalyserNode` / `postMessage` / `syncFitting`+其 observer / `brightness`）。**C3 `isWaitingForUnmute` 必须保留**——它是 `tests/e2e.mjs:404-410` 的观测面
+- [ ] F11 补 `cacheQuotaMB` 滑块 + `lruAutoClean` 勾选框
+
+**第三组（快捷键与收尾，来自「追加裁定（第二轮）」）**
+- [ ] K1–K5 移除五个 Alt 快捷键（删 `src/core/ShortcutManager.ts`；清 `index.ts`/`types`/`SettingsDrawer` 的接线与 `shortcutsEnabled`）
+- [ ] K6–K8 背景可见性：面板勾选框 + `index.ts` 回调 + `PublicAPI.setBackgroundVisible()/isBackgroundVisible()`
+- [ ] S1 网格刷新票据（`grid.dataset.refreshSeq`；await 前预约、await 后**相等判定**）
+- [ ] S2 配额变化即时 `cleanLRU`（门控 `lruAutoClean`，仅配额真变时触发）
+
+**第四组（复核订正）**
+- [ ] 订正 1 `CacheManager.evictCacheEntry` 注释（"挂载项是最后候选"论据不成立；如实写 LRU 不保证 + BGM 残留窗口）
+- [ ] 订正 2 `.trellis/spec/frontend/host-native-ui.md` §3 门禁 → `grep -c 'box-shadow:'`
+- [ ] 订正 3 `.trellis/spec/frontend/state-management.md`：删 `chatBindings` 段；加 A5「启动优先级」与「已知后果（不自愈）」
+
+### 提交纪律（本次事故的直接教训）
+
+**每完成一组立即提交，不攒到最后。** 事故正是因为改动长期留在工作树未提交而全数丢失。
+- 提交信息含编号，如 `fix(audit): A1 受控可见性 …`
+- 组间不要跨文件混提交
