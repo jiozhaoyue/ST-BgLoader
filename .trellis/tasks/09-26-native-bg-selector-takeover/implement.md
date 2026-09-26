@@ -14,9 +14,15 @@
 
 ## Phase B：源码证据留档
 
-- [ ] B1 `research/st-native-evidence.md` 落盘：`backgrounds.js` 关键函数（`initBackgrounds` / `onSelectBackgroundClick` / `setBackground` / `forceSetBackground` / `highlightSelectedBackground` / `renderSystemBackgrounds` / `setBackgroundSelectionMode`）的行号与摘录
-- [ ] B2 记录 ST 版本/commit（供将来判断宿主漂移）
-- [ ] B3 记录不可用接缝（`setBackground` / `background_settings` 模块私有）与理由
+- [x] B1 `research/st-native-evidence.md` 落盘：`backgrounds.js` 关键函数（`initBackgrounds` / `onSelectBackgroundClick` / `setBackground` / `forceSetBackground` / `highlightSelectedBackground` / `renderSystemBackgrounds` / `setBackgroundSelectionMode`）的行号与摘录
+      > 证据文件规划期已落盘，本轮**全量校正行号**（1865 行版本 → 实测 2039 行版本）并补 §2.1 锁定接缝、
+      > §2.2 `#bg1` 抢写风险、§3 两处结论订正。
+- [x] B2 记录 ST 版本/commit（供将来判断宿主漂移）
+      > `v2.7.0-605-ge1dbd1904` / `e1dbd1904a1e49465feb7da38115def7fdac2192`（2026-09-24）。
+- [x] B3 记录不可用接缝（`setBackground` / `background_settings` 模块私有）与理由
+      > 理由已订正：`background_settings` 当前是 **`export let`**（`:136`），不在 `window` 也不在
+      > `getContext()` 返回键里 —— 不可用的真因是「**已导出但扩展不可达**」（独立脚本接不到宿主模块图），
+      > 而非「模块私有」。
 
 ## Phase C：控制器骨架与探针
 
