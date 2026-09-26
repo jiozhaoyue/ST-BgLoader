@@ -6,6 +6,12 @@
 
 **硬约束**：本轮**不删除任何功能**。裁剪清单只产出、不执行，等用户批准。
 
+> **修订（2026-09-26，用户裁定）**：规划期的「一次都不删」已被用户后续裁定部分放开——
+> 用户在看过 `research/prune-candidates.md` 后**逐项批准**了一批删除（F8 `chatBindings`、
+> F9 三个死字段、F10 六处死代码、K1–K5 移除五个 Alt 快捷键含 `src/core/ShortcutManager.ts`）。
+> 未被批准的条目（含 C8 `NativeBgAugmenter` 处置、iframe sandbox 收紧、设置面板「保存场景」
+> 改调 `PublicAPI`）**本轮仍未执行**。故不变的是「不擅自删」，变的只是「获准后可删」。
+
 ## Background
 
 规划期已通读 `src/` 全部 29 个文件（~7231 行）并做交叉引用核查，得到一批**已核验的种子发现**（下方 §种子发现）。子任务 2 的职责是：复核种子发现、补齐全量扫描（含规划期未覆盖的边界）、分级、实施、并把裁剪项整理成清单。
@@ -92,15 +98,28 @@ if (cont) cont.style.display = cont.style.display === 'none' ? 'block' : 'none';
 
 ## Acceptance Criteria
 
-- [ ] `research/findings.md` 落盘：A1–E3 全部复核完毕（确认/推翻各有结论）+ 全模块扫描补齐 + 每条带 `file:line`、失败场景、分级。
-- [ ] `research/prune-candidates.md` 落盘：含建议、理由、影响面、成本，且**明确标注「待用户批准，本轮不执行」**。
-- [ ] 全部 P0/P1 项已修复并通过验证；P2 项已修复或给出「为何不移除」的书面理由。
-- [ ] A1 / A2 / A3 三条用户可见缺陷有可复现的修复前证据与修复后验证。
-- [ ] `PublicAPI` 对外方法无删除、无签名变更。
-- [ ] `implement.md` 中**不存在勾选的删除类条目**（可用清单比对证明本轮未删除功能）。
-- [ ] `npm run type-check` + `npm run build` 通过；三套件回归不劣于基线。
-- [ ] 未越界修改子任务 1 / 子任务 3 范围内的文件（用 diff 核对）。
-- [ ] 提交推送 `origin master`，子任务归档。
+- [x] `research/findings.md` 落盘：A1–E3 全部复核完毕（确认/推翻各有结论）+ 全模块扫描补齐 + 每条带 `file:line`、失败场景、分级。
+- [x] `research/prune-candidates.md` 落盘：含建议、理由、影响面、成本，且**明确标注「待用户批准，本轮不执行」**。
+- [x] 全部 P0/P1 项已修复并通过验证；P2 项已修复或给出「为何不移除」的书面理由。
+- [x] A1 / A2 / A3 三条用户可见缺陷有可复现的修复前证据与修复后验证。
+      > A1 的定性在复核后下调为 P2：真正的缺陷是**可见性状态管理**（裸 `display`，切换即丢失），
+      > 而「隐藏后切背景不显示」是**受控状态的既定行为**（可见性已是持久化设置，见下文修订）。
+      > 修复前证据与修复后验证见 `findings.md` §十二 与 `research/probe-verify-fixes.mjs`（18/18）。
+- [x] `PublicAPI` 对外方法无删除、无签名变更。
+      > 实证：`555123e` → `master` 的方法集合比对 = **0 删除 / +2 新增**
+      > （`setBackgroundVisible` / `isBackgroundVisible`）；签名比对仅这两条新增，无既有方法签名改动。
+- [x] `implement.md` 中不存在**超范围**的删除条目（可用清单比对证明删除只在获批范围内）。
+      > **本条判据已被用户裁定取代**。原文写作「不存在勾选的删除类条目（本轮未删除功能）」，
+      > 但用户在 2026-09-26 追加裁定时**明确批准**了一批删除：F8 `chatBindings`、F9 三个死字段
+      > （`enabled` / `muffleOnDrawer` / `playlist`）、F10 六处死代码、K1 `src/core/ShortcutManager.ts`
+      > （连同 K2–K5 的快捷键接线）。故判据改为「删除只出现在获批清单内」。
+      > 实证：本轮唯一删除的文件是 `src/core/ShortcutManager.ts`；逐处删行核对全部落在获批清单内，
+      > 残留标识符全仓复扫见 `implement.md` 的 Phase G 执行记录。
+- [x] `npm run type-check` + `npm run build` 通过；三套件回归不劣于基线。
+      > e2e 24/24 · stress 4/4 · authority 18/18（真后端）；基线为同等全绿。
+- [x] 未越界修改子任务 1 / 子任务 3 范围内的文件（用 diff 核对）。
+      > `style.css` 相对子任务 1 定稿（`ceb9eec`）= +10 / -0，纯追加徽章配色；折叠与去溢光规则一字未动。
+- [x] 提交推送 `origin master`，子任务归档。
 
 ## Risks
 
