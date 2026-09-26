@@ -21,7 +21,12 @@ src/
 │   #  reserved by Windows. Background visibility is a panel checkbox instead.)
 ├── renderers/          # one per media type: VideoRenderer, IframeRenderer, ImageRenderer
 ├── ui/                 # SettingsDrawer (DOM-built panel), MiniPlayer,
-│                       # NativeBgAugmenter, FrostedGlassController, style.css
+│                       # NativeBackgroundController, FrostedGlassController, style.css
+│   # (NativeBackgroundController replaced NativeBgAugmenter on 2026-09-26 when the
+│   #  native picker takeover landed: decoration and interception had to share one
+│   #  module, because a capture-phase interceptor makes element-level listeners
+│   #  unreachable — see host-native-ui.md §8.1. Its URL construction also fixed a
+│   #  latent bug: the old code read `data-url`, which jQuery never writes to the DOM.)
 ├── audio/              # AudioEngine (BGM), AmbientSoundGenerator (procedural)
 ├── fx/                 # AtmosphereFX (weather particles)
 ├── visualizer/         # AudioVisualizer

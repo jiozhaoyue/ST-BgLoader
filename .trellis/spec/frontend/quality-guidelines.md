@@ -99,6 +99,16 @@ holds real (Dev) settings, so they carry production obligations:
     visibility — check the `hidden`/`visible` class or the computed display;
   - a checkbox whose initial value is a persisted setting must be asserted **directionally**
     (relative to `wasChecked`), never as an absolute state.
+  - **assert on your own additions, not on the host's styling.** Probing "our additions do not
+    glow" by reading `boxShadow` off a host `.bg_example` measures the *host's* stylesheet — the
+    host gives its thumbnails a shadow by design. Read it off the elements we actually create
+    (the badge, the marker dot), and enforce "we add no `box-shadow` anywhere" at source level.
+  - **a "did the host handle it" assertion must not click an element already in the target state,
+    and must re-query the element first.** Clicking the tile the host already had selected makes
+    "nothing happened" and "the host handled it" indistinguishable; dispatching on a *detached*
+    node bypasses document-level listeners entirely, so a pass-through assertion can pass for
+    the wrong reason. Both happened on 2026-09-26; asserting "the host's mark moved **to the tile
+    I clicked**" (plus `isConnected`) is what makes the test mean something.
 - **Record page errors with their origin.** The host page loads other third-party extensions, so a
   bare message cannot be attributed (`Identifier 'SPresetSettings' has already been declared` is
   plainly someone else's). Assert "no error originating from `dist/index.js`" and print the foreign

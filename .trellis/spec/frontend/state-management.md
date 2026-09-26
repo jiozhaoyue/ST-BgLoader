@@ -30,6 +30,13 @@ private settings: BgLoaderSettings = { ...DEFAULT_SETTINGS };
   checkbox routes its `change` back through that same public path. Rendering never writes a
   stray inline `display` on the container any more — doing so once meant mounts into a hidden
   container and a background that never came back (audit A1).
+- `settings.nativeTakeover` (`'off' | 'non-image' | 'all'`, default `'all'`) is how much of the
+  **host's own** background picker this extension replaces. It is read in `init()` to install
+  `NativeBackgroundController` and re-applied on every fan-out
+  (`applySettingsToSubsystems()` → `setLevel()`), so the panel switch and the persisted setting
+  cannot drift. Unlike `backgroundVisible` there is no second copy of the state: the controller's
+  `level` field is the applied value, not an independent truth (see host-native-ui.md §8 for what
+  the takeover may and may not touch).
 
 ---
 

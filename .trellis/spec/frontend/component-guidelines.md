@@ -22,6 +22,11 @@ export class VideoRenderer {
 - Every class that creates DOM implements `destroy()` that removes its nodes and
   releases attached resources (`MediaMount.mountMedia` calls destroy on all three
   renderers of a layer before rendering; `MediaMount.clear()` destroys everything).
+  `NativeBackgroundController` is the one exception, and deliberately so: its teardown is
+  `stop()`, because it is also the user-facing switch — the panel dropdown must install and
+  remove it repeatedly at runtime, and `destroy()` would imply a one-way teardown. `stop()`
+  does the same work (remove every node it added, disconnect every observer, detach the
+  document listener, restore the host layer) and is idempotent by contract.
 - `render()` methods return a promise of the created element and MUST settle
   unconditionally (see backend/error-handling.md bounded-wait rule).
 

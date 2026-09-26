@@ -147,3 +147,127 @@ a *native* drawer in the same page — parity against the host is the actual req
 
 The host's icon convention is `up` = expanded, `down` = collapsed (plus the paired
 `fa-circle-chevron-up` / `fa-circle-chevron-down` classes).
+
+---
+
+## 8. Taking over a host surface (native picker, added 2026-09-26)
+
+The extension can replace what a host control does, not just decorate it.
+`NativeBackgroundController` takes over the native background picker (plan T2); these are the rules
+that made it safe.
+
+### 8.1 Intercept in the capture phase, and keep ONE interception point
+
+The host binds its selection handler as a **document-level delegated click in the bubble phase**
+(`backgrounds.js`: `$(document).off('click','.bg_example').on('click','.bg_example', handler)`).
+Document is the root of the event path, so a listener registered there with `{ capture: true }` runs
+first, and `stopPropagation()` keeps the event from ever reaching the host's handler.
+
+The consequence for us: **an element-level listener on the same target can never fire again.** The
+previous `NativeBgAugmenter` bound `click` directly on each tile; keeping it alongside the capture
+listener would have left code that looks alive but is unreachable. That is why the takeover replaced
+the augmenter instead of sitting next to it — one module, one interception point.
+
+`removeEventListener` must repeat the same capture flag, or it silently removes nothing.
+
+Verify there is only one: `grep -rn "bg_example" src/` and confirm the hits are queries, not bindings.
+
+### 8.2 Every interception must name the host branch it bypasses
+
+Interception is only safe if you know precisely what you are removing. Read the host handler and
+handle **each** of its branches — the picker's handler has three (`backgrounds.js:421`): group
+multi-select, chat-locked / chat-specific, and global. Planning found only two, and the miss would
+have made the host's "lock this background to this chat" feature fail silently.
+
+For every branch you do not own, pass through — and pass through by *deciding* not to intercept
+(return before `preventDefault`), never by re-implementing the host's behaviour:
+
+| Pass-through | Host signal |
+| --- | --- |
+| Group multi-select mode | `#Backgrounds.bg-selection-mode` |
+| Chat has a locked background | `chat_metadata['custom_background']` |
+| Tile menu buttons / folder tiles / mobile menu toggles | `.jg-button`, `.bg_folder_tile`, `.mobile-only-menu-toggle` |
+| Chat-specific backgrounds | `.bg_example[custom="true"]` |
+| Level `non-image` leaves images alone | own setting |
+
+A takeover that eats host features is a regression, not a feature. When a pass-through forces a second
+change somewhere else, drive both from the **same** predicate (here `isChatBackgroundLocked()` gates
+both the click and the `#bg1` suppression) — otherwise the two halves drift and the host ends up
+fighting you.
+
+### 8.3 Read host state through public APIs, and prefer the authority over the rendering
+
+- `getContext().chatMetadata` is a documented getter (`st-context.js`) → reading the lock through it is
+  a public seam. Do not monkey-patch, and do not sniff a host module's internals.
+- The lock key `custom_background` is **persisted in the chat file**, so renaming it would invalidate
+  every historical chat's lock — it is more stable than any DOM class name.
+- Prefer authoritative data over rendering results: `.bg_example.locked-background` is produced by the
+  host's `highlightLockedBackground()` and only refreshed at certain moments; the metadata is the truth.
+- **jQuery `.data()` values are not in the DOM.** `createThumbnailElement` calls `.data('url', …)`, and
+  `el.getAttribute('data-url')` returns `null` — verified live. Read such values with `jQuery(el).data()`
+  or find another attribute. (`data-url` also holds a CSS string `url("backgrounds/x.jpg")`, not a URL;
+  build URLs with our own `mediaUrl()`, which matches the host's `getBackgroundPath()` byte for byte.)
+
+### 8.4 Suppress a host layer only while you actually own it — and give it back
+
+Clearing `#bg1` is what stops the host's image showing under ours. Three gates make it correct, and
+each one was a real defect first:
+
+1. **Only when something is mounted.** Otherwise enabling the takeover blanks a user's wallpaper.
+2. **Only at the level where you own every selection.** At `non-image`, image clicks are deliberately
+   passed through, so clearing would fight a click you just allowed.
+3. **Not while the host owns the layer** (the chat-lock case above).
+
+Symmetrically, when the extension stops owning the layer — takeover switched off, background cleared
+through the API — **hand it back**: `releaseNativeBackground()` and `stop()` both restore the snapshot
+taken at install time. Forgetting this leaves the user with no background at all.
+
+The host rewrites `#bg1` on chat change and on lock actions, so suppression must be repeatable, not
+one-shot. An `attributes` observer filtered to `style` catches every host write without touching host
+code. Note the callback is **async**: a synchronous "I am writing" flag is usually already reset by
+then — the real loop-breaker is the "already empty, return" check. Say so in the comment rather than
+implying the flag does the work.
+
+### 8.5 Your own observers must not be self-exciting
+
+`decorateGrid()` runs from a `MutationObserver` on the grid, and it writes to that same subtree. Two
+rules keep it convergent:
+
+- **Idempotent markers**: a `data-st-bg-*` attribute per tile, so a second pass finds nothing to do.
+- **Conditional writes**: compare desired vs current state and only touch the DOM when they differ. An
+  unconditional "clear all, then re-add" mutates on every pass → callback → mutation → loop. Our
+  selection marker is a real child element, so this matters: remove-then-add each pass never settles,
+  while "add if missing / remove if present" settles after one extra pass.
+
+### 8.6 Marking host DOM: prefer a real child element over a pseudo-element
+
+The host already uses `::before` (selection checkmark) and `::after` (padlock) on `.bg_example`. Reusing
+either means one of us wins by specificity or both paint on top of each other. Add a real child
+(`<span class="st-bg-native-current">`) with `pointer-events: none` instead, and place it clear of the
+host's own affordances — the badge sits top-left, the padlock bottom-right, the mobile toggle top-right,
+so the marker goes bottom-left.
+
+### 8.7 When the seam is gone, degrade — never half-work
+
+`probe()` reads the elements and tile structure the takeover depends on. Distinguish the two kinds:
+
+- **Containers not rendered yet** (the drawer is built lazily) → wait, with a give-up timer (30s).
+- **Containers present but tiles lost `bgfile`** → the host changed its structure → do **not** install,
+  log once, and stay in enhancement mode. Media, the panel and the public API keep working.
+
+A takeover that installs on a changed structure breaks the host's picker; one that refuses to install
+costs the user only the enhancement.
+
+### 8.8 Verifying a takeover
+
+Judge by **observable consequences**, not by the controller's own fields — internal state cannot prove
+interception happened. What the probe asserts instead:
+
+- the extension's `activeMediaId` changed → we handled it;
+- the **host's** own mark (`selected-background`) did *not* move → the host did not, i.e. single writer;
+- `#bg1` ends up empty → suppression ran.
+
+For pass-through cases, assert the host's effect *did* appear (and pick a tile the host has not already
+selected — otherwise "nothing happened" and "the host handled it" look identical). Re-query elements
+before each click: dispatching on a detached node bypasses document-level listeners entirely and makes
+a pass-through assertion succeed for the wrong reason.
