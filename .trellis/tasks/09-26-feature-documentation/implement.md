@@ -4,18 +4,25 @@
 
 ## Phase A：冻结基线
 
-- [ ] A1 确认子任务 1 / 2 / 3 已提交、`git status` 干净
-- [ ] A2 重新核对 `src/` 与 `dist/` 一致性（`npm run build` 后 `git status` 应无 `dist/` 变更；若有则说明产物未同步，先同步再冻结）
-- [ ] A3 `npm run type-check && npm run build` 绿
-- [ ] A4 记录本次文档基线的 commit hash 到 `research/doc-baseline.md`
-- [ ] A5 任务激活（`task.py start`）
+- [x] A1 确认子任务 1 / 2 / 3 已提交、`git status` 干净
+- [x] A2 重新核对 `src/` 与 `dist/` 一致性（`npm run build` 后 `git status` 应无 `dist/` 变更；若有则说明产物未同步，先同步再冻结）
+      > 实测：build 后 `git status` 仍为空 → 一致。
+- [x] A3 `npm run type-check && npm run build` 绿
+- [x] A4 记录本次文档基线的 commit hash 到 `research/doc-baseline.md`
+      > 基线 `141dc72`。该文件同时记录了 **PRD R-1 风险成真的清单**：前两个子任务作废了本任务规划的
+      > 4 处（快捷键已删、`NativeBgAugmenter` 已删、设置字段集合已变），**动手写文档前必须先读它**。
+- [x] A5 任务激活（`task.py start`）
 
 ## Phase B：事实采集（只读）
 
 - [ ] B1 读 `src/types/index.ts` 提取：`DEFAULT_SETTINGS` 全字段 + `BUILTIN_PRESETS` + `BUILTIN_SCENES` + 全部枚举（`WeatherType`/`VisualizerMode`/`TransitionType`/`AmbientSoundType`/`PlaybackMode`/`MediaType`）
 - [ ] B2 读 `src/api/PublicAPI.ts` 提取全部公开方法签名 + `emit()` 的事件名清单
 - [ ] B3 读 `src/ui/SettingsDrawer.ts` 提取面板分区结构与文案、每个控件的 id 与对应设置项
-- [ ] B4 读 `src/core/ShortcutManager.ts` 提取快捷键表
+- [ ] B4 ~~读 `src/core/ShortcutManager.ts` 提取快捷键表~~
+      > **已作废**：该文件在子任务 2 的 K1 中被删除（五个 Alt 快捷键全部移除）。改为「**确认快捷键确实
+      > 不存在**」——`grep -rn "shortcutsEnabled\|ShortcutManager" src/` 应为 0，并在文档中写明移除理由
+      > （Alt+F 与浏览器 app-menu 加速键冲突、Ctrl+Alt 被 Windows 保留）与替代入口。
+- [ ] B4b 读 `src/ui/NativeBackgroundController.ts` 提取接管行为面（三档开关、五条放行规则、降级条件）
 - [ ] B5 读 `src/backend/*` 提取存储模型与 Authority 能力面（`AuthorityCapabilities` 各字段语义）
 - [ ] B6 读 `src/index.ts` 提取初始化顺序与生命周期钩子
 - [ ] B7 逐文件清点 29 个模块的对外功能，形成覆盖矩阵草稿
@@ -30,8 +37,13 @@
 
 - [ ] D1 `wiki/Settings-Reference.md`（**核心交付物**：全字段 + 默认值 + 作用 + 面板入口 + 无入口项汇总）
 - [ ] D2 `wiki/Storage-and-Authority-Integration.md`（服务端真源 + 浏览器热缓存 + Authority 能力 + Agent 工具 + 降级路径）
-- [ ] D3 `wiki/Native-Background-Integration.md`（原生面板徽章 + 接管开关 + 接管范围 + 退出方式）
-- [ ] D4 `wiki/UI-Components-and-Shortcuts.md`（迷你播放器 + 毛玻璃 + 转场 5 种 + 快捷键全表）
+- [ ] D3 `wiki/Native-Background-Integration.md`（原生面板徽章 + 接管开关三档 + 接管范围与五条放行规则 + 退出方式）
+      > 实现主体是 `src/ui/NativeBackgroundController.ts`（**不是**规划期写的 `NativeBgAugmenter`——该文件
+      > 已删除）。接管的完整行为契约见 `.trellis/spec/frontend/host-native-ui.md` §8。
+- [ ] D4 `wiki/UI-Components-and-Transitions.md`（迷你播放器 + 毛玻璃 + 转场 5 种）
+      > **原名为 `UI-Components-and-Shortcuts.md`**：快捷键已不存在（B4 已作废），文件名与内容一并去掉
+      > 快捷键全表；改加一小节「快捷键的历史与替代入口」，说明移除了什么、为什么、现在用什么。
+      > 注意 `_Sidebar.md` / `Home.md` / `README.md` 的链接要跟着用**新文件名**。
 - [ ] D5 每篇写完即做一次「抽查 10 条陈述回查 `src/`」
 
 ## Phase E：修订既有文档
