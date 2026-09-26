@@ -15,6 +15,22 @@
 2. **`NativeBackgroundController` 不需要任何注入能力**：模块设计中不含向 `#bg_menu_content` 添加节点的代码（D-4）。
 3. **`TakeoverLevel` 三档保留**：`'off' | 'non-image' | 'all'`，默认 `'all'`。`'non-image'` 保留为用户可选的降档，不是默认路径。
 
+## 2026-09-26 实测补充：T1 层级被证明近乎空操作（务必据此实施）
+
+子任务 2 的体检在 Dev 实例上实测了两件事，直接改变本子任务的实施前提：
+
+1. **原生 `/api/backgrounds/all` 只返回图片**：实测 27 项，非图片扩展名 **0 项**；响应字段恰为 `images` / `config`。
+2. **原生网格里的 `.bg_example` 全部是图片类**，唯一例外是 `.svg`——因为 `detectMediaType('*.svg')` 返回 `'svg'` 而非 `'image'`。
+
+**推论**：
+
+- **T1（只接管非图片）在当前宿主上几乎无对象** —— 原生网格中不存在 video/audio/html 条目可拦。若当初选了 T1，实施后用户会发现「什么也没变」。**用户选定 T2 是正确的**，T2 是唯一有实质效果的层级。
+- **T3（把扩展媒体注入原生网格）的动机被加强但成本不变**：扩展自有 19 个非图片条目在原生网格中完全不可见（实测），所以注入确有需求；但注入节点不参与原生的文件夹归类 / `#bg-filter` 筛选 / 群组多选 / 移动端菜单，且每次 `renderSystemBackgrounds()` 的 `empty()` 重建都要重注入。用户已裁定不做。
+- **A3 双写的实际受影响集合**：`detectMediaType(bgFile) !== 'image'` 的项，当前只有 `.svg`。子任务 2 已在本轮给 `NativeBgAugmenter` 的非图片点击处理加了阻止冒泡（消除双写），并在注释中声明**将被本子任务的 `NativeBackgroundController` 取代**。本子任务实施时**必须删除该临时处理**，不得两套并存（PRD R2 / R-4 已约定）。
+- **C8（`NativeBgAugmenter` 的处置）**：用户裁定其处置权归本子任务。因上述实测，该组件面向 video/audio/html 的功能面在现实中为零；本子任务落地后应由 `NativeBackgroundController` 完全取代并删除 `NativeBgAugmenter.ts`（`implement.md` D6 已列）。
+
+**升级期注意**：若宿主将来开始让 `/api/backgrounds/all` 返回非图片文件，则原生网格会出现真实的非图片缩略图，本子任务的拦截范围与放行规则需重新评估（见 `research/st-native-evidence.md` §4 比对清单第 3 条）。
+
 ## 尚待实测裁定
 
 | 编号 | 问题 | 处置 |
