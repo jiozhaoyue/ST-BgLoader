@@ -168,7 +168,16 @@ export class NativeBackgroundController {
             this.start(level);
             return;
         }
+        const previous = this.level;
         this.level = level;
+
+        // Leaving `all` hands `#bg1` back to the host (image clicks are passed through again), so
+        // the image we were suppressing comes back. Otherwise re-assert our ownership.
+        if (previous === 'all' && level !== 'all' && this.seams) {
+            this.restoreNativeBackgroundImage(this.seams.bgHost);
+        } else {
+            this.clearNativeBackgroundImage();
+        }
     }
 
     // ---------------------------------------------------------------- decorations
@@ -244,6 +253,20 @@ export class NativeBackgroundController {
             }
             if (!shouldMark && marker) marker.remove();
         });
+    }
+
+    /**
+     * Called when the extension no longer has anything mounted (background cleared through the
+     * public API, media deleted): the native marker has nothing to point at, and `#bg1` goes back
+     * to the host. Without this the user would be left with no background at all — our layer is
+     * gone and the host's image is still suppressed.
+     *
+     * A no-op restore when we never cleared anything (the current value already equals the
+     * snapshot), which covers the levels where we do not suppress `#bg1` in the first place.
+     */
+    public releaseNativeBackground(): void {
+        this.refreshSelection(null);
+        if (this.seams) this.restoreNativeBackgroundImage(this.seams.bgHost);
     }
 
     // ---------------------------------------------------------------- interception
@@ -333,6 +356,19 @@ export class NativeBackgroundController {
         const seams = this.seams;
         if (!this.active || !seams || this.clearingNativeBg) return;
 
+        // Only clear once we actually have something mounted. Takeover with an empty extension
+        // state would otherwise blank the background entirely — the user enables the feature and
+        // their wallpaper disappears until they pick a new one. Leaving the host's image in place
+        // until we can replace it is strictly better, and the moment `applyMedia` runs it is
+        // cleared (see `refreshSelection`, which is what sets `activeFileName`).
+        if (!this.activeFileName) return;
+
+        // And only when we own *every* selection. At `non-image` an image click is passed through
+        // to the host on purpose (`shouldTakeOver` rule 5), so the host's image is the user's
+        // actual intent — clearing it would fight a click we deliberately allowed. Not clearing
+        // here also keeps that level's behaviour identical to the pre-takeover enhancement mode.
+        if (this.level !== 'all') return;
+
         // D-1 again, and this is the half that is easy to miss: passing the click through is not
         // enough. If we kept clearing while the chat is locked, the host would write the locked
         // image and we would immediately wipe it — a visible fight that leaves the locked
@@ -360,6 +396,9 @@ export class NativeBackgroundController {
      */
     private restoreNativeBackgroundImage(bgHost: HTMLElement): void {
         if (!this.savedNativeBgImage) return;
+        // Nothing to undo when we never cleared it (the common case for a takeover that was
+        // switched off before any media was mounted).
+        if (bgHost.style.backgroundImage === this.savedNativeBgImage) return;
         this.clearingNativeBg = true;
         try {
             bgHost.style.backgroundImage = this.savedNativeBgImage;
@@ -371,6 +410,9 @@ export class NativeBackgroundController {
     // ---------------------------------------------------------------- install internals
 
     private install(seams: NativeSeams): void {
+        // A pending seam-retry is moot once we are installed; leave no observer/timer behind.
+        this.stopWaitingForSeams();
+
         this.seams = seams;
         this.active = true;
         this.savedNativeBgImage = seams.bgHost.style.backgroundImage;

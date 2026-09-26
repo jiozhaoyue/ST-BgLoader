@@ -83,6 +83,9 @@ export class STBgLoaderExtension {
     public clearActiveBackground(): void {
         this.settings.activeMediaId = null;
         this.mediaMount.clear();
+        // Nothing is mounted any more: drop the native picker's marker and give the host's own
+        // background layer back, otherwise the user is left with no background at all.
+        this.nativeController?.releaseNativeBackground();
         this.saveSettings();
         if (this.settingsDrawer) {
             this.settingsDrawer.refreshMediaGrid();

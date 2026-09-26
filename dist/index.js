@@ -37,18 +37,18 @@ const A = {
   cyber_motes: "Cyber Motes (赛博霓虹微粒)",
   scanlines: "Scanlines (复古CRT扫描线)"
 };
-function N(l) {
+function D(l) {
   return typeof l == "object" && l !== null && !Array.isArray(l);
 }
-function G(l) {
+function W(l) {
   const e = { ...R };
-  if (!N(l)) return e;
+  if (!D(l)) return e;
   const t = l, i = R, s = e;
   for (const a of Object.keys(i)) {
     const n = t[a];
     if (n === void 0) continue;
     const r = i[a];
-    s[a] = N(r) && N(n) ? { ...r, ...n } : n;
+    s[a] = D(r) && D(n) ? { ...r, ...n } : n;
   }
   return e;
 }
@@ -243,7 +243,7 @@ class H {
             url: v(s.filename),
             cacheKey: v(s.filename),
             size: 0,
-            mimeType: W(s.filename, a),
+            mimeType: G(s.filename, a),
             addedTimestamp: 0,
             lastUsedTimestamp: 0,
             hasAudio: !1
@@ -277,7 +277,7 @@ class H {
     return t ? q(t.filename) ? null : this.manifestToItem(t) : (await this.listCatalog()).find((s) => s.id === e) ?? null;
   }
   async putMedia(e) {
-    const t = "bg_" + Date.now() + "_" + Math.random().toString(36).substring(2, 9), i = e.blob.type || W(e.name, e.type);
+    const t = "bg_" + Date.now() + "_" + Math.random().toString(36).substring(2, 9), i = e.blob.type || G(e.name, e.type);
     if (e.source === "url" && e.blob.size === 0 && e.remoteUrl) {
       const n = {
         id: t,
@@ -420,7 +420,7 @@ class H {
     };
   }
 }
-function W(l, e) {
+function G(l, e) {
   switch (l.split(".").pop()?.toLowerCase()) {
     case "mp4":
       return "video/mp4";
@@ -692,7 +692,7 @@ class Ie {
     return w(e);
   }
   getMimeType(e, t) {
-    return W(e, t);
+    return G(e, t);
   }
   // ---------- browser cache (L1) internals ----------
   async fetchForStorage(e) {
@@ -1273,7 +1273,7 @@ class $e {
     this.crossfadeTimer !== null && (clearTimeout(this.crossfadeTimer), this.crossfadeTimer = null), this.layerA && (this.layerA.style.opacity = "0", this.layerA.style.transform = "none", this.layerA.style.filter = "none"), this.layerB && (this.layerB.style.opacity = "0", this.layerB.style.transform = "none", this.layerB.style.filter = "none"), this.videoRendererA?.destroy(), this.videoRendererB?.destroy(), this.iframeRendererA?.destroy(), this.iframeRendererB?.destroy(), this.imageRendererA?.destroy(), this.imageRendererB?.destroy();
   }
 }
-const De = {
+const Ne = {
   "&": "&amp;",
   "<": "&lt;",
   ">": "&gt;",
@@ -1281,9 +1281,9 @@ const De = {
   "'": "&#39;"
 };
 function S(l) {
-  return String(l).replace(/[&<>"']/g, (e) => De[e]);
+  return String(l).replace(/[&<>"']/g, (e) => Ne[e]);
 }
-class Ne {
+class De {
   container = null;
   settings;
   cacheManager;
@@ -1874,9 +1874,9 @@ class Ne {
     $?.addEventListener("change", () => {
       this.settings.showMiniPlayer = $.checked, this.callbacks.onMiniPlayerToggle($.checked), this.callbacks.onSettingsChanged(this.settings);
     });
-    const D = this.container.querySelector("#st_capsule_on_play");
-    D?.addEventListener("change", () => {
-      this.settings.capsuleOnPlayOnly = D.checked, this.callbacks.onCapsuleOnPlayToggle?.(D.checked), this.callbacks.onSettingsChanged(this.settings);
+    const N = this.container.querySelector("#st_capsule_on_play");
+    N?.addEventListener("change", () => {
+      this.settings.capsuleOnPlayOnly = N.checked, this.callbacks.onCapsuleOnPlayToggle?.(N.checked), this.callbacks.onSettingsChanged(this.settings);
     }), this.container.querySelector("#st_trigger_add_btn")?.addEventListener("click", () => {
       const o = this.container?.querySelector("#st_trigger_form");
       if (o) {
@@ -1901,7 +1901,7 @@ class Ne {
       if (E.files && E.files[0]) {
         try {
           const o = await E.files[0].text(), d = JSON.parse(o);
-          d && typeof d == "object" && (this.settings = G(d), this.callbacks.onSettingsChanged(this.settings), this.render(), alert("Settings successfully imported!"));
+          d && typeof d == "object" && (this.settings = W(d), this.callbacks.onSettingsChanged(this.settings), this.render(), alert("Settings successfully imported!"));
         } catch (o) {
           alert(`Failed to import settings JSON: ${o}`);
         }
@@ -2142,7 +2142,8 @@ class ze {
       this.start(e);
       return;
     }
-    this.level = e;
+    const t = this.level;
+    this.level = e, t === "all" && e !== "all" && this.seams ? this.restoreNativeBackgroundImage(this.seams.bgHost) : this.clearNativeBackgroundImage();
   }
   // ---------------------------------------------------------------- decorations
   /**
@@ -2191,6 +2192,18 @@ class ze {
       }
       !s && n && n.remove();
     });
+  }
+  /**
+   * Called when the extension no longer has anything mounted (background cleared through the
+   * public API, media deleted): the native marker has nothing to point at, and `#bg1` goes back
+   * to the host. Without this the user would be left with no background at all — our layer is
+   * gone and the host's image is still suppressed.
+   *
+   * A no-op restore when we never cleared anything (the current value already equals the
+   * snapshot), which covers the levels where we do not suppress `#bg1` in the first place.
+   */
+  releaseNativeBackground() {
+    this.refreshSelection(null), this.seams && this.restoreNativeBackgroundImage(this.seams.bgHost);
   }
   // ---------------------------------------------------------------- interception
   /**
@@ -2241,7 +2254,7 @@ class ze {
    */
   clearNativeBackgroundImage() {
     const e = this.seams;
-    if (!(!this.active || !e || this.clearingNativeBg) && !this.isChatBackgroundLocked() && e.bgHost.style.backgroundImage) {
+    if (!(!this.active || !e || this.clearingNativeBg) && this.activeFileName && this.level === "all" && !this.isChatBackgroundLocked() && e.bgHost.style.backgroundImage) {
       this.clearingNativeBg = !0;
       try {
         e.bgHost.style.backgroundImage = "";
@@ -2260,7 +2273,7 @@ class ze {
    * have answered with the new chat's locked/default background.
    */
   restoreNativeBackgroundImage(e) {
-    if (this.savedNativeBgImage) {
+    if (this.savedNativeBgImage && e.style.backgroundImage !== this.savedNativeBgImage) {
       this.clearingNativeBg = !0;
       try {
         e.style.backgroundImage = this.savedNativeBgImage;
@@ -2271,7 +2284,7 @@ class ze {
   }
   // ---------------------------------------------------------------- install internals
   install(e) {
-    this.seams = e, this.active = !0, this.savedNativeBgImage = e.bgHost.style.backgroundImage, document.addEventListener("click", this.onDocumentClickCapture, !0), this.bgHostObserver = new MutationObserver(() => this.clearNativeBackgroundImage()), this.bgHostObserver.observe(e.bgHost, { attributes: !0, attributeFilter: ["style"] }), this.gridObserver = new MutationObserver(() => this.decorateGrid()), this.gridObserver.observe(e.menuContent, { childList: !0, subtree: !0 }), this.clearNativeBackgroundImage(), this.decorateGrid();
+    this.stopWaitingForSeams(), this.seams = e, this.active = !0, this.savedNativeBgImage = e.bgHost.style.backgroundImage, document.addEventListener("click", this.onDocumentClickCapture, !0), this.bgHostObserver = new MutationObserver(() => this.clearNativeBackgroundImage()), this.bgHostObserver.observe(e.bgHost, { attributes: !0, attributeFilter: ["style"] }), this.gridObserver = new MutationObserver(() => this.decorateGrid()), this.gridObserver.observe(e.menuContent, { childList: !0, subtree: !0 }), this.clearNativeBackgroundImage(), this.decorateGrid();
   }
   /** Waits for lazily-built host containers, then starts for real. */
   waitForSeams() {
@@ -2384,7 +2397,7 @@ class Ve {
     this.hideTimer !== null && (clearTimeout(this.hideTimer), this.hideTimer = null), this.unsubscribeTrack?.(), this.unsubscribeTrack = null, this.unsubscribePlayState?.(), this.unsubscribePlayState = null, this.container && (this.container.remove(), this.container = null);
   }
 }
-class Ge {
+class We {
   ext;
   eventListeners = /* @__PURE__ */ new Map();
   constructor(e) {
@@ -2700,7 +2713,7 @@ class Ge {
     });
   }
 }
-class We {
+class Ge {
   canvas;
   ctx = null;
   parentEl = null;
@@ -3724,7 +3737,7 @@ class dt {
   agentBridge = null;
   publicApi;
   constructor() {
-    this.cacheManager = new Ie(), this.audioEngine = new Be(), this.mediaMount = new $e(this.audioEngine, (e) => this.mountOverlays(e)), this.atmosphereFX = new We(), this.audioVisualizer = new He(), this.parallaxController = new je(), this.triggerManager = new Ke(), this.ambientSoundGenerator = new Xe(), this.frostedGlassController = new Ye(), this.publicApi = new Ge(this);
+    this.cacheManager = new Ie(), this.audioEngine = new Be(), this.mediaMount = new $e(this.audioEngine, (e) => this.mountOverlays(e)), this.atmosphereFX = new Ge(), this.audioVisualizer = new He(), this.parallaxController = new je(), this.triggerManager = new Ke(), this.ambientSoundGenerator = new Xe(), this.frostedGlassController = new Ye(), this.publicApi = new We(this);
   }
   getCacheManager() {
     return this.cacheManager;
@@ -3775,7 +3788,7 @@ class dt {
     return this.nativeController;
   }
   clearActiveBackground() {
-    this.settings.activeMediaId = null, this.mediaMount.clear(), this.saveSettings(), this.settingsDrawer && this.settingsDrawer.refreshMediaGrid();
+    this.settings.activeMediaId = null, this.mediaMount.clear(), this.nativeController?.releaseNativeBackground(), this.saveSettings(), this.settingsDrawer && this.settingsDrawer.refreshMediaGrid();
   }
   /**
    * Mounts a media item as the background. `persist` = false is for TRANSIENT items that
@@ -3802,7 +3815,7 @@ class dt {
         s && await this.applyMedia(s);
       } else i.mediaUrl && await this.publicApi.setBackground(i.mediaUrl);
       i.bgmUrl && await this.publicApi.playBGM(i.bgmUrl), i.presetId && this.publicApi.applyPreset(i.presetId), i.filters && this.publicApi.setFilters(i.filters), i.weather && this.publicApi.setWeather(i.weather), i.visualizer && this.publicApi.setVisualizer(i.visualizer), i.parallax && this.publicApi.setParallax(i.parallax.enabled, i.parallax.intensity), i.ambientSound && this.publicApi.setAmbientSound(i.ambientSound), typeof i.frostedChat == "boolean" && this.publicApi.setFrostedChat(i.frostedChat);
-    }), this.settingsDrawer = new Ne(this.settings, this.cacheManager, {
+    }), this.settingsDrawer = new De(this.settings, this.cacheManager, {
       onSettingsChanged: (i) => {
         this.settings = i, this.saveSettings(), this.applySettingsToSubsystems(), this.enforceQuotaIfChanged();
       },
@@ -3997,7 +4010,7 @@ class dt {
   loadSettings() {
     try {
       const e = localStorage.getItem(V);
-      e && (this.settings = G(JSON.parse(e))), this.settingsRevision = parseInt(localStorage.getItem(fe) || "0", 10) || 0;
+      e && (this.settings = W(JSON.parse(e))), this.settingsRevision = parseInt(localStorage.getItem(fe) || "0", 10) || 0;
     } catch (e) {
       console.error("[ST-BgLoader] Failed to parse saved settings:", e), this.settings = { ...R }, this.settingsRevision = 0;
     }
@@ -4011,7 +4024,7 @@ class dt {
     this.loadSettings();
     try {
       const e = await this.serverSettings.load();
-      e && e.revision >= this.settingsRevision ? (this.settings = G(e.settings), this.settingsRevision = e.revision, this.persistLocalSettings()) : this.settingsRevision > 0 && this.serverSettings.scheduleSave(this.settings, this.settingsRevision);
+      e && e.revision >= this.settingsRevision ? (this.settings = W(e.settings), this.settingsRevision = e.revision, this.persistLocalSettings()) : this.settingsRevision > 0 && this.serverSettings.scheduleSave(this.settings, this.settingsRevision);
     } catch (e) {
       console.warn("[ST-BgLoader] Server settings unavailable, using local settings:", e);
     }
