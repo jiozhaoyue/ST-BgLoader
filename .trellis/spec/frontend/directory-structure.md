@@ -15,10 +15,12 @@ src/
 ├── core/               # orchestration subsystems
 │   ├── MediaMount.ts       # #bg1 layer A/B double-buffering, transitions, fitting
 │   ├── SceneManager.ts     # scene snapshots & bookmarks
-│   ├── ShortcutManager.ts  # keyboard shortcuts
 │   └── ParallaxController.ts
+│   # (no ShortcutManager: the Alt+letter shortcuts were removed on 2026-09-26 —
+│   #  Alt+F collides with the browser's own app-menu accelerator and Ctrl+Alt is
+│   #  reserved by Windows. Background visibility is a panel checkbox instead.)
 ├── renderers/          # one per media type: VideoRenderer, IframeRenderer, ImageRenderer
-├── ui/                 # SettingsDrawer (1043 lines, DOM-built panel), MiniPlayer,
+├── ui/                 # SettingsDrawer (DOM-built panel), MiniPlayer,
 │                       # NativeBgAugmenter, FrostedGlassController, style.css
 ├── audio/              # AudioEngine (BGM), AmbientSoundGenerator (procedural)
 ├── fx/                 # AtmosphereFX (weather particles)
