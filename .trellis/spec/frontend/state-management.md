@@ -23,6 +23,13 @@ private settings: BgLoaderSettings = { ...DEFAULT_SETTINGS };
   first when `persist` is true (the default), so a page reload restores the last background.
   Transient backgrounds (`PublicAPI.setBackground` WITHOUT `saveToLibrary`, `persist = false`)
   deliberately do not record it — see the Runtime-only state section below.
+- `settings.backgroundVisible` is the durable intent for the background layer's visibility; it
+  replaced the removed Alt+B shortcut. `MediaMount.visible` is only the *applied mirror*:
+  `setBackgroundVisible()` writes the setting, persists it, and fans out through
+  `applySettingsToSubsystems()`; `init()` and the panel checkbox both read the setting, and the
+  checkbox routes its `change` back through that same public path. Rendering never writes a
+  stray inline `display` on the container any more — doing so once meant mounts into a hidden
+  container and a background that never came back (audit A1).
 
 ---
 
@@ -34,7 +41,6 @@ dangling references:
 | State | Owner | Why it is not persisted |
 | --- | --- | --- |
 | Transient background | `MediaMount` mount + `applyMedia(item, persist = false)` | Its item id (`custom_<ts>`) exists nowhere in the catalog, so a persisted `activeMediaId` could never be resolved on reload (audit A2). `PublicAPI.setBackground` opts in with `saveToLibrary: true`. |
-| Background visibility | `MediaMount.visible` (`setVisible()` / `isVisible()`) | Not a stray inline `display` on the container any more: writing `display` from outside meant mounts into a hidden container and a background that never came back (audit A1). Rendering never touches it; `PublicAPI.setBackgroundVisible/isBackgroundVisible` and the panel checkbox route through it. |
 
 `init()` self-heals the one dangling case that IS persisted: if `activeMediaId` no longer
 resolves (`CacheManager.getMedia` returns null), it is cleared and saved instead of being

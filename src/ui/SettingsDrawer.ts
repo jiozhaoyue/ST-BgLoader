@@ -29,7 +29,7 @@ export interface SettingsDrawerCallbacks {
     onMediaSelected: (item: MediaItem) => void;
     onMediaDeleted: (id: string) => void;
     onMediaUploaded: (item: MediaItem) => void;
-    /** Initial/current background visibility (MediaMount owns the state, not settings). */
+    /** Initial/current background visibility, read from `settings.backgroundVisible`. */
     getBackgroundVisible?: () => boolean;
     onBackgroundVisibilityChanged?: (visible: boolean) => void;
     onPresetChanged: (preset: FilterPreset) => void;
@@ -100,8 +100,8 @@ export class SettingsDrawer {
         drawer.id = 'st_bgloader_settings';
         drawer.className = 'st-bgloader-panel';
 
-        // Read from MediaMount, not from settings: visibility is controlled runtime state
-        // (finding A1), and the panel only mirrors it.
+        // Renders settings.backgroundVisible (the durable single source of truth); the panel only
+        // mirrors it. The write path back is onBackgroundVisibilityChanged -> PublicAPI.
         const backgroundVisible = this.callbacks.getBackgroundVisible?.() ?? true;
 
         drawer.innerHTML = `

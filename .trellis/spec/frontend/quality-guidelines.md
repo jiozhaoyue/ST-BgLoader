@@ -70,3 +70,36 @@ all 24 pass.
   update labels/subsystems in realtime but persist settings through the debounce
   (`SettingsDrawer` bindSlider), otherwise each drag step stringifies and writes
   localStorage synchronously.
+
+---
+
+## Probe hygiene (added 2026-09-26 full audit)
+
+The Dev-instance probes under `.trellis/tasks/*/research/probe-*.mjs` drive a **live** host that
+holds real (Dev) settings, so they carry production obligations:
+
+- **A probe that changes state must restore it — and must wait for the write to actually land
+  before closing the page.** Settings writes are debounced *and* pushed to the server document
+  asynchronously, while startup trusts the server document (see state-management.md, A5). A page
+  closed right after the last mutation can therefore leave the instance changed. The nastier half:
+  the *next* run then reads that residue as its "initial" value and faithfully restores it,
+  cementing the pollution. Observed 2026-09-26 — `settings.backgroundVisible` stuck at `false`
+  after a probe threw mid-run, skipping its restore block. Sit out the write, then assert the
+  restore (`probe-smoke-g6.mjs` R-1..R-3).
+- **Never write to the instance just to set up a test.** `CacheManager.preloadUrl()` calls
+  `origin.putMedia()`, i.e. it adds a real entry to the user's server-side media library — that is
+  exactly how the junk-card finding (M1) got in. Prefer read-only setup; when the evidence is
+  unreachable without writing, record an honest `SKIP` and give the source-level evidence instead
+  (`probe-perf-e1-e2.mjs` E2-2).
+- **Write assertions against the implementation's semantics, not against intuition.** Three false
+  failures on 2026-09-26 came from the assertion rather than the product:
+  - drawer collapse: read `getComputedStyle().display` — the initial state comes from the host
+    stylesheet, so inline `style.display` is empty until a click makes slideToggle write it;
+  - `MiniPlayer.hide()` only swaps a class and keeps the node, so "element exists" is not
+    visibility — check the `hidden`/`visible` class or the computed display;
+  - a checkbox whose initial value is a persisted setting must be asserted **directionally**
+    (relative to `wasChecked`), never as an absolute state.
+- **Record page errors with their origin.** The host page loads other third-party extensions, so a
+  bare message cannot be attributed (`Identifier 'SPresetSettings' has already been declared` is
+  plainly someone else's). Assert "no error originating from `dist/index.js`" and print the foreign
+  ones as context — requiring a page-wide zero-error run is not achievable on a real tavern.
