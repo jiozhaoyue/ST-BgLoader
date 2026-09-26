@@ -24,6 +24,7 @@ These guides help you **ask the right questions before coding**.
 | [Code Reuse Thinking Guide](./code-reuse-thinking-guide.md) | Identify patterns and reduce duplication | When you notice repeated patterns |
 | [Cross-Layer Thinking Guide](./cross-layer-thinking-guide.md) | Think through data flow across layers | Features spanning multiple layers |
 | [Trellis Shell Discipline](./trellis-shell-discipline.md) | Avoid stranding the shell cwd (the pre-shell hook resolves relatively) | Before any Bash command that uses `cd` |
+| [Repo Integrity Discipline](./repo-integrity-discipline.md) | Never let a sync/restore tool write `.git/refs` directly; commit at each step | Before writing any sync/backup/restore tooling, and whenever the working tree looks wrong |
 
 ---
 
