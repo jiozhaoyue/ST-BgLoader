@@ -144,16 +144,18 @@
 
 ## Phase G：回归与收尾
 
-- [ ] G1 A1/A2/A3 修复前证据 + 修复后验证（按 `design.md` §5 的验证表）
-- [ ] G2 E1/E2 性能验证（请求数 / IDB 调用数前后对比）
+- [x] G1 A1/A2/A3 修复前证据 + 修复后验证（按 `design.md` §5 的验证表）
+- [x] G2 E1/E2 性能验证（请求数 / IDB 调用数前后对比）
 - [x] G3 `npm run type-check && npm run build`
 - [x] G4 CSS 裸选择器门禁为 0
-- [ ] G5 e2e + stress + authority 三套件
-- [ ] G6 Dev 冒烟：抽屉开合、切背景、Alt+B、迷你播放器、pulse+视差同开
-- [ ] G7 **未越界核对**：`git diff --stat` 确认未修改 SettingsDrawer 视觉区与原生接管接缝（子任务 1/3 范围）
-- [ ] G8 **未删除核对**：清单比对，确认本轮零删除
-      > **本条已被重做范围取代**：本轮**确有获准删除**（F8 `chatBindings`、F9 三个死字段、F10 6 处死代码、K1 `src/core/ShortcutManager.ts`）。判据改为「删除只出现在获批清单内、无超范围删除」，而不是「零删除」。
-- [ ] G9 更新 `dist/` 并按发现编号分组提交、推送 `origin master`
+- [x] G5 e2e + stress + authority 三套件
+- [x] G6 Dev 冒烟：抽屉开合、切背景、背景可见性勾选框、迷你播放器、pulse+视差同开
+      > **原条目写的 Alt+B 已随 K1 移除**，冒烟项改为替代它的可见性勾选框。
+- [x] G7 **未越界核对**：`git diff --stat` 确认未修改 SettingsDrawer 视觉区与原生接管接缝（子任务 1/3 范围）
+      > **判据已按重做后的实情改写**：本轮获准改动的 F11（配额控件）、F5（徽章配色）、K6/S1/A4 本来
+      > 就落在 `SettingsDrawer.ts` / `style.css` 里，故「两文件无改动」不成立。实际判据 = **样式表只有追加**。
+- [x] G8 **未删除核对**：删除只出现在获批清单内、无超范围删除
+- [x] G9 更新 `dist/` 并按发现编号分组提交、推送 `origin master`
 - [ ] G10 归档子任务
 
 ## 验证命令
@@ -270,3 +272,57 @@ git diff --stat HEAD -- src/ui/SettingsDrawer.ts src/ui/style.css
 - **⚠️ 运行期验证被环境阻塞（需用户处置）**：Dev 实例 `https://127.0.0.1:8003` 上，**ST-BgLoader 处于停用状态**——`SillyTavern.getContext().extensionSettings.disabledExtensions` 含 `"third-party/ST-BgLoader"`，页面无该扩展的 script 标签，故 `window.STBgLoader` 为 `undefined`、`isInitialized` 永不为真；`probe-k-s-verify.mjs` 在等 `isInitialized` 40s 后超时（0 passed / 1 failed）。扩展文件本身在位（实例经 `manifest.json` 的 `js: dist/index.js` 提供本仓 `dist/`，服务端字节数 178523 = 本地 `dist/index.js` 字节数，特征串命中）。
   → **待用户在实例中重新启用扩展后**，G1/G2/G6 与 `probe-k-s-verify.mjs` / `probe-verify-fixes.mjs` 才能取得运行期证据；G5 三套件按主会话指示本轮未跑。
 - **G7 越界核对的读法需更新**：`git diff --stat HEAD -- src/ui/SettingsDrawer.ts src/ui/style.css` 现在**必然非空**，因为 F11（配额控件）与 F5/K6/S1/A4 本就落在两个文件里——判据应是「只有本子任务获准的那几处改动」，而非「无改动」。已人工核对：样式表只有**追加**的类型徽章规则，折叠规则（`display`/`height` 相关）与去溢光既定规则一字未动。
+
+---
+
+### Phase G 执行记录（2026-09-26 收尾）
+
+- **G5 三套件（当前 HEAD 重跑，不沿用旧结果）**：`TEST_TARGET_URL=https://127.0.0.1:8003`
+  → e2e **24/24** · stress **4/4** · authority **18/18**（真后端）。本轮改动只有注释与 spec 文本，
+  但仍在提交前重跑——避免养成「只改了注释就不测」的习惯。
+- **G1 验收探针**：`research/probe-verify-fixes.mjs`（A1–A5 专项，18/18）。A1 组已改为新机制
+  （`setBackgroundVisible` 取代已移除的 Alt+B）并补持久化断言（隐藏态跨刷新存活）。
+- **G2 性能量化**：新增 `research/probe-perf-e1-e2.mjs`（只读，不写实例）。判据不依赖旧代码，而是断言改动后的性质：
+  - **E1**：TTL 窗口内 **20 次**目录调用（`listMedia` ×15 + `getMedia` ×5）→ **0 次** `/api/backgrounds/all`
+    请求（3ms 窗口内完成）；TTL 过期后 1 次调用 → **恰好 1 次**请求（证明是短时缓存而非永久缓存）。
+    改前基线：每次调用一次 POST（`findings.md` §五 E1）。
+  - **E2**：**12 次** `getMediaBlobUrl` 热路径调用 → **0 次**全量 IDB 读（`getAll`/`getAllKeys` 增量均为 0）。
+    改前基线：每次 touch 一次全量 `getAll`（`findings.md` §五 E2）。
+  - **E2-2 记 SKIP（诚实缺口）**：探针无法在**零写入前提下**取得「写回仍持久化」的运行期证据——
+    该路径要求被测条目已在浏览器 CacheStorage 中，而当前 CacheStorage 为空，探针**拒绝**用 `preloadUrl`
+    预热（那会向实例媒体库写入条目，正是 M1「媒体库垃圾卡片」的来源）。替代证据为源级：
+    `src/cache/CacheManager.ts` 的 `touchCache()` 内 `if (entry) { entry.lastUsed = Date.now();
+    await this.indexPut(entry); }` —— 存量条目仍写回单条 lastUsed，只是不再读全量。
+    **不影响 E2 的结论**：省读来自内存镜像，不是靠不写。
+- **G6 Dev 冒烟**：新增 `research/probe-smoke-g6.mjs`，**16/16 通过**（全程真实点击 DOM，非直接调 API）：
+  抽屉开合（`none → block → none`，即子任务 1 折叠修复的回归）· 点网格卡片切背景（`activeMediaId` 变更 +
+  容器内挂载 1 个媒体元素）· 可见性勾选框（勾掉后 `display:none` 且 PublicAPI 同步，勾回即恢复）·
+  迷你播放器（取消勾选后 capsule 不可见，勾选后可见）· pulse 视觉化 + 视差同开（背景仍挂载）。
+  探针末尾**逐项复原**初始态并留 1800ms 等防抖写盘落盘，三项复原断言全过。
+  - 页面上另有 **3 个非本扩展的 page error**（`Unexpected reserved word` / `$(...) is not a function` /
+    `Identifier 'SPresetSettings' has already been declared`）与 14 条 console error，**来源均非
+    `dist/index.js`**（一条来自宿主自身脚本 URL，其余属其它第三方扩展）。判据因此收紧为「无源自本扩展的
+    page error / console error」，并把外来错误打印出来供对照，而不是简单要求页面零错误。
+- **G7 未越界（静态核对）**：`git diff ceb9eec master -- src/ui/style.css` = **+10 / -0**，全部是
+  D2 的类型徽章配色规则（F5）；折叠相关规则（宿主 `.inline-drawer-content` 的 `display`）与去溢光
+  既定规则**一字未动**。
+- **G8 删除范围（静态核对）**：本轮唯一删除的文件是 `src/core/ShortcutManager.ts`（K1 获批）。
+  逐处核对删行均落在获批清单内：`SceneManager.setApplyCallback`、`AudioVisualizer` 的 `brightness`、
+  `AudioEngine.getAnalyserNode`（F10）、`SettingsDrawer` 的 `shortcutsEnabled` 控件（K1–K5）、
+  `index.ts` 的 ShortcutManager 接线与 `chatBindings` 不可达分支（K1 / F8）。残留标识符全仓复扫：
+  `chatBindings` **1**（仅注释，说明移除缘由）、`playlist` **23**（全部是 `AudioEngine` 的私有运行时
+  播放列表，与 F9 砍掉的 `settings.playlist` 死字段无关）、`isWaitingForUnmute` **1**（按 F10 保留，
+  它是 `tests/e2e.mjs:404-410` 的观测面）、其余均为 0。
+- **实例侧残留清理（本轮真实踩到的坑）**：G6 探针首次运行在 S5 抛错、复原段未执行，于是
+  Dev 实例的 `backgroundVisible` 停在 `false`——设置写入是防抖 + **异步推服务端文档**
+  （而启动以服务端文档为准，见 A5），页面关闭时最后一次写入未必已到达那里；**更隐蔽的是下一次运行**：
+  它把该值当作「初始值」并"忠实"复原，把残留固化了。已用 `research/probe-cleanup-g6residue.mjs`
+  显式设回 `true` 并读回确认（`before=false → after=true api=true display=block`）。
+  **教训**：会改状态的探针必须自己负责复原，且要**等写入真正落盘（含服务端文档）再关页面**；
+  否则"复原"本身会变成新的污染源。
+- **收尾期一致性订正（本轮新增 2 处）**：`settings.backgroundVisible` 持久化改造（提交 `1ee8e2a`）之后，
+  两处表述失真——`SettingsDrawer` 的 `getBackgroundVisible` JSDoc 与 `render()` 注释仍写
+  「visibility is controlled runtime state / MediaMount owns the state, not settings」；
+  `state-management.md` 仍把背景可见性列在「Runtime-only state（不持久化）」表里。两者都会诱导后来者
+  **重新引入 A1 的裸 `display` 写法**，故一并订正：真源是 `settings.backgroundVisible`，
+  `MediaMount.visible` 只是被应用的镜像。

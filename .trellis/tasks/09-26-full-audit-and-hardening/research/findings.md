@@ -290,3 +290,67 @@ public async start(): Promise<void> {
 | M3 | 媒体库存在指向已失效外部 URL 的条目（实测 `files.catbox.moe/...` 404） | 仅记录（属用户数据） |
 | — | 设置面板「保存场景」按钮另有一套内联实现，未复用 `PublicAPI.saveCurrentScene` | 未获批准，未动 |
 | — | `PublicAPI.setBackgroundVisible` 未接入 `buildAgentHost`，AI 导演模式暂无法开关背景 | 下一轮小增量 |
+
+---
+
+## 十五、Phase G 收尾验证（2026-09-26）
+
+三套件在**当前 HEAD** 重跑（`TEST_TARGET_URL=https://127.0.0.1:8003`）：**e2e 24/24 · stress 4/4 ·
+authority 18/18**（真后端）。本轮收尾改动只有注释与 spec 文本，仍重跑，以保持「提交前必测」的纪律。
+
+### G2 性能量化（`research/probe-perf-e1-e2.mjs`，只读探针，不写实例）
+
+| 发现 | 指标 | 改前基线 | 改后实测 | 结论 |
+| --- | --- | --- | --- | --- |
+| E1 | TTL 窗口内 **20 次**目录调用（`listMedia` ×15 + `getMedia` ×5）触发的 `/api/backgrounds/all` 请求数 | 20（每次调用一次 POST） | **0**（3ms 窗口内跑完） | TTL 合并生效 |
+| E1 | TTL 过期后 **1 次**调用的请求数 | — | **1** | 是**短时缓存**而非永久缓存，列表变更仍可见 |
+| E2 | **12 次** `getMediaBlobUrl` 热路径调用的全量 IDB 读（`getAll`/`getAllKeys`） | 12 | **0** | 内存镜像生效 |
+
+**E2-2 记 SKIP（诚实缺口）**：探针**无法在零写入前提下**取得「touch 仍写回 lastUsed」的运行期证据——
+该路径要求被测条目已在浏览器 CacheStorage 中，而当前 CacheStorage 为空；探针**拒绝**用 `preloadUrl`
+预热，因为那会 `origin.putMedia()` 往实例媒体库写入条目（`src/cache/CacheManager.ts:187`），
+正是 M1「媒体库垃圾卡片」的来源。替代证据为**源级**：`src/cache/CacheManager.ts:226-233` 的
+`touchCache()` 为 `if (entry) { entry.lastUsed = Date.now(); await this.indexPut(entry); }`
+—— 存量条目仍写回单条 `lastUsed`，只不再读全量。**不影响 E2 结论**：省读来自内存镜像，不是靠不写。
+
+### G6 Dev 冒烟（`research/probe-smoke-g6.mjs`，**16/16 通过**，全程真实点击 DOM）
+
+| 场景 | 实测 |
+| --- | --- |
+| 抽屉开合（子任务 1 折叠修复回归） | 计算 `display`：`none → block → none` |
+| 点网格卡片切背景 | `activeMediaId` 变更；容器内挂载 1 个媒体元素 |
+| 背景可见性勾选框 | 勾掉 → `display:none` 且 `PublicAPI.isBackgroundVisible()=false`；勾回即恢复 |
+| 迷你播放器 | 取消勾选 → capsule 不可见；勾选 → 可见 |
+| pulse 视觉化 + 视差同开 | 两者均生效，背景仍挂载（`canvas=0` 属正常：pulse 走 CSS transform 而非 canvas） |
+| 收尾复原 | `activeMediaId` / 可见性 / 视觉化+视差 三项断言全过（复原后留 1800ms 等防抖写盘落盘） |
+
+**页面上另有 3 个非本扩展的 page error**：`Unexpected reserved word`、`$(...) is not a function`
+（来源 `https://127.0.0.1:8003/a0ce1ded-…`，即宿主自身脚本）、`Identifier 'SPresetSettings' has
+already been declared`（第三方扩展的预设脚本）。另有 14 条 console error（含 404 资源）。
+**来源均非 `dist/index.js`** → 判据收紧为「无源自本扩展的 page error / console error」，
+并把外来错误原样打印供对照，而不是要求整页零错误（那在装满扩展的真实酒馆上不可能成立）。
+
+### 探针自身踩到的坑（教训，已固化到 spec）
+
+1. **会改状态的探针必须自己负责复原，且要等写入真正落盘（含服务端文档）再关页面。**
+   G6 探针首次运行在 S5 抛错 → 复原段没执行；设置写入是防抖 + 异步推服务端文档，而**启动以
+   服务端文档为准**（见 A5），页面关闭时最后一次写入未必已到达那里 → Dev 实例
+   `backgroundVisible` 停在 `false`。**更隐蔽的是下一次运行**：它把 `false` 读作「初始值」并
+   "忠实"复原，把残留固化了下来。已用 `research/probe-cleanup-g6residue.mjs` 设回 `true` 并读回确认。
+2. **判据要跟着实现语义走，别跟着直觉走。** 本轮三处初期误判都源于判据写错而非产品缺陷：
+   折叠态要读**计算样式**（初始态由宿主样式表决定，inline `style.display` 是空的）；
+   迷你播放器的 `hide()` **只换类名、不移除 DOM**，故不能用「元素是否存在」判可见性；
+   可见性勾选框的初始值取决于**持久化设置**，断言必须写成方向性（相对 `wasChecked`）而非绝对。
+3. **page error 必须带来源**。宿主页面同时加载多个第三方扩展，裸消息无法区分归属（`SPresetSettings`
+   这种显然是别人的），不记来源就会把别人的错误算到自己头上。
+
+### 收尾期一致性订正（2 处，均与提交 `1ee8e2a` 的持久化改造同源）
+
+背景可见性改为 `settings.backgroundVisible` 持久化之后，两处表述仍停留在旧形态，都会诱导后来者
+**重新引入 A1 的裸 `display` 写法**：
+
+- `src/ui/SettingsDrawer.ts`：`getBackgroundVisible` 的 JSDoc 与 `render()` 内注释仍写
+  「visibility is controlled runtime state」「MediaMount owns the state, not settings」→ 已订正为
+  「读 `settings.backgroundVisible`，面板只做镜像」。
+- `.trellis/spec/frontend/state-management.md`：背景可见性仍被列在「Runtime-only state（不持久化）」
+  表格里 → 已移出该表，改为「单一真源」小节里的一条（并保留 A1 的历史教训）。
