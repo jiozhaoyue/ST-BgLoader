@@ -15,23 +15,43 @@
 
 ## Phase B：事实采集（只读）
 
-- [ ] B1 读 `src/types/index.ts` 提取：`DEFAULT_SETTINGS` 全字段 + `BUILTIN_PRESETS` + `BUILTIN_SCENES` + 全部枚举（`WeatherType`/`VisualizerMode`/`TransitionType`/`AmbientSoundType`/`PlaybackMode`/`MediaType`）
-- [ ] B2 读 `src/api/PublicAPI.ts` 提取全部公开方法签名 + `emit()` 的事件名清单
-- [ ] B3 读 `src/ui/SettingsDrawer.ts` 提取面板分区结构与文案、每个控件的 id 与对应设置项
-- [ ] B4 ~~读 `src/core/ShortcutManager.ts` 提取快捷键表~~
+- [x] B1 读 `src/types/index.ts` 提取：`DEFAULT_SETTINGS` 全字段 + `BUILTIN_PRESETS` + `BUILTIN_SCENES` + 全部枚举（`WeatherType`/`VisualizerMode`/`TransitionType`/`AmbientSoundType`/`PlaybackMode`/`MediaType`）
+      > 实测：`DEFAULT_SETTINGS` **26** 个顶层键 + 6 个嵌套对象；`BUILTIN_PRESETS` 6 个；`BUILTIN_SCENES` 4 个；
+      > 枚举含 `TakeoverLevel` 共 7 个。天气 6 种（`WEATHER_TYPES` + `WEATHER_LABELS` 同处声明）。
+- [x] B2 读 `src/api/PublicAPI.ts` 提取全部公开方法签名 + `emit()` 的事件名清单
+      > **40** 个公开方法（含 4 个 `async`）、**22** 个事件名（`PublicAPI.ts` 与 `src/index.ts` 的 `emit`
+      > 调用点并集 —— 只看前者会漏掉 `play-state-change` 与 `settings-sync`）。
+- [x] B3 读 `src/ui/SettingsDrawer.ts` 提取面板分区结构与文案、每个控件的 id 与对应设置项
+      > 11 个分区、**73** 个控件 id（全量 `grep -oE 'id="st_[a-z_0-9]+"' | sort -u`）。
+- [x] B4 ~~读 `src/core/ShortcutManager.ts` 提取快捷键表~~
       > **已作废**：该文件在子任务 2 的 K1 中被删除（五个 Alt 快捷键全部移除）。改为「**确认快捷键确实
       > 不存在**」——`grep -rn "shortcutsEnabled\|ShortcutManager" src/` 应为 0，并在文档中写明移除理由
       > （Alt+F 与浏览器 app-menu 加速键冲突、Ctrl+Alt 被 Windows 保留）与替代入口。
-- [ ] B4b 读 `src/ui/NativeBackgroundController.ts` 提取接管行为面（三档开关、五条放行规则、降级条件）
-- [ ] B5 读 `src/backend/*` 提取存储模型与 Authority 能力面（`AuthorityCapabilities` 各字段语义）
-- [ ] B6 读 `src/index.ts` 提取初始化顺序与生命周期钩子
-- [ ] B7 逐文件清点 29 个模块的对外功能，形成覆盖矩阵草稿
+      > 实测：`src/` 内两者**均为 0 命中**（仅 `implement.md` 与 spec 的历史说明里出现文件名）。
+- [x] B4b 读 `src/ui/NativeBackgroundController.ts` 提取接管行为面（三档开关、五条放行规则、降级条件）
+      > 该模块为本会话所写，行为面已固化在 `.trellis/spec/frontend/host-native-ui.md` §8（可直接引用）。
+- [x] B5 读 `src/backend/*` 提取存储模型与 Authority 能力面（`AuthorityCapabilities` 各字段语义）
+      > `available` / `sync`（KV 跨设备同步）/ `serverFetch`（CORS 受阻媒体的服务端导入回退）/
+      > `agentTools`（Agent 工具注册，另受用户设置门控）+ `agentToolsState`（`unknown` 直到首次注册尝试）
+      > + `degradedReason`（`sdk-missing` / `init-failed` / `permission-denied`）。
+- [x] B6 读 `src/index.ts` 提取初始化顺序与生命周期钩子
+- [x] B7 逐文件清点 29 个模块的对外功能，形成覆盖矩阵草稿
+      > 实际是 **28 个文件**（规划期的 29 已过期，原因见 `doc-baseline.md`）。矩阵已落盘。
 
 ## Phase C：覆盖矩阵与不确定项
 
-- [ ] C1 `research/coverage-matrix.md` 落盘（29 行，无空缺）
-- [ ] C2 `research/doc-uncertainties.md` 落盘（无法从代码确证且无法实测的陈述）
-- [ ] C3 逐条验证 PRD 的 D4 待核对项（天气清单、压力测试数据、CORS 答案、设置项文案）
+- [x] C1 `research/coverage-matrix.md` 落盘（29 行，无空缺）
+      > 按 28 个 src 文件 + 3 个测试套件分 13 组，**空缺 0**。
+- [x] C2 `research/doc-uncertainties.md` 落盘（无法从代码确证且无法实测的陈述）
+      > 7 条待核实（U-1..U-7）+ 7 条已核实（V-1..V-7）+ 2 条「已知的文档-实现不一致」（X-1..X-2）。
+- [x] C3 逐条验证 PRD 的 D4 待核对项（天气清单、压力测试数据、CORS 答案、设置项文案）
+      > - D4-1 天气清单：**通过**，与 `WEATHER_TYPES`（6 种）完全一致。
+      > - D4-2 压力测试数据：**待 Phase E1 处置**（本轮未重跑可复现基准 → 已登记为 U-2）。
+      > - D4-3 CORS 答案：**确认过期**。`FAQ-and-Troubleshooting.md:17` 既未提 Authority 服务端导入
+      >   回退（`RemoteImporter`，`AuthorityCapabilities.serverFetch`），还把结果描述成「存入本地持久化
+      >   离线缓存」——**与 D1 同源的过期表述**，Phase E4 一并修正（已登记为 X-2）。
+      > - D4-4 设置项文案：**待 Phase E9/写 SET 时逐条比对**（面板文案以 `SettingsDrawer.ts` 模板串为
+      >   唯一真源，已登记为 V-7）。
 
 ## Phase D：新增文档
 
