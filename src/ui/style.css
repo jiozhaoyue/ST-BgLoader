@@ -241,6 +241,33 @@
 .st-bg-native-badge.html { background: var(--st-bg-badge-html, #fb8c00); }
 .st-bg-native-badge.svg { background: var(--st-bg-badge-svg, #43a047); }
 
+/* Native picker takeover: marks the thumbnail whose file is the media this extension has
+   mounted. A class of our own is required — the host recomputes `.selected-background` from
+   `background_settings.url`, a value we deliberately never write, so borrowing its class would
+   be cleared on the next re-render (and would fight its own highlight).
+
+   Expressed with an outline plus a real child marker, never with `::before` / `::after`: the
+   host already uses both pseudo-elements on this element (checkmark for selected, padlock for
+   locked), and sharing one would let our content win or lose by specificity. The marker sits
+   bottom-left to stay clear of the host's badge (top-left), its padlock (bottom-right) and the
+   mobile menu toggle (top-right). No glow — borders and contrast only. */
+.st-bg-takeover-selected {
+    outline: 2px solid var(--SmartThemeQuoteColor, #4fa3d1);
+    outline-offset: -1px;
+}
+
+.st-bg-native-current {
+    position: absolute;
+    bottom: 2px;
+    left: 2px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--SmartThemeQuoteColor, #4fa3d1);
+    z-index: 2;
+    pointer-events: none;
+}
+
 /* Preset & Dropdown Controls */
 .st-bgloader-preset-row {
     display: flex;

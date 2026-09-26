@@ -2,6 +2,14 @@ export type MediaType = 'video' | 'audio' | 'html' | 'svg' | 'image';
 export type MediaSource = 'url' | 'server';
 export type PlaybackMode = 'loop' | 'single' | 'shuffle';
 
+/**
+ * How much of the host's own background picker the extension takes over.
+ * - `off`       — enhance only: type badges, no interception.
+ * - `non-image` — intercept only what the native grid cannot preview anyway.
+ * - `all`       — intercept every selection, images included.
+ */
+export type TakeoverLevel = 'off' | 'non-image' | 'all';
+
 export interface VisualFilters {
     blur: number;         // 0 to 20 px
     brightness: number;   // 0 to 200 %
@@ -169,6 +177,12 @@ export interface BgLoaderSettings {
     playbackMode: PlaybackMode;
     cacheQuotaMB: number;
     lruAutoClean: boolean;
+    /**
+     * Takeover of the host's native background picker. Defaults to `all`: clicking any thumbnail
+     * in the host's own panel routes through this extension, so filters, weather and transitions
+     * apply to every background alike.
+     */
+    nativeTakeover: TakeoverLevel;
 
     // New Modular Subsystems
     weather: WeatherOptions;
@@ -318,6 +332,7 @@ export const DEFAULT_SETTINGS: BgLoaderSettings = {
     playbackMode: 'loop',
     cacheQuotaMB: 1024,
     lruAutoClean: true,
+    nativeTakeover: 'all',
 
     // Subsystem Defaults
     weather: {

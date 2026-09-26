@@ -8,6 +8,7 @@ import {
     mergeSettings,
     PlaybackMode,
     SceneSnapshot,
+    TakeoverLevel,
     TransitionType,
     TriggerRule,
     VisualizerMode,
@@ -32,6 +33,8 @@ export interface SettingsDrawerCallbacks {
     /** Initial/current background visibility, read from `settings.backgroundVisible`. */
     getBackgroundVisible?: () => boolean;
     onBackgroundVisibilityChanged?: (visible: boolean) => void;
+    /** How much of the host's native background picker the extension takes over. */
+    onNativeTakeoverChanged?: (level: TakeoverLevel) => void;
     onPresetChanged: (preset: FilterPreset) => void;
     onInteractiveChanged: (enabled: boolean) => void;
     onMiniPlayerToggle: (visible: boolean) => void;
@@ -103,6 +106,7 @@ export class SettingsDrawer {
         // Renders settings.backgroundVisible (the durable single source of truth); the panel only
         // mirrors it. The write path back is onBackgroundVisibilityChanged -> PublicAPI.
         const backgroundVisible = this.callbacks.getBackgroundVisible?.() ?? true;
+        const nativeTakeover = this.settings.nativeTakeover;
 
         drawer.innerHTML = `
             <div class="inline-drawer">
@@ -137,6 +141,14 @@ export class SettingsDrawer {
                                 <input type="checkbox" id="st_bg_visible" ${backgroundVisible ? 'checked' : ''} />
                                 <span>Show background layer (显示背景)</span>
                             </label>
+                        </div>
+                        <div class="st-bgloader-preset-row">
+                            <label class="st-bgloader-label-md">Native picker:</label>
+                            <select id="st_native_takeover">
+                                <option value="all" ${nativeTakeover === 'all' ? 'selected' : ''}>Take over every selection (接管全部)</option>
+                                <option value="non-image" ${nativeTakeover === 'non-image' ? 'selected' : ''}>Only non-image types (仅非图片)</option>
+                                <option value="off" ${nativeTakeover === 'off' ? 'selected' : ''}>Leave it native (关闭接管)</option>
+                            </select>
                         </div>
                         <div class="st-bgloader-media-grid" id="st_bgloader_grid">
                             <!-- Injected dynamically -->
@@ -850,6 +862,16 @@ export class SettingsDrawer {
         const bgVisibleCb = this.container.querySelector('#st_bg_visible') as HTMLInputElement;
         bgVisibleCb?.addEventListener('change', () => {
             this.callbacks.onBackgroundVisibilityChanged?.(bgVisibleCb.checked);
+        });
+
+        // Native picker takeover. Routed through the callback rather than written here so the
+        // controller is re-levelled at once instead of waiting for the next full fan-out.
+        const nativeTakeoverSel = this.container.querySelector('#st_native_takeover') as HTMLSelectElement;
+        nativeTakeoverSel?.addEventListener('change', () => {
+            const level = nativeTakeoverSel.value as TakeoverLevel;
+            this.settings.nativeTakeover = level;
+            this.callbacks.onNativeTakeoverChanged?.(level);
+            this.callbacks.onSettingsChanged(this.settings);
         });
 
         // Cache quota & auto-clean (B5: both fields drove cleanLRU but had no panel control, so

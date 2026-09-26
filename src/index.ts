@@ -4,7 +4,7 @@ import { CacheManager } from './cache/CacheManager';
 import { AudioEngine } from './audio/AudioEngine';
 import { MediaMount } from './core/MediaMount';
 import { SettingsDrawer } from './ui/SettingsDrawer';
-import { NativeBgAugmenter } from './ui/NativeBgAugmenter';
+import { NativeBackgroundController } from './ui/NativeBackgroundController';
 import { MiniPlayer } from './ui/MiniPlayer';
 import { PublicAPI } from './api/PublicAPI';
 import { AtmosphereFX } from './fx/AtmosphereFX';
@@ -18,6 +18,7 @@ import { AuthorityBridge } from './backend/AuthorityBridge';
 import { SettingsSync } from './backend/SettingsSync';
 import { ServerSettings } from './backend/ServerSettings';
 import { AgentBridge, AgentToolHost } from './backend/AgentBridge';
+import { mediaUrl as serverMediaUrl } from './backend/ServerOrigin';
 import { WeatherOptions, WeatherType } from './types';
 
 const SETTINGS_KEY = 'st_bgloader_settings';
@@ -33,7 +34,7 @@ export class STBgLoaderExtension {
     private mediaMount: MediaMount;
     private overlaysMounted = false;
     private settingsDrawer: SettingsDrawer | null = null;
-    private nativeAugmenter: NativeBgAugmenter | null = null;
+    private nativeController: NativeBackgroundController | null = null;
     private miniPlayer: MiniPlayer | null = null;
     private atmosphereFX: AtmosphereFX;
     private audioVisualizer: AudioVisualizer;
@@ -77,6 +78,7 @@ export class STBgLoaderExtension {
     public getAuthorityBridge(): AuthorityBridge { return this.authorityBridge; }
     public getServerSettings(): ServerSettings { return this.serverSettings; }
     public getAPI(): PublicAPI { return this.publicApi; }
+    public getNativeController(): NativeBackgroundController | null { return this.nativeController; }
 
     public clearActiveBackground(): void {
         this.settings.activeMediaId = null;
@@ -216,12 +218,15 @@ export class STBgLoaderExtension {
                 this.applySettingsToSubsystems();
                 this.enforceQuotaIfChanged();
             },
-            // Replaces the removed Alt+B shortcut: visibility is MediaMount's controlled state
-            // (finding A1), and routing the panel through the PublicAPI keeps one write path and
-            // one event for third-party callers.
+            // Replaces the removed Alt+B shortcut. `settings.backgroundVisible` is the durable
+            // truth (MediaMount mirrors it); routing the panel through the PublicAPI keeps one
+            // write path and one event for third-party callers.
             getBackgroundVisible: () => this.settings.backgroundVisible,
             onBackgroundVisibilityChanged: (visible) => {
                 this.publicApi.setBackgroundVisible(visible);
+            },
+            onNativeTakeoverChanged: (level) => {
+                this.nativeController?.setLevel(level);
             },
             onPresetChanged: (preset) => {
                 this.mediaMount.applyFilters(preset.filters);
@@ -287,11 +292,18 @@ export class STBgLoaderExtension {
         }, this.authorityBridge);
         this.settingsDrawer.render();
 
-        // 9. Setup Native Background Augmenter
-        this.nativeAugmenter = new NativeBgAugmenter(async (url, type, name) => {
+        // 9. Setup native background takeover
+        //
+        // One interception point for the host's own picker: clicking any thumbnail in the host's
+        // background panel routes through this extension, so filters/weather/transitions apply to
+        // every background alike. The URL is built with `mediaUrl()` — byte-identical to the
+        // host's `getBackgroundPath()` — rather than from the tile's `data-url`, which holds a
+        // CSS `url("…")` wrapper (and is only readable through jQuery's own data store).
+        this.nativeController = new NativeBackgroundController(async (bgFile, type) => {
+            const url = serverMediaUrl(bgFile);
             const virtualItem: MediaItem = {
-                id: 'native_' + name,
-                name,
+                id: 'native_' + bgFile,
+                name: bgFile,
                 type,
                 source: 'server',
                 url,
@@ -303,7 +315,7 @@ export class STBgLoaderExtension {
             };
             await this.applyMedia(virtualItem);
         });
-        this.nativeAugmenter.start();
+        this.nativeController.start(this.settings.nativeTakeover);
 
         // 10. Register Global Lifecycle Hooks
         document.addEventListener('visibilitychange', () => {
@@ -349,6 +361,13 @@ export class STBgLoaderExtension {
         const mediaUrl = await this.cacheManager.getMediaBlobUrl(item);
         await this.mediaMount.mountMedia(item, mediaUrl);
 
+        // Keep the host's picker in sync with what we just mounted: mark the matching native
+        // thumbnail, and make sure the host's own layer is not showing underneath ours.
+        // (Host-initiated `#bg1` writes are caught by the controller's own observer, so the
+        // CHAT_CHANGED case needs no extra call site here — it would only be a timing race.)
+        this.nativeController?.refreshSelection(item.name);
+        this.nativeController?.clearNativeBackgroundImage();
+
         if (this.settingsDrawer) {
             this.settingsDrawer.refreshMediaGrid();
             this.settingsDrawer.updateCacheStats();
@@ -392,6 +411,7 @@ export class STBgLoaderExtension {
         this.frostedGlassController.setOptions(this.settings.frostedChat);
         this.triggerManager.setRules(this.settings.triggerRules || []);
         this.sceneManager?.setUserScenes(this.settings.scenes || {});
+        this.nativeController?.setLevel(this.settings.nativeTakeover);
         this.syncAgentTools();
     }
 

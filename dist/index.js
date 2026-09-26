@@ -1,4 +1,4 @@
-const C = {
+const A = {
   default: {
     id: "default",
     name: "Default (原色)",
@@ -29,7 +29,7 @@ const C = {
     name: "Monochrome (黑白极简)",
     filters: { blur: 0, brightness: 100, opacity: 100, saturate: 0 }
   }
-}, S = ["off", "rain", "snow", "sakura", "cyber_motes", "scanlines"], pe = {
+}, _ = ["off", "rain", "snow", "sakura", "cyber_motes", "scanlines"], ve = {
   off: "Off (关闭天气)",
   rain: "Rain (细雨微涟)",
   snow: "Snow (冬日飘雪)",
@@ -37,22 +37,22 @@ const C = {
   cyber_motes: "Cyber Motes (赛博霓虹微粒)",
   scanlines: "Scanlines (复古CRT扫描线)"
 };
-function $(l) {
+function N(l) {
   return typeof l == "object" && l !== null && !Array.isArray(l);
 }
-function z(l) {
-  const e = { ...L };
-  if (!$(l)) return e;
-  const t = l, i = L, s = e;
+function G(l) {
+  const e = { ...R };
+  if (!N(l)) return e;
+  const t = l, i = R, s = e;
   for (const a of Object.keys(i)) {
     const n = t[a];
     if (n === void 0) continue;
     const r = i[a];
-    s[a] = $(r) && $(n) ? { ...r, ...n } : n;
+    s[a] = N(r) && N(n) ? { ...r, ...n } : n;
   }
   return e;
 }
-const I = {
+const B = {
   cyber_rain: {
     id: "cyber_rain",
     name: "Cyberpunk Rain (赛博雨夜)",
@@ -97,7 +97,7 @@ const I = {
     frostedChat: !0,
     isBuiltin: !0
   }
-}, L = {
+}, R = {
   activeMediaId: null,
   volume: 0.8,
   muted: !1,
@@ -117,6 +117,7 @@ const I = {
   playbackMode: "loop",
   cacheQuotaMB: 1024,
   lruAutoClean: !0,
+  nativeTakeover: "all",
   // Subsystem Defaults
   weather: {
     type: "off",
@@ -150,19 +151,19 @@ const I = {
   scenes: {},
   agentToolsEnabled: !1
 };
-function x(l, e = "") {
+function w(l, e = "") {
   const t = l.split(".").pop()?.toLowerCase().split("?")[0] || "";
   return ["mp4", "webm", "mov", "m4v", "ogv"].includes(t) || e.startsWith("video/") ? "video" : ["mp3", "wav", "ogg", "flac", "aac", "m4a"].includes(t) || e.startsWith("audio/") ? "audio" : t === "html" || t === "htm" ? "html" : t === "svg" ? "svg" : "image";
 }
-const te = "st-bg-loader-manifest.json", A = 1;
+const ne = "st-bg-loader-manifest.json", I = 1;
 function v(l) {
   return `backgrounds/${encodeURIComponent(l)}`;
 }
-const me = /* @__PURE__ */ new Set(["favicon.ico"]);
-function D(l) {
-  return !!l && me.has(l.toLowerCase());
+const we = /* @__PURE__ */ new Set(["favicon.ico"]);
+function q(l) {
+  return !!l && we.has(l.toLowerCase());
 }
-function M() {
+function k() {
   try {
     const e = window.SillyTavern?.getContext?.().getRequestHeaders?.({ omitContentType: !0 });
     return e ? { ...e } : {};
@@ -170,7 +171,7 @@ function M() {
     return {};
   }
 }
-async function fe(l) {
+async function Se(l) {
   try {
     const e = await fetch(`${v(l)}?t=${Date.now()}`, { cache: "no-store" });
     return e.ok ? JSON.parse(await e.text()) : null;
@@ -178,16 +179,16 @@ async function fe(l) {
     return console.warn(`[ST-BgLoader] Server document "${l}" is missing or unreadable:`, e), null;
   }
 }
-async function ye(l, e) {
+async function _e(l, e) {
   const t = new Blob([JSON.stringify(e, null, 2)], { type: "application/json" }), i = new FormData();
   i.append("avatar", new File([t], l, { type: "application/json" }));
-  const s = await fetch("/api/backgrounds/upload", { method: "POST", headers: M(), body: i });
+  const s = await fetch("/api/backgrounds/upload", { method: "POST", headers: k(), body: i });
   if (!s.ok)
     throw new Error(`Server upload failed for "${l}": HTTP ${s.status}`);
 }
-const be = 6e4;
-class V {
-  manifest = { version: A, items: [] };
+const Ee = 6e4;
+class H {
+  manifest = { version: I, items: [] };
   // Serializes manifest writes: manifest mutations are synchronous on this single
   // instance, so queueing uploads guarantees the last write carries the newest state
   // and prevents redundant parallel POSTs (two rapid putMedia calls).
@@ -200,19 +201,19 @@ class V {
   static CATALOG_TTL_MS = 2e3;
   async init() {
     try {
-      const e = await fetch(`${v(te)}?t=${Date.now()}`, { cache: "no-store" });
+      const e = await fetch(`${v(ne)}?t=${Date.now()}`, { cache: "no-store" });
       if (e.ok) {
         const t = JSON.parse(await e.text());
-        t && Array.isArray(t.items) && (this.manifest = { version: A, items: t.items });
+        t && Array.isArray(t.items) && (this.manifest = { version: I, items: t.items });
       }
     } catch (e) {
-      console.warn("[ST-BgLoader] No server media manifest yet, starting a fresh one:", e), this.manifest = { version: A, items: [] };
+      console.warn("[ST-BgLoader] No server media manifest yet, starting a fresh one:", e), this.manifest = { version: I, items: [] };
     }
     console.log(`[ST-BgLoader] Server media library ready: ${this.manifest.items.length} cataloged entries.`);
   }
   async listCatalog() {
     const e = this.catalogCache;
-    if (e && Date.now() - e.at < V.CATALOG_TTL_MS)
+    if (e && Date.now() - e.at < H.CATALOG_TTL_MS)
       return [...e.items];
     const t = await this.fetchCatalog();
     return this.catalogCache = { items: t, at: Date.now() }, [...t];
@@ -226,14 +227,14 @@ class V {
     try {
       const t = await fetch("/api/backgrounds/all", {
         method: "POST",
-        headers: { ...M(), "Content-Type": "application/json" },
+        headers: { ...k(), "Content-Type": "application/json" },
         body: "{}"
       });
       if (t.ok) {
         const i = await t.json();
         for (const s of i.images ?? []) {
-          if (D(s.filename)) continue;
-          const a = x(s.filename);
+          if (q(s.filename)) continue;
+          const a = w(s.filename);
           e.set(s.filename, {
             id: "native_" + s.filename,
             name: s.filename,
@@ -242,7 +243,7 @@ class V {
             url: v(s.filename),
             cacheKey: v(s.filename),
             size: 0,
-            mimeType: N(s.filename, a),
+            mimeType: W(s.filename, a),
             addedTimestamp: 0,
             lastUsedTimestamp: 0,
             hasAudio: !1
@@ -254,7 +255,7 @@ class V {
     }
     for (const t of this.manifest.items)
       if (t.filename) {
-        if (D(t.filename)) continue;
+        if (q(t.filename)) continue;
         e.set(t.filename, this.manifestToItem(t));
       } else t.remoteUrl && e.set(t.id, {
         id: t.id,
@@ -273,10 +274,10 @@ class V {
   }
   async getCatalogItem(e) {
     const t = this.manifest.items.find((s) => s.id === e);
-    return t ? D(t.filename) ? null : this.manifestToItem(t) : (await this.listCatalog()).find((s) => s.id === e) ?? null;
+    return t ? q(t.filename) ? null : this.manifestToItem(t) : (await this.listCatalog()).find((s) => s.id === e) ?? null;
   }
   async putMedia(e) {
-    const t = "bg_" + Date.now() + "_" + Math.random().toString(36).substring(2, 9), i = e.blob.type || N(e.name, e.type);
+    const t = "bg_" + Date.now() + "_" + Math.random().toString(36).substring(2, 9), i = e.blob.type || W(e.name, e.type);
     if (e.source === "url" && e.blob.size === 0 && e.remoteUrl) {
       const n = {
         id: t,
@@ -330,7 +331,7 @@ class V {
     }
     const s = await fetch("/api/backgrounds/delete", {
       method: "POST",
-      headers: { ...M(), "Content-Type": "application/json" },
+      headers: { ...k(), "Content-Type": "application/json" },
       body: JSON.stringify({ bg: i })
     });
     if (!s.ok)
@@ -353,20 +354,20 @@ class V {
       t = new URL(e, window.location.href);
     } catch {
     }
-    const i = !!t && t.origin !== window.location.origin, s = await fetch(e, i ? { signal: AbortSignal.timeout(be) } : void 0);
+    const i = !!t && t.origin !== window.location.origin, s = await fetch(e, i ? { signal: AbortSignal.timeout(Ee) } : void 0);
     if (!s.ok)
       throw new Error(`Failed to fetch media from ${e}: ${s.status} ${s.statusText}`);
     return s.blob();
   }
   async uploadFile(e, t, i) {
-    let s = ve(e || "media");
+    let s = Te(e || "media");
     if (await this.filenameExists(s)) {
       const r = s.lastIndexOf("."), c = r > 0 ? s.slice(0, r) : s, h = r > 0 ? s.slice(r) : "";
       s = `${c}_${Date.now()}${h}`;
     }
     const a = new FormData();
     a.append("avatar", new File([t], s, { type: i }));
-    const n = await fetch("/api/backgrounds/upload", { method: "POST", headers: M(), body: a });
+    const n = await fetch("/api/backgrounds/upload", { method: "POST", headers: k(), body: a });
     if (!n.ok)
       throw new Error(`Server upload failed: HTTP ${n.status}`);
     return (await n.text()).trim() || s;
@@ -376,7 +377,7 @@ class V {
     try {
       const t = await fetch("/api/backgrounds/all", {
         method: "POST",
-        headers: { ...M(), "Content-Type": "application/json" },
+        headers: { ...k(), "Content-Type": "application/json" },
         body: "{}"
       });
       if (t.ok)
@@ -390,12 +391,12 @@ class V {
     return this.saveQueue = this.saveQueue.then(e, e), this.saveQueue;
   }
   async doSaveManifest() {
-    this.manifest.version = A;
+    this.manifest.version = I;
     const e = new Blob([JSON.stringify(this.manifest, null, 2)], { type: "application/json" });
     try {
       const t = new FormData();
-      t.append("avatar", new File([e], te, { type: "application/json" }));
-      const i = await fetch("/api/backgrounds/upload", { method: "POST", headers: M(), body: t });
+      t.append("avatar", new File([e], ne, { type: "application/json" }));
+      const i = await fetch("/api/backgrounds/upload", { method: "POST", headers: k(), body: t });
       if (!i.ok)
         throw new Error(`HTTP ${i.status}`);
     } catch (t) {
@@ -419,7 +420,7 @@ class V {
     };
   }
 }
-function N(l, e) {
+function W(l, e) {
   switch (l.split(".").pop()?.toLowerCase()) {
     case "mp4":
       return "video/mp4";
@@ -450,19 +451,19 @@ function N(l, e) {
       return e === "video" ? "video/mp4" : e === "audio" ? "audio/mpeg" : e === "svg" ? "image/svg+xml" : e === "html" ? "text/html" : "image/png";
   }
 }
-function ve(l) {
+function Te(l) {
   return (l || "media").replace(/[^\p{L}\p{N}._ -]/gu, "_");
 }
-const T = "st-bgloader-main";
-function ge(l) {
+const M = "st-bgloader-main";
+function be(l) {
   if (l && typeof l == "object" && l.name === "AuthorityPermissionError") return !0;
   const e = l instanceof Error ? l.message : String(l);
   return /permission|denied|forbidden|封锁/i.test(e);
 }
-const we = "extension:third-party/ST-BgLoader", ie = "st_bgloader_cloud_notice_v1";
-class R {
+const ke = "extension:third-party/ST-BgLoader", re = "st_bgloader_cloud_notice_v1";
+class P {
   static EXTENSION_ID = "third-party/ST-BgLoader";
-  static CHANNEL = we;
+  static CHANNEL = ke;
   client = null;
   caps = {
     available: !1,
@@ -519,7 +520,7 @@ class R {
     try {
       const e = window.STAuthority?.AuthoritySDK;
       return e ? (this.client = await e.init({
-        extensionId: R.EXTENSION_ID,
+        extensionId: P.EXTENSION_ID,
         displayName: "ST-BgLoader",
         version: "1.0.0",
         installType: "local",
@@ -529,10 +530,10 @@ class R {
           sql: { private: !0 },
           http: { allow: [...this.httpAllow] },
           jobs: { background: ["delay", "sql.backup"] },
-          events: { channels: [R.CHANNEL] },
+          events: { channels: [P.CHANNEL] },
           // Undeclared resources hit the declaration gate (hard 'blocked') even when an
           // admin would grant them — declare exactly the one browser instance we register.
-          agent: { browser: [T] }
+          agent: { browser: [M] }
         }
       }), this.caps = {
         available: !0,
@@ -542,7 +543,7 @@ class R {
         agentToolsState: "unknown"
       }, console.log("[ST-BgLoader] Authority backend connected:", this.client.getSession()), this.caps) : this.degrade("sdk-missing", "未检测到 Authority 后端，媒体库运行于本地模式（仅当前浏览器）");
     } catch (e) {
-      const t = e instanceof Error ? e.message : String(e), i = ge(e);
+      const t = e instanceof Error ? e.message : String(e), i = be(e);
       return console.warn("[ST-BgLoader] Authority unavailable, falling back to local mode:", t), this.client = null, this.degrade(
         i ? "permission-denied" : "init-failed",
         i ? "Authority 权限被拒绝，媒体库运行于本地模式" : "Authority 连接失败，媒体库运行于本地模式"
@@ -564,24 +565,24 @@ class R {
   notifyOnce(e, t) {
     console.info(`[ST-BgLoader] ${t} (${e})`);
     try {
-      if (localStorage.getItem(ie)) return;
-      localStorage.setItem(ie, (/* @__PURE__ */ new Date()).toISOString()), window.toastr?.info(t, "ST-BgLoader");
+      if (localStorage.getItem(re)) return;
+      localStorage.setItem(re, (/* @__PURE__ */ new Date()).toISOString()), window.toastr?.info(t, "ST-BgLoader");
     } catch {
     }
   }
 }
-function Se(l) {
+function Me(l) {
   const e = atob(l), t = new ArrayBuffer(e.length), i = new Uint8Array(t);
   for (let s = 0; s < e.length; s++)
     i[s] = e.charCodeAt(s);
   return i;
 }
-class _e {
+class xe {
   constructor(e) {
     this.bridge = e;
   }
   async import(e) {
-    const t = Ee(e);
+    const t = Ce(e);
     if (!t)
       throw new Error(`Cannot import from invalid URL: ${e}`);
     if (!await this.bridge.ensureHttpAllowed(t))
@@ -592,19 +593,19 @@ class _e {
     const s = await i.http.fetch({ url: e, method: "GET" });
     if (!s.ok)
       throw new Error(`Server fetch failed with HTTP ${s.status} for ${e}`);
-    const a = Se(s.body);
+    const a = Me(s.body);
     return new Blob([a], { type: s.contentType || "application/octet-stream" });
   }
 }
-function Ee(l) {
+function Ce(l) {
   try {
     return new URL(l).hostname;
   } catch {
     return null;
   }
 }
-const U = "st-bg-cache-v1", Me = "st_bg_cache_index", b = "entries";
-class Te {
+const U = "st-bg-cache-v1", Ae = "st_bg_cache_index", b = "entries";
+class Ie {
   origin;
   remoteImporter = null;
   l1 = null;
@@ -620,10 +621,10 @@ class Te {
   // that makes a decision from it (cleanLRU) re-reads it first.
   indexMirror = null;
   constructor() {
-    this.origin = new V();
+    this.origin = new H();
   }
   async init(e) {
-    "caches" in window && (this.l1 = await caches.open(U)), await this.openIndex(), e && (await e.detectAndInit()).available && e.getClient() && (this.remoteImporter = new _e(e)), await this.origin.init(), console.log("[ST-BgLoader] Media library source of truth: server backgrounds/ directory (browser keeps cache only).");
+    "caches" in window && (this.l1 = await caches.open(U)), await this.openIndex(), e && (await e.detectAndInit()).available && e.getClient() && (this.remoteImporter = new xe(e)), await this.origin.init(), console.log("[ST-BgLoader] Media library source of truth: server backgrounds/ directory (browser keeps cache only).");
   }
   async listMedia() {
     return this.origin.listCatalog();
@@ -688,10 +689,10 @@ class Te {
     return await this.backfillCache(r, n), { item: r, isNew: !0 };
   }
   detectMediaType(e) {
-    return x(e);
+    return w(e);
   }
   getMimeType(e, t) {
-    return N(e, t);
+    return W(e, t);
   }
   // ---------- browser cache (L1) internals ----------
   async fetchForStorage(e) {
@@ -741,7 +742,7 @@ class Te {
   }
   async openIndex() {
     this.indexDb = await new Promise((e, t) => {
-      const i = indexedDB.open(Me, 1);
+      const i = indexedDB.open(Ae, 1);
       i.onupgradeneeded = (s) => {
         const a = s.target.result;
         a.objectStoreNames.contains(b) || a.createObjectStore(b, { keyPath: "cacheKey" });
@@ -782,8 +783,8 @@ class Te {
     }), this.indexMirror = /* @__PURE__ */ new Map();
   }
 }
-const xe = 1e4;
-class ke {
+const Le = 1e4;
+class Be {
   audioElement = null;
   attachedVideo = null;
   volume = 0.8;
@@ -964,7 +965,7 @@ class ke {
           this.audioElement.play().catch((i) => {
             console.warn("[ST-BgLoader AudioEngine] Autoplay was prevented by browser policy:", i);
           }),
-          new Promise((i) => window.setTimeout(i, xe))
+          new Promise((i) => window.setTimeout(i, Le))
         ]);
       } catch (i) {
         console.warn("[ST-BgLoader AudioEngine] Autoplay was prevented by browser policy:", i);
@@ -1010,8 +1011,8 @@ class ke {
     }), this.audioContext = null), this.attachedVideo = null, this.playlist = [];
   }
 }
-const Ce = 15e3;
-class se {
+const Re = 15e3;
+class oe {
   videoElement = null;
   container;
   audioEngine;
@@ -1026,7 +1027,7 @@ class se {
       let a = !1;
       const n = () => {
         a || (a = !0, window.clearTimeout(r), this.pendingSettle = null, i.removeEventListener("canplay", c), s(i));
-      }, r = window.setTimeout(n, Ce);
+      }, r = window.setTimeout(n, Re);
       this.pendingSettle = n;
       const c = async () => {
         try {
@@ -1062,8 +1063,8 @@ class se {
     this.videoElement && (this.pendingSettle?.(), this.audioEngine.attachVideo(null), this.videoElement.pause(), this.videoElement.removeAttribute("src"), this.videoElement.load(), this.videoElement.remove(), this.videoElement = null);
   }
 }
-const Ae = 8e3;
-class ae {
+const Pe = 8e3;
+class le {
   iframeElement = null;
   container;
   pendingSettle = null;
@@ -1077,7 +1078,7 @@ class ae {
       let a = !1;
       const n = () => {
         a || (a = !0, window.clearTimeout(r), this.pendingSettle = null, s(i));
-      }, r = window.setTimeout(n, Ae);
+      }, r = window.setTimeout(n, Pe);
       this.pendingSettle = n, i.onload = () => {
         i.style.opacity = "1", n();
       }, t ? i.src = e : i.srcdoc = e;
@@ -1087,8 +1088,8 @@ class ae {
     this.iframeElement && (this.pendingSettle?.(), this.iframeElement.srcdoc = "", this.iframeElement.src = "about:blank", this.iframeElement.remove(), this.iframeElement = null);
   }
 }
-const Ie = 15e3;
-class ne {
+const Oe = 15e3;
+class ce {
   imageElement = null;
   container;
   pendingSettle = null;
@@ -1102,7 +1103,7 @@ class ne {
       let a = !1;
       const n = () => {
         a || (a = !0, window.clearTimeout(r), this.pendingSettle = null, s(i));
-      }, r = window.setTimeout(n, Ie);
+      }, r = window.setTimeout(n, Oe);
       this.pendingSettle = n, i.onload = () => {
         i.style.opacity = "1", n();
       }, i.onerror = () => {
@@ -1131,8 +1132,8 @@ class ne {
     this.imageElement && (this.pendingSettle?.(), this.imageElement.remove(), this.imageElement = null);
   }
 }
-const Le = 3e4;
-class Re {
+const Fe = 3e4;
+class $e {
   hostEl = null;
   containerEl = null;
   // Sits between the container and the A/B layers: the visualizer's pulse pump scales
@@ -1195,7 +1196,7 @@ class Re {
         i && (window.clearTimeout(t), e.disconnect(), this.hostEl = i, this.setupContainer());
       });
       e.observe(document.body, { childList: !0, subtree: !0 });
-      const t = window.setTimeout(() => e.disconnect(), Le);
+      const t = window.setTimeout(() => e.disconnect(), Fe);
       return;
     }
     this.setupContainer();
@@ -1211,7 +1212,7 @@ class Re {
       const i = document.createElement("div");
       i.className = "st-bg-pump-wrapper", i.style.position = "absolute", i.style.top = "0", i.style.left = "0", i.style.width = "100%", i.style.height = "100%", i.style.pointerEvents = "none", this.layerA = document.createElement("div"), this.layerA.className = "st-bg-layer st-bg-layer-a", this.setupLayerStyle(this.layerA), this.layerB = document.createElement("div"), this.layerB.className = "st-bg-layer st-bg-layer-b", this.setupLayerStyle(this.layerB), i.appendChild(this.layerA), i.appendChild(this.layerB), t.appendChild(i), this.hostEl.appendChild(t);
     }
-    this.pumpWrapperEl || (this.pumpWrapperEl = this.layerA?.parentElement ?? t), this.containerEl = t, this.videoRendererA = new se(this.layerA, this.audioEngine), this.videoRendererB = new se(this.layerB, this.audioEngine), this.iframeRendererA = new ae(this.layerA), this.iframeRendererB = new ae(this.layerB), this.imageRendererA = new ne(this.layerA), this.imageRendererB = new ne(this.layerB), this.applyVisibility(), this.onHostReady?.(t);
+    this.pumpWrapperEl || (this.pumpWrapperEl = this.layerA?.parentElement ?? t), this.containerEl = t, this.videoRendererA = new oe(this.layerA, this.audioEngine), this.videoRendererB = new oe(this.layerB, this.audioEngine), this.iframeRendererA = new le(this.layerA), this.iframeRendererB = new le(this.layerB), this.imageRendererA = new ce(this.layerA), this.imageRendererB = new ce(this.layerB), this.applyVisibility(), this.onHostReady?.(t);
   }
   setupLayerStyle(e) {
     e.style.position = "absolute", e.style.top = "0", e.style.left = "0", e.style.width = "100%", e.style.height = "100%", e.style.opacity = "0", e.style.transition = `all ${this.transitionDurationMs}ms cubic-bezier(0.4, 0, 0.2, 1)`, e.style.pointerEvents = "none";
@@ -1272,17 +1273,17 @@ class Re {
     this.crossfadeTimer !== null && (clearTimeout(this.crossfadeTimer), this.crossfadeTimer = null), this.layerA && (this.layerA.style.opacity = "0", this.layerA.style.transform = "none", this.layerA.style.filter = "none"), this.layerB && (this.layerB.style.opacity = "0", this.layerB.style.transform = "none", this.layerB.style.filter = "none"), this.videoRendererA?.destroy(), this.videoRendererB?.destroy(), this.iframeRendererA?.destroy(), this.iframeRendererB?.destroy(), this.imageRendererA?.destroy(), this.imageRendererB?.destroy();
   }
 }
-const Be = {
+const De = {
   "&": "&amp;",
   "<": "&lt;",
   ">": "&gt;",
   '"': "&quot;",
   "'": "&#39;"
 };
-function w(l) {
-  return String(l).replace(/[&<>"']/g, (e) => Be[e]);
+function S(l) {
+  return String(l).replace(/[&<>"']/g, (e) => De[e]);
 }
-class Pe {
+class Ne {
   container = null;
   settings;
   cacheManager;
@@ -1307,18 +1308,18 @@ class Pe {
     const e = document.querySelector("#extensions_settings");
     if (!e) {
       console.warn("[ST-BgLoader] #extensions_settings not found yet, waiting for DOM insertion...");
-      const a = new MutationObserver(() => {
-        document.querySelector("#extensions_settings") && (window.clearTimeout(n), a.disconnect(), this.render());
+      const n = new MutationObserver(() => {
+        document.querySelector("#extensions_settings") && (window.clearTimeout(r), n.disconnect(), this.render());
       });
-      a.observe(document.body, { childList: !0, subtree: !0 });
-      const n = window.setTimeout(() => a.disconnect(), 3e4);
+      n.observe(document.body, { childList: !0, subtree: !0 });
+      const r = window.setTimeout(() => n.disconnect(), 3e4);
       return;
     }
     const t = document.querySelector("#st_bgloader_settings");
     t && t.remove();
     const i = document.createElement("div");
     i.id = "st_bgloader_settings", i.className = "st-bgloader-panel";
-    const s = this.callbacks.getBackgroundVisible?.() ?? !0;
+    const s = this.callbacks.getBackgroundVisible?.() ?? !0, a = this.settings.nativeTakeover;
     i.innerHTML = `
             <div class="inline-drawer">
                 <div class="inline-drawer-toggle inline-drawer-header">
@@ -1352,6 +1353,14 @@ class Pe {
                                 <input type="checkbox" id="st_bg_visible" ${s ? "checked" : ""} />
                                 <span>Show background layer (显示背景)</span>
                             </label>
+                        </div>
+                        <div class="st-bgloader-preset-row">
+                            <label class="st-bgloader-label-md">Native picker:</label>
+                            <select id="st_native_takeover">
+                                <option value="all" ${a === "all" ? "selected" : ""}>Take over every selection (接管全部)</option>
+                                <option value="non-image" ${a === "non-image" ? "selected" : ""}>Only non-image types (仅非图片)</option>
+                                <option value="off" ${a === "off" ? "selected" : ""}>Leave it native (关闭接管)</option>
+                            </select>
                         </div>
                         <div class="st-bgloader-media-grid" id="st_bgloader_grid">
                             <!-- Injected dynamically -->
@@ -1431,7 +1440,7 @@ class Pe {
                             <select id="st_weather_type">
                                 <!-- Derived from WEATHER_TYPES so the list cannot drift from the
                                      type union (it was a fourth hand-maintained copy). -->
-                                ${S.map((a) => `<option value="${a}" ${this.settings.weather.type === a ? "selected" : ""}>${pe[a]}</option>`).join(`
+                                ${_.map((n) => `<option value="${n}" ${this.settings.weather.type === n ? "selected" : ""}>${ve[n]}</option>`).join(`
                                 `)}
                             </select>
                         </div>
@@ -1681,7 +1690,7 @@ class Pe {
   }
   populateScenes() {
     const e = this.container?.querySelector("#st_scene_select");
-    e && (e.innerHTML = "", Object.values(I).forEach((t) => {
+    e && (e.innerHTML = "", Object.values(B).forEach((t) => {
       const i = document.createElement("option");
       i.value = t.id, i.textContent = t.name, t.id === this.settings.activeSceneId && (i.selected = !0), e.appendChild(i);
     }), Object.entries(this.settings.scenes || {}).forEach(([t, i]) => {
@@ -1691,7 +1700,7 @@ class Pe {
   }
   populatePresets() {
     const e = this.container?.querySelector("#st_preset_select");
-    e && (e.innerHTML = "", Object.values(C).forEach((t) => {
+    e && (e.innerHTML = "", Object.values(A).forEach((t) => {
       const i = document.createElement("option");
       i.value = t.id, i.textContent = t.name, t.id === this.settings.activePresetId && (i.selected = !0), e.appendChild(i);
     }), Object.entries(this.settings.userPresets || {}).forEach(([t, i]) => {
@@ -1722,7 +1731,7 @@ class Pe {
     }), this.container.querySelector("#st_scene_save_btn")?.addEventListener("click", () => {
       const o = prompt("Enter a name for this custom audiovisual scene:");
       if (o && o.trim()) {
-        const d = `scene_${Date.now()}`, E = {
+        const d = `scene_${Date.now()}`, T = {
           id: d,
           name: o.trim(),
           mediaId: this.settings.activeMediaId || void 0,
@@ -1734,11 +1743,11 @@ class Pe {
           ambientSound: { ...this.settings.ambientSound },
           frostedChat: this.settings.frostedChat.enabled
         };
-        this.settings.scenes[d] = E, this.settings.activeSceneId = d, this.populateScenes(), this.callbacks.onSettingsChanged(this.settings);
+        this.settings.scenes[d] = T, this.settings.activeSceneId = d, this.populateScenes(), this.callbacks.onSettingsChanged(this.settings);
       }
     }), this.container.querySelector("#st_scene_del_btn")?.addEventListener("click", () => {
       const o = a?.value;
-      if (I[o]) {
+      if (B[o]) {
         alert("Cannot delete built-in scenes.");
         return;
       }
@@ -1748,7 +1757,7 @@ class Pe {
     n?.addEventListener("change", () => {
       const o = n.value;
       this.settings.activePresetId = o;
-      let d = C[o]?.filters;
+      let d = A[o]?.filters;
       !d && this.settings.userPresets[o] && (d = this.settings.userPresets[o]), d && (this.settings.filters = { ...d }, this.updateSliders(d), this.callbacks.onPresetChanged({ id: o, name: o, filters: d }), this.callbacks.onSettingsChanged(this.settings));
     }), this.container.querySelector("#st_preset_save_btn")?.addEventListener("click", () => {
       const o = prompt("Enter a name for this custom preset:");
@@ -1761,8 +1770,8 @@ class Pe {
       if (this.settings.userPresets[o]) {
         if (confirm(`Delete custom preset "${o}"?`)) {
           delete this.settings.userPresets[o], this.settings.activePresetId = "default", this.populatePresets();
-          const d = C.default.filters;
-          this.settings.filters = { ...d }, this.updateSliders(d), this.callbacks.onPresetChanged(C.default), this.callbacks.onSettingsChanged(this.settings);
+          const d = A.default.filters;
+          this.settings.filters = { ...d }, this.updateSliders(d), this.callbacks.onPresetChanged(A.default), this.callbacks.onSettingsChanged(this.settings);
         }
       } else
         alert("Cannot delete built-in presets.");
@@ -1772,11 +1781,11 @@ class Pe {
       r !== null && window.clearTimeout(r), r = window.setTimeout(() => {
         r = null, this.callbacks.onSettingsChanged(this.settings);
       }, 300);
-    }, h = (o, d, E, k) => {
-      const J = this.container.querySelector(o), Z = this.container.querySelector(d);
-      J?.addEventListener("input", () => {
-        const ee = Number(J.value);
-        Z && (Z.textContent = `${ee}${E}`), k(ee), c();
+    }, h = (o, d, T, x) => {
+      const ie = this.container.querySelector(o), se = this.container.querySelector(d);
+      ie?.addEventListener("input", () => {
+        const ae = Number(ie.value);
+        se && (se.textContent = `${ae}${T}`), x(ae), c();
       });
     };
     h("#st_filter_blur", "#st_filter_blur_val", "px", (o) => this.settings.filters.blur = o), h("#st_filter_brightness", "#st_filter_brightness_val", "%", (o) => this.settings.filters.brightness = o), h("#st_filter_opacity", "#st_filter_opacity_val", "%", (o) => this.settings.filters.opacity = o), h("#st_filter_saturate", "#st_filter_saturate_val", "%", (o) => this.settings.filters.saturate = o);
@@ -1818,51 +1827,56 @@ class Pe {
     }), h("#st_frosted_opacity", "#st_frosted_opacity_val", "%", (o) => {
       this.settings.frostedChat.opacity = o, this.callbacks.onFrostedChatChanged?.(this.settings.frostedChat);
     });
-    const G = this.container.querySelector("#st_transition_effect");
-    G?.addEventListener("change", () => {
-      this.settings.transitionEffect = G.value, this.callbacks.onTransitionChanged?.(this.settings.transitionEffect, this.settings.transitionDurationMs), this.callbacks.onSettingsChanged(this.settings);
+    const K = this.container.querySelector("#st_transition_effect");
+    K?.addEventListener("change", () => {
+      this.settings.transitionEffect = K.value, this.callbacks.onTransitionChanged?.(this.settings.transitionEffect, this.settings.transitionDurationMs), this.callbacks.onSettingsChanged(this.settings);
     }), h("#st_transition_dur", "#st_transition_dur_val", "ms", (o) => {
       this.settings.transitionDurationMs = o, this.callbacks.onTransitionChanged?.(this.settings.transitionEffect, this.settings.transitionDurationMs);
     }), h("#st_audio_volume", "#st_audio_volume_val", "%", (o) => this.settings.volume = o / 100);
-    const j = this.container.querySelector("#st_playback_mode");
-    j?.addEventListener("change", () => {
-      this.settings.playbackMode = j.value, this.callbacks.onPlaybackModeChanged(this.settings.playbackMode), this.callbacks.onSettingsChanged(this.settings);
-    });
-    const H = this.container.querySelector("#st_audio_mute");
-    H?.addEventListener("change", () => {
-      this.settings.muted = H.checked, this.callbacks.onSettingsChanged(this.settings);
-    });
-    const B = this.container.querySelector("#st_audio_muffle");
-    B?.addEventListener("change", () => {
-      this.settings.muffleBGM = B.checked, this.callbacks.onMuffleChanged?.(B.checked), this.callbacks.onSettingsChanged(this.settings);
-    });
-    const K = this.container.querySelector("#st_audio_blur");
-    K?.addEventListener("change", () => {
-      this.settings.pauseOnBlur = K.checked, this.callbacks.onSettingsChanged(this.settings);
-    });
-    const X = this.container.querySelector("#st_bg_visible");
+    const X = this.container.querySelector("#st_playback_mode");
     X?.addEventListener("change", () => {
-      this.callbacks.onBackgroundVisibilityChanged?.(X.checked);
-    }), h("#st_cache_quota", "#st_cache_quota_val", " MB", (o) => this.settings.cacheQuotaMB = o);
-    const Y = this.container.querySelector("#st_cache_autoclean");
+      this.settings.playbackMode = X.value, this.callbacks.onPlaybackModeChanged(this.settings.playbackMode), this.callbacks.onSettingsChanged(this.settings);
+    });
+    const Y = this.container.querySelector("#st_audio_mute");
     Y?.addEventListener("change", () => {
-      this.settings.lruAutoClean = Y.checked, this.callbacks.onSettingsChanged(this.settings);
+      this.settings.muted = Y.checked, this.callbacks.onSettingsChanged(this.settings);
     });
-    const P = this.container.querySelector("#st_bg_interactive");
-    P?.addEventListener("change", () => {
-      this.settings.interactiveBackground = P.checked, this.callbacks.onInteractiveChanged(P.checked), this.callbacks.onSettingsChanged(this.settings);
-    });
-    const Q = this.container.querySelector("#st_bgloader_agent_tools_cb");
-    Q?.addEventListener("change", () => {
-      this.settings.agentToolsEnabled = Q.checked, this.callbacks.onSettingsChanged(this.settings);
-    });
-    const O = this.container.querySelector("#st_mini_player_toggle");
+    const O = this.container.querySelector("#st_audio_muffle");
     O?.addEventListener("change", () => {
-      this.settings.showMiniPlayer = O.checked, this.callbacks.onMiniPlayerToggle(O.checked), this.callbacks.onSettingsChanged(this.settings);
+      this.settings.muffleBGM = O.checked, this.callbacks.onMuffleChanged?.(O.checked), this.callbacks.onSettingsChanged(this.settings);
     });
-    const F = this.container.querySelector("#st_capsule_on_play");
+    const Q = this.container.querySelector("#st_audio_blur");
+    Q?.addEventListener("change", () => {
+      this.settings.pauseOnBlur = Q.checked, this.callbacks.onSettingsChanged(this.settings);
+    });
+    const J = this.container.querySelector("#st_bg_visible");
+    J?.addEventListener("change", () => {
+      this.callbacks.onBackgroundVisibilityChanged?.(J.checked);
+    });
+    const Z = this.container.querySelector("#st_native_takeover");
+    Z?.addEventListener("change", () => {
+      const o = Z.value;
+      this.settings.nativeTakeover = o, this.callbacks.onNativeTakeoverChanged?.(o), this.callbacks.onSettingsChanged(this.settings);
+    }), h("#st_cache_quota", "#st_cache_quota_val", " MB", (o) => this.settings.cacheQuotaMB = o);
+    const ee = this.container.querySelector("#st_cache_autoclean");
+    ee?.addEventListener("change", () => {
+      this.settings.lruAutoClean = ee.checked, this.callbacks.onSettingsChanged(this.settings);
+    });
+    const F = this.container.querySelector("#st_bg_interactive");
     F?.addEventListener("change", () => {
-      this.settings.capsuleOnPlayOnly = F.checked, this.callbacks.onCapsuleOnPlayToggle?.(F.checked), this.callbacks.onSettingsChanged(this.settings);
+      this.settings.interactiveBackground = F.checked, this.callbacks.onInteractiveChanged(F.checked), this.callbacks.onSettingsChanged(this.settings);
+    });
+    const te = this.container.querySelector("#st_bgloader_agent_tools_cb");
+    te?.addEventListener("change", () => {
+      this.settings.agentToolsEnabled = te.checked, this.callbacks.onSettingsChanged(this.settings);
+    });
+    const $ = this.container.querySelector("#st_mini_player_toggle");
+    $?.addEventListener("change", () => {
+      this.settings.showMiniPlayer = $.checked, this.callbacks.onMiniPlayerToggle($.checked), this.callbacks.onSettingsChanged(this.settings);
+    });
+    const D = this.container.querySelector("#st_capsule_on_play");
+    D?.addEventListener("change", () => {
+      this.settings.capsuleOnPlayOnly = D.checked, this.callbacks.onCapsuleOnPlayToggle?.(D.checked), this.callbacks.onSettingsChanged(this.settings);
     }), this.container.querySelector("#st_trigger_add_btn")?.addEventListener("click", () => {
       const o = this.container?.querySelector("#st_trigger_form");
       if (o) {
@@ -1877,21 +1891,21 @@ class Pe {
     }), this.container.querySelector("#st_cache_clear_btn")?.addEventListener("click", async () => {
       confirm("Are you sure you want to clear all cached media files?") && (await this.cacheManager.clearAll(), await this.refreshMediaGrid(), await this.updateCacheStats());
     }), this.container.querySelector("#st_backup_export_btn")?.addEventListener("click", () => {
-      const o = JSON.stringify(this.settings, null, 2), d = new Blob([o], { type: "application/json" }), E = URL.createObjectURL(d), k = document.createElement("a");
-      k.href = E, k.download = `st-bgloader-settings-${Date.now()}.json`, k.click(), URL.revokeObjectURL(E);
+      const o = JSON.stringify(this.settings, null, 2), d = new Blob([o], { type: "application/json" }), T = URL.createObjectURL(d), x = document.createElement("a");
+      x.href = T, x.download = `st-bgloader-settings-${Date.now()}.json`, x.click(), URL.revokeObjectURL(T);
     });
-    const _ = this.container.querySelector("#st_backup_import_file");
+    const E = this.container.querySelector("#st_backup_import_file");
     this.container.querySelector("#st_backup_import_btn")?.addEventListener("click", () => {
-      _?.click();
-    }), _?.addEventListener("change", async () => {
-      if (_.files && _.files[0]) {
+      E?.click();
+    }), E?.addEventListener("change", async () => {
+      if (E.files && E.files[0]) {
         try {
-          const o = await _.files[0].text(), d = JSON.parse(o);
-          d && typeof d == "object" && (this.settings = z(d), this.callbacks.onSettingsChanged(this.settings), this.render(), alert("Settings successfully imported!"));
+          const o = await E.files[0].text(), d = JSON.parse(o);
+          d && typeof d == "object" && (this.settings = G(d), this.callbacks.onSettingsChanged(this.settings), this.render(), alert("Settings successfully imported!"));
         } catch (o) {
           alert(`Failed to import settings JSON: ${o}`);
         }
-        _.value = "";
+        E.value = "";
       }
     });
   }
@@ -1939,8 +1953,8 @@ class Pe {
                 <div class="st-bgloader-trigger-row">
                     <input type="checkbox" class="st-rule-toggle" ${t.enabled ? "checked" : ""} />
                     <div>
-                        <span class="st-bgloader-trigger-badge">${w(t.type)}</span>
-                        <strong>${w(t.name)}</strong>: <code>${w(t.pattern)}</code>
+                        <span class="st-bgloader-trigger-badge">${S(t.type)}</span>
+                        <strong>${S(t.name)}</strong>: <code>${S(t.pattern)}</code>
                     </div>
                 </div>
                 <button class="menu_button menu_button_danger st-rule-del" title="Delete"><i class="fa-solid fa-trash"></i></button>
@@ -1993,7 +2007,7 @@ class Pe {
         n.className = "st-bgloader-media-card", this.settings.activeMediaId === a.id && n.classList.add("active"), n.innerHTML = `
                 <div class="st-bgloader-media-badge ${a.type}">${a.type}</div>
                 <button class="st-bgloader-media-delete" title="Delete"><i class="fa-solid fa-trash"></i></button>
-                <div class="st-bgloader-media-card-title" title="${w(a.name)}">${w(a.name)}</div>
+                <div class="st-bgloader-media-card-title" title="${S(a.name)}">${S(a.name)}</div>
             `, n.addEventListener("click", (c) => {
           c.target.closest(".st-bgloader-media-delete") || (this.settings.activeMediaId = a.id, this.container?.querySelectorAll(".st-bgloader-media-card").forEach((u) => u.classList.remove("active")), n.classList.add("active"), this.callbacks.onMediaSelected(a), this.callbacks.onSettingsChanged(this.settings));
         }), n.querySelector(".st-bgloader-media-delete")?.addEventListener("click", async (c) => {
@@ -2011,7 +2025,7 @@ class Pe {
   async handleFileUpload(e) {
     this.setImportBusy(!0);
     try {
-      const t = x(e.name, e.type), i = await this.cacheManager.saveMedia(e, e.name, t, "server");
+      const t = w(e.name, e.type), i = await this.cacheManager.saveMedia(e, e.name, t, "server");
       await this.refreshMediaGrid(), await this.updateCacheStats(), this.callbacks.onMediaUploaded(i);
     } catch (t) {
       this.reportImportError(t);
@@ -2022,7 +2036,7 @@ class Pe {
   async handleUrlImport(e) {
     this.setImportBusy(!0);
     try {
-      const t = e.split("/").pop()?.split("?")[0] || "remote_media", i = x(t), s = await this.cacheManager.saveMedia(new Blob([]), t, i, "url", e);
+      const t = e.split("/").pop()?.split("?")[0] || "remote_media", i = w(t), s = await this.cacheManager.saveMedia(new Blob([]), t, i, "url", e);
       await this.refreshMediaGrid(), await this.updateCacheStats(), this.callbacks.onMediaUploaded(s);
     } catch (t) {
       this.reportImportError(t);
@@ -2043,43 +2057,242 @@ class Pe {
     window.toastr?.error(`媒体导入失败：${t}`, "ST-BgLoader");
   }
 }
-class Oe {
-  observer = null;
-  onNativeMediaSelect;
+const L = "data-st-bg-augmented", he = "data-st-bg-badge", z = "data-st-bg-current", C = "st-bg-takeover-selected", qe = "custom_background", Ue = 3e4;
+class ze {
   constructor(e) {
-    this.onNativeMediaSelect = e;
+    this.onSelect = e;
   }
-  start() {
-    const e = document.querySelector("#bg_menu_content");
-    if (e)
-      this.augmentThumbnails(e), this.observer = new MutationObserver(() => this.augmentThumbnails(e)), this.observer.observe(e, { childList: !0, subtree: !0 });
-    else {
-      const t = new MutationObserver(() => {
-        document.querySelector("#bg_menu_content") && (window.clearTimeout(i), t.disconnect(), this.start());
-      });
-      t.observe(document.body, { childList: !0, subtree: !0 });
-      const i = window.setTimeout(() => t.disconnect(), 3e4);
+  seams = null;
+  level = "off";
+  active = !1;
+  degraded = !1;
+  gridObserver = null;
+  bgHostObserver = null;
+  seamWaitObserver = null;
+  seamGiveUpTimer = null;
+  /**
+   * Native `#bg1` background-image captured right before we first cleared it, so `stop()` can
+   * put it back without needing to re-drive the host's own loader (design §5 / U-1).
+   */
+  savedNativeBgImage = "";
+  /**
+   * Guards our own write to `#bg1`. Note the MutationObserver callback is async, so this flag
+   * has usually been reset by the time it runs — the real loop-breaker is the "already empty"
+   * check in `clearNativeBackgroundImage()`. Kept as belt-and-braces for the synchronous path.
+   */
+  clearingNativeBg = !1;
+  /** File name of the media the extension currently has mounted, for the selection marker. */
+  activeFileName = null;
+  // ---------------------------------------------------------------- seams
+  /**
+   * Checks the seams this controller depends on.
+   *
+   * Returns `null` for "do not take over", which covers two different situations that the
+   * caller distinguishes:
+   * - the containers are not rendered yet (the background drawer is built lazily) — retryable;
+   * - the containers exist but a thumbnail lacks `bgfile` — the host changed its structure.
+   */
+  probe() {
+    const e = document.querySelector("#bg_menu_content"), t = document.querySelector("#bg1");
+    if (!e || !t) return null;
+    const i = e.querySelector(".bg_example");
+    if (i && !i.hasAttribute("bgfile")) return null;
+    const s = window.event_types;
+    return {
+      menuContent: e,
+      customContent: document.querySelector("#bg_custom_content") ?? e,
+      bgHost: t,
+      hasForceEvent: !!s?.FORCE_SET_BACKGROUND
+    };
+  }
+  // ---------------------------------------------------------------- lifecycle
+  isActive() {
+    return this.active;
+  }
+  getLevel() {
+    return this.level;
+  }
+  /** Installs (or re-levels) the takeover. Idempotent. */
+  start(e) {
+    if (this.level = e, e === "off") {
+      this.stop();
+      return;
     }
+    if (this.active) return;
+    const t = this.probe();
+    if (!t) {
+      !!document.querySelector("#bg_menu_content") && !!document.querySelector("#bg1") ? this.degrade("the background grid no longer exposes `bgfile` tiles") : this.waitForSeams();
+      return;
+    }
+    this.install(t);
   }
-  augmentThumbnails(e) {
-    e.querySelectorAll(".bg_example[bgfile]:not([data-st-bg-augmented])").forEach((i) => {
-      i.setAttribute("data-st-bg-augmented", "true");
-      const s = i.getAttribute("bgfile") || "", a = x(s);
-      if (a !== "image") {
-        const n = document.createElement("span");
-        n.className = `st-bg-native-badge ${a}`, n.textContent = a.toUpperCase(), i.appendChild(n), i.addEventListener("click", (r) => {
-          r.preventDefault(), r.stopPropagation();
-          const c = i.dataset.url || `/backgrounds/${s}`;
-          this.onNativeMediaSelect(c, a, s);
-        });
+  /** Uninstalls everything: interception, observers, decorations. Idempotent. */
+  stop() {
+    if (this.level = "off", this.stopWaitingForSeams(), !this.active) return;
+    this.active = !1, document.removeEventListener("click", this.onDocumentClickCapture, !0), this.gridObserver?.disconnect(), this.gridObserver = null, this.bgHostObserver?.disconnect(), this.bgHostObserver = null;
+    const e = this.seams;
+    e && (e.menuContent.querySelectorAll(`[${he}]`).forEach((t) => t.remove()), e.menuContent.querySelectorAll(`[${z}]`).forEach((t) => t.remove()), e.menuContent.querySelectorAll(`.${C}`).forEach((t) => t.classList.remove(C)), e.menuContent.querySelectorAll(`[${L}]`).forEach((t) => t.removeAttribute(L)), this.restoreNativeBackgroundImage(e.bgHost)), this.seams = null;
+  }
+  setLevel(e) {
+    if (e === "off") {
+      this.stop();
+      return;
+    }
+    if (!this.active) {
+      this.start(e);
+      return;
+    }
+    this.level = e;
+  }
+  // ---------------------------------------------------------------- decorations
+  /**
+   * Badges every tile with its media type (non-image only) and re-applies the selection marker.
+   * Runs on install and after every grid re-render: the host rebuilds the grid wholesale with
+   * `$('#bg_menu_content').empty()` (`backgrounds.js:715`), so both our badge nodes and our
+   * class are wiped each time.
+   */
+  decorateGrid() {
+    const e = this.seams;
+    !e || !this.active || (e.menuContent.querySelectorAll(`.bg_example[bgfile]:not([${L}])`).forEach((t) => {
+      t.setAttribute(L, "true"), this.addBadge(t);
+    }), this.refreshSelection(this.activeFileName));
+  }
+  addBadge(e) {
+    const t = w(e.getAttribute("bgfile") || "");
+    if (t === "image") return;
+    const i = document.createElement("span");
+    i.className = `st-bg-native-badge ${t}`, i.setAttribute(he, "true"), i.textContent = t.toUpperCase(), e.appendChild(i);
+  }
+  /**
+   * Marks the native thumbnail matching the extension's current media.
+   *
+   * Matching is by the `bgfile` attribute (a plain file name) — never by `data-url`. That one
+   * holds a CSS string (`url("backgrounds/x.jpg")`, from `generateUrlParameter`,
+   * `backgrounds.js:1533`) and is not a URL at all; it is also invisible to `getAttribute`
+   * because the host writes it through jQuery's `.data()`, which keeps it in its own store.
+   *
+   * The host's own highlight recomputes `.selected-background` from `background_settings.url`
+   * (`backgrounds.js:1773`), which we deliberately do not update, so a distinct class is
+   * required — and it has to be re-applied on every re-render.
+   *
+   * **Every write here is conditional on the state actually differing.** This runs from the
+   * grid observer, and our marker is a child element, so an unconditional remove-then-add would
+   * mutate the grid on every pass and drive the observer in a loop. Convergent writes mean the
+   * follow-up pass finds nothing to change and the observer settles.
+   */
+  refreshSelection(e) {
+    this.activeFileName = e;
+    const t = this.seams;
+    t && t.menuContent.querySelectorAll(".bg_example").forEach((i) => {
+      const s = !!e && i.getAttribute("bgfile") === e, a = i.classList.contains(C), n = i.querySelector(`[${z}]`);
+      if (s && !a && i.classList.add(C), !s && a && i.classList.remove(C), s && !n) {
+        const r = document.createElement("span");
+        r.className = "st-bg-native-current", r.setAttribute(z, "true"), i.appendChild(r);
       }
+      !s && n && n.remove();
     });
   }
-  stop() {
-    this.observer && (this.observer.disconnect(), this.observer = null);
+  // ---------------------------------------------------------------- interception
+  /**
+   * The single interception point. Registered on `document` in the **capture** phase: the host
+   * listens on `document` in the bubble phase (`backgrounds.js:1884`), and document is the root
+   * of the event path, so capture runs first and `stopPropagation()` keeps the event from ever
+   * reaching the host's delegated handler.
+   */
+  onDocumentClickCapture = (e) => {
+    if (!this.active || this.level === "off") return;
+    const t = e.target;
+    if (!t || typeof t.closest != "function") return;
+    const i = t.closest(".bg_example");
+    if (!i || !this.shouldTakeOver(i, t)) return;
+    const s = i.getAttribute("bgfile");
+    s && (e.preventDefault(), e.stopPropagation(), this.onSelect(s, w(s)));
+  };
+  /**
+   * Decides whether a thumbnail click is ours to handle.
+   *
+   * Every pass-through rule below mirrors a branch the host itself acts on, so that taking the
+   * picker over never removes a capability the user had. Each one names its host signal; the
+   * line numbers are for the host version recorded in `research/st-native-evidence.md`.
+   */
+  shouldTakeOver(e, t) {
+    return !(document.querySelector("#Backgrounds.bg-selection-mode") || this.isChatBackgroundLocked() || t.closest(".jg-button, .bg_folder_tile, .mobile-only-menu-toggle") || e.getAttribute("custom") === "true" || this.level === "non-image" && w(e.getAttribute("bgfile") || "") === "image");
+  }
+  /**
+   * Whether the current chat has a locked background.
+   *
+   * Read through the **public** context API: `getContext().chatMetadata` is a documented getter
+   * (`st-context.js:2477`), so this is not host-internals sniffing. The key is read from the
+   * chat file the host persists, which makes it stable — renaming it would invalidate every
+   * historical chat's lock, so the host cannot change it without a migration. (The alternative
+   * signal, the `.locked-background` class from `backgrounds.js:355`, is a *rendering* result
+   * refreshed only at certain moments, so the metadata is the authority.)
+   */
+  isChatBackgroundLocked() {
+    return !!window.SillyTavern?.getContext?.()?.chatMetadata?.[qe];
+  }
+  // ---------------------------------------------------------------- #bg1 layer
+  /**
+   * Clears the host's own background image so the extension's layer is the only visible one.
+   *
+   * Idempotent and repeatable by design: the host rewrites `#bg1` on chat changes and on lock
+   * actions (`backgrounds.js:310` / `:380` / `:288` / `:433`), so a one-shot clear would be
+   * undone the moment the user switches chats.
+   */
+  clearNativeBackgroundImage() {
+    const e = this.seams;
+    if (!(!this.active || !e || this.clearingNativeBg) && !this.isChatBackgroundLocked() && e.bgHost.style.backgroundImage) {
+      this.clearingNativeBg = !0;
+      try {
+        e.bgHost.style.backgroundImage = "";
+      } finally {
+        this.clearingNativeBg = !1;
+      }
+    }
+  }
+  /**
+   * Best-effort restoration of the host's background on `stop()` (design §5's open item U-1).
+   *
+   * The host's own loader is not callable, so the value captured when the takeover started is
+   * put back. While takeover was active the user could not change the host's global background
+   * (we intercepted those clicks), so the host's own belief still matches that snapshot — the
+   * one case that can differ is a chat change during takeover, which the host would normally
+   * have answered with the new chat's locked/default background.
+   */
+  restoreNativeBackgroundImage(e) {
+    if (this.savedNativeBgImage) {
+      this.clearingNativeBg = !0;
+      try {
+        e.style.backgroundImage = this.savedNativeBgImage;
+      } finally {
+        this.clearingNativeBg = !1;
+      }
+    }
+  }
+  // ---------------------------------------------------------------- install internals
+  install(e) {
+    this.seams = e, this.active = !0, this.savedNativeBgImage = e.bgHost.style.backgroundImage, document.addEventListener("click", this.onDocumentClickCapture, !0), this.bgHostObserver = new MutationObserver(() => this.clearNativeBackgroundImage()), this.bgHostObserver.observe(e.bgHost, { attributes: !0, attributeFilter: ["style"] }), this.gridObserver = new MutationObserver(() => this.decorateGrid()), this.gridObserver.observe(e.menuContent, { childList: !0, subtree: !0 }), this.clearNativeBackgroundImage(), this.decorateGrid();
+  }
+  /** Waits for lazily-built host containers, then starts for real. */
+  waitForSeams() {
+    this.seamWaitObserver || (this.seamWaitObserver = new MutationObserver(() => {
+      !document.querySelector("#bg_menu_content") || !document.querySelector("#bg1") || (this.stopWaitingForSeams(), this.level !== "off" && this.start(this.level));
+    }), this.seamWaitObserver.observe(document.body, { childList: !0, subtree: !0 }), this.seamGiveUpTimer = window.setTimeout(() => this.stopWaitingForSeams(), Ue));
+  }
+  stopWaitingForSeams() {
+    this.seamWaitObserver?.disconnect(), this.seamWaitObserver = null, this.seamGiveUpTimer !== null && (window.clearTimeout(this.seamGiveUpTimer), this.seamGiveUpTimer = null);
+  }
+  /**
+   * Probe failed on a rendered host: stay in enhancement mode. Media, the panel and the public
+   * API are untouched — only the takeover is skipped — and we say so once.
+   */
+  degrade(e) {
+    this.degraded || (this.degraded = !0, console.warn(
+      `[ST-BgLoader] Native background takeover disabled: ${e}. The extension keeps working; the native picker simply stays native.`
+    ));
   }
 }
-class Fe {
+class Ve {
   container = null;
   audioEngine;
   isVisible = !0;
@@ -2108,7 +2321,7 @@ class Fe {
                 <button class="st-bg-mini-btn" id="st_mini_next" title="Next Track">
                     <i class="fa-solid fa-forward-step"></i>
                 </button>
-                <div class="st-bg-mini-track" id="st_mini_title" title="${w(n)}">${w(n)}</div>
+                <div class="st-bg-mini-track" id="st_mini_title" title="${S(n)}">${S(n)}</div>
                 <button class="st-bg-mini-btn st-bg-mini-mode" id="st_mini_mode" title="Mode: ${c}">
                     <i class="fa-solid ${this.getModeIcon(c)}"></i>
                 </button>
@@ -2171,7 +2384,7 @@ class Fe {
     this.hideTimer !== null && (clearTimeout(this.hideTimer), this.hideTimer = null), this.unsubscribeTrack?.(), this.unsubscribeTrack = null, this.unsubscribePlayState?.(), this.unsubscribePlayState = null, this.container && (this.container.remove(), this.container = null);
   }
 }
-class $e {
+class Ge {
   ext;
   eventListeners = /* @__PURE__ */ new Map();
   constructor(e) {
@@ -2189,7 +2402,7 @@ class $e {
   async setBackground(e, t) {
     let s = (await this.ext.getCacheManager().listMedia()).find((n) => n.id === e || n.name === e || n.url === e || n.cacheKey === e), a = !1;
     if (!s) {
-      const n = t?.name || e.split("/").pop()?.split("?")[0] || "remote_background", r = t?.type || x(e);
+      const n = t?.name || e.split("/").pop()?.split("?")[0] || "remote_background", r = t?.type || w(e);
       t?.saveToLibrary ? s = await this.ext.getCacheManager().saveMedia(new Blob([]), n, r, "url", e) : (a = !0, s = {
         id: "custom_" + Date.now(),
         name: n,
@@ -2286,7 +2499,7 @@ class $e {
   }
   applyPreset(e) {
     const t = this.ext.getSettings();
-    let i = C[e]?.filters;
+    let i = A[e]?.filters;
     !i && t.userPresets[e] && (i = t.userPresets[e]), i ? (t.activePresetId = e, t.filters = { ...i }, this.ext.getMediaMount().applyFilters(i), this.ext.saveSettings(), this.emit("preset-change", e, i)) : console.warn(`[ST-BgLoader PublicAPI] Preset "${e}" not found.`);
   }
   setInteractive(e) {
@@ -2301,7 +2514,7 @@ class $e {
       ...this.ext.getSettings().weather,
       type: e,
       ...t || {}
-    } : i = { ...e }, !S.includes(i.type)) {
+    } : i = { ...e }, !_.includes(i.type)) {
       console.warn(`[ST-BgLoader PublicAPI] Ignored invalid weather type "${String(i.type)}".`);
       return;
     }
@@ -2417,7 +2630,7 @@ class $e {
    * Quick cycle through weather types
    */
   cycleWeather() {
-    const e = this.ext.getSettings().weather.type, t = (S.indexOf(e) + 1) % S.length, i = S[t];
+    const e = this.ext.getSettings().weather.type, t = (_.indexOf(e) + 1) % _.length, i = _[t];
     return this.setWeather(i), i;
   }
   getPlaybackState() {
@@ -2487,7 +2700,7 @@ class $e {
     });
   }
 }
-class De {
+class We {
   canvas;
   ctx = null;
   parentEl = null;
@@ -2662,7 +2875,7 @@ class De {
     this.stop(), window.removeEventListener("resize", this.onWindowResize), this.resizeObserver && (this.resizeObserver.disconnect(), this.resizeObserver = null), this.canvas.parentElement && this.canvas.parentElement.removeChild(this.canvas), this.particles = [], this.ripples = [];
   }
 }
-class Ue {
+class He {
   canvas;
   ctx = null;
   parentEl = null;
@@ -2754,7 +2967,7 @@ class Ue {
     this.stop(), window.removeEventListener("resize", this.onResize), this.canvas.parentElement && this.canvas.parentElement.removeChild(this.canvas), this.pumpTargetEl && (this.pumpTargetEl.style.transform = "", this.pumpTargetEl.style.transition = "", this.pumpTargetEl = null);
   }
 }
-class qe {
+class je {
   targetEl = null;
   options = {
     enabled: !1,
@@ -2808,7 +3021,7 @@ class qe {
     this.disable(), this.targetEl = null;
   }
 }
-class ze {
+class Ke {
   rules = [];
   onTriggerCallback;
   eventSourceUnlisteners = [];
@@ -2902,7 +3115,7 @@ class ze {
     this.unbindEvents(), this.rules = [], this.regexCache.clear(), this.onTriggerCallback = void 0;
   }
 }
-class Ne {
+class Xe {
   ctx = null;
   gainNode = null;
   activeSource = null;
@@ -3022,7 +3235,7 @@ class Ne {
     }), this.ctx = null), this.gainNode = null;
   }
 }
-class Ve {
+class Ye {
   styleEl = null;
   options = {
     enabled: !1,
@@ -3066,7 +3279,7 @@ class Ve {
     document.body.classList.remove("st-bgloader-frosted-active"), this.styleEl && this.styleEl.parentElement && (this.styleEl.parentElement.removeChild(this.styleEl), this.styleEl = null);
   }
 }
-class We {
+class Qe {
   userScenes = {};
   onApplySceneCallback;
   constructor(e = {}, t) {
@@ -3077,7 +3290,7 @@ class We {
   }
   getAllScenes() {
     return {
-      ...I,
+      ...B,
       ...this.userScenes
     };
   }
@@ -3091,15 +3304,15 @@ class We {
     this.userScenes[e.id] = { ...e, isBuiltin: !1 };
   }
   deleteScene(e) {
-    return I[e] ? (console.warn(`[ST-BgLoader SceneManager] Cannot delete builtin scene "${e}"`), !1) : this.userScenes[e] ? (delete this.userScenes[e], !0) : !1;
+    return B[e] ? (console.warn(`[ST-BgLoader SceneManager] Cannot delete builtin scene "${e}"`), !1) : this.userScenes[e] ? (delete this.userScenes[e], !0) : !1;
   }
   applyScene(e) {
     const t = this.getScene(e);
     return t ? (console.log(`[ST-BgLoader SceneManager] Applying scene: "${t.name}"`), this.onApplySceneCallback?.(t), !0) : (console.warn(`[ST-BgLoader SceneManager] Scene "${e}" not found.`), !1);
   }
 }
-const re = "settings:rev", oe = "settings:data", Ge = 2e3, je = 1e4;
-class He {
+const de = "settings:rev", ue = "settings:data", Je = 2e3, Ze = 1e4;
+class et {
   constructor(e, t, i) {
     this.client = e, this.onRemoteSettings = t, this.hasServerDocument = i;
   }
@@ -3135,7 +3348,7 @@ class He {
     } catch (t) {
       console.warn("[ST-BgLoader] Failed to read cloud settings mirror:", t);
     }
-    this.pollTimer = window.setInterval(() => void this.pollOnce(), je);
+    this.pollTimer = window.setInterval(() => void this.pollOnce(), Ze);
   }
   stop() {
     this.pollTimer !== null && window.clearInterval(this.pollTimer), this.pushTimer !== null && window.clearTimeout(this.pushTimer), this.pollTimer = null, this.pushTimer = null, this.running = !1;
@@ -3143,11 +3356,11 @@ class He {
   schedulePush(e) {
     !this.running || this.applyingRemote || (this.pushTimer !== null && window.clearTimeout(this.pushTimer), this.pushTimer = window.setTimeout(() => {
       this.pushTimer = null, this.push(e);
-    }, Ge));
+    }, Je));
   }
   async push(e) {
     try {
-      const t = JSON.stringify(e), i = await Ke(t);
+      const t = JSON.stringify(e), i = await tt(t);
       if (i === this.lastPushedFingerprint) return;
       const s = this.localRevision + 1, a = {
         revision: s,
@@ -3155,7 +3368,7 @@ class He {
         updatedAt: Date.now(),
         settings: e
       };
-      await this.client.storage.kv.set(oe, a), await this.client.storage.kv.set(re, s), this.localRevision = s, this.lastPushedFingerprint = i;
+      await this.client.storage.kv.set(ue, a), await this.client.storage.kv.set(de, s), this.localRevision = s, this.lastPushedFingerprint = i;
     } catch (t) {
       console.warn("[ST-BgLoader] Failed to push settings to cloud mirror:", t);
     }
@@ -3163,7 +3376,7 @@ class He {
   async pollOnce() {
     if (!this.applyingRemote)
       try {
-        const e = await this.client.storage.kv.get(re);
+        const e = await this.client.storage.kv.get(de);
         if ((typeof e == "number" ? e : 0) <= this.localRevision) return;
         const i = await this.readPayload();
         if (!i || i.revision <= this.localRevision) return;
@@ -3183,13 +3396,13 @@ class He {
       }
   }
   async readPayload() {
-    const e = await this.client.storage.kv.get(oe);
+    const e = await this.client.storage.kv.get(ue);
     if (!e || typeof e != "object") return null;
     const t = e;
     return typeof t.revision != "number" || !t.settings || typeof t.fingerprint != "string" ? null : t;
   }
 }
-async function Ke(l) {
+async function tt(l) {
   try {
     if (crypto?.subtle) {
       const t = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(l));
@@ -3202,8 +3415,8 @@ async function Ke(l) {
     e = (e << 5) + e + l.charCodeAt(t) | 0;
   return "djb2:" + (e >>> 0).toString(16);
 }
-const le = "st-bg-loader-settings.json", Xe = 1, Ye = 800;
-class Qe {
+const ge = "st-bg-loader-settings.json", it = 1, st = 800;
+class at {
   saveTimer = null;
   pending = null;
   writing = !1;
@@ -3212,13 +3425,13 @@ class Qe {
   onRemoteNewer = null;
   /** Returns the server document, or null when it is missing/unparsable (first run). */
   async load() {
-    const e = await fe(le);
+    const e = await Se(ge);
     return !e || typeof e != "object" || !e.settings || typeof e.revision != "number" ? null : e;
   }
   scheduleSave(e, t) {
     this.pending = { settings: e, revision: t }, this.saveTimer !== null && window.clearTimeout(this.saveTimer), this.saveTimer = window.setTimeout(() => {
       this.saveTimer = null, this.flush();
-    }, Ye);
+    }, st);
   }
   /** Resolves once every scheduled write has been attempted (test hook). */
   async flush() {
@@ -3234,7 +3447,7 @@ class Qe {
               this.onRemoteNewer?.(t);
               break;
             }
-            await ye(le, this.toDoc(e)), this.warnedAboutWriteFailure = !1;
+            await _e(ge, this.toDoc(e)), this.warnedAboutWriteFailure = !1;
           } catch (t) {
             this.warnedAboutWriteFailure || (this.warnedAboutWriteFailure = !0, console.warn("[ST-BgLoader] Server settings write failed; localStorage stays the durable copy:", t));
             break;
@@ -3247,20 +3460,20 @@ class Qe {
   }
   toDoc(e) {
     return {
-      version: Xe,
+      version: it,
       revision: e.revision,
       updatedTimestamp: Date.now(),
       settings: e.settings
     };
   }
 }
-const ce = 3e4, Je = 2e3, Ze = 5 * 60 * 1e3, et = 2 * 60 * 1e3, tt = 15e3;
-class he extends Error {
+const pe = 3e4, nt = 2e3, rt = 5 * 60 * 1e3, ot = 2 * 60 * 1e3, lt = 15e3;
+class me extends Error {
   constructor() {
     super("Agent tool registration timed out"), this.name = "AgentRegisterTimeoutError";
   }
 }
-const it = [
+const ct = [
   {
     id: "stbg_set_background",
     title: "设置背景媒体",
@@ -3287,11 +3500,11 @@ const it = [
     // Fourth copy of the weather vocabulary used to live here as a literal, which silently
     // drifted whenever a weather type was added. Referencing the shared constant keeps the
     // AI-facing tool schema in step with the runtime validator in PublicAPI.
-    description: `Set the atmospheric weather FX (${S.join(", ")}).`,
+    description: `Set the atmospheric weather FX (${_.join(", ")}).`,
     inputSchema: {
       type: "object",
       properties: {
-        type: { type: "string", enum: S },
+        type: { type: "string", enum: _ },
         density: { type: "string", enum: ["low", "medium", "high"] }
       },
       required: ["type"]
@@ -3332,7 +3545,7 @@ const it = [
     }
   }
 ];
-class st {
+class ht {
   constructor(e, t, i = () => {
   }) {
     this.client = e, this.host = t, this.reportState = i;
@@ -3350,7 +3563,7 @@ class st {
   registrationOk = !1;
   warnedIssue = !1;
   start() {
-    this.running || (this.running = !0, this.permissionBlockedUntil = 0, this.registerWaitUntil = 0, this.register(), this.claimLoop(), this.registerTimer = window.setInterval(() => void this.register(), ce));
+    this.running || (this.running = !0, this.permissionBlockedUntil = 0, this.registerWaitUntil = 0, this.register(), this.claimLoop(), this.registerTimer = window.setInterval(() => void this.register(), pe));
   }
   stop() {
     this.running = !1, this.timer !== null && window.clearTimeout(this.timer), this.registerTimer !== null && window.clearInterval(this.registerTimer), this.timer = null, this.registerTimer = null, this.reportedState = null, this.registrationOk = !1;
@@ -3366,7 +3579,7 @@ class st {
         if (!e) return;
         await this.registerWithTimeout(e), this.permissionBlockedUntil = 0, this.registerWaitUntil = 0, this.registrationOk = !0, this.warnedIssue = !1, this.publishState("ok"), console.log("[ST-BgLoader] Agent ambient tools registered.");
       } catch (e) {
-        this.registrationOk = !1, ge(e) ? (this.permissionBlockedUntil = Date.now() + Ze, this.publishState("blocked", e instanceof Error ? e.message : String(e)), this.warnOnce("Agent tool registration blocked by permission policy (retrying every 5 min — adjust in Authority Security Center if intended):", e)) : e instanceof he ? (this.registerWaitUntil = Date.now() + et, this.publishState("pending", "等待 agent.browser 授权（若页面出现 Authority 权限弹窗请处理；稍后自动重试）"), this.warnOnce("Agent tool registration is waiting for permission (check the Authority prompt / Security Center):", e)) : console.warn("[ST-BgLoader] Agent tool registration failed (will retry):", e);
+        this.registrationOk = !1, be(e) ? (this.permissionBlockedUntil = Date.now() + rt, this.publishState("blocked", e instanceof Error ? e.message : String(e)), this.warnOnce("Agent tool registration blocked by permission policy (retrying every 5 min — adjust in Authority Security Center if intended):", e)) : e instanceof me ? (this.registerWaitUntil = Date.now() + ot, this.publishState("pending", "等待 agent.browser 授权（若页面出现 Authority 权限弹窗请处理；稍后自动重试）"), this.warnOnce("Agent tool registration is waiting for permission (check the Authority prompt / Security Center):", e)) : console.warn("[ST-BgLoader] Agent tool registration failed (will retry):", e);
       } finally {
         this.registerInFlight = !1;
       }
@@ -3378,14 +3591,14 @@ class st {
   async registerWithTimeout(e) {
     let t;
     const i = new Promise((s, a) => {
-      t = window.setTimeout(() => a(new he()), tt);
+      t = window.setTimeout(() => a(new me()), lt);
     });
     try {
       return await Promise.race([
         e.registerTools({
-          browserInstanceId: T,
-          leaseDurationMs: ce * 2,
-          tools: it.map((s) => ({
+          browserInstanceId: M,
+          leaseDurationMs: pe * 2,
+          tools: ct.map((s) => ({
             id: s.id,
             title: s.title,
             description: s.description,
@@ -3407,14 +3620,14 @@ class st {
   claimLoop() {
     this.running && (this.timer = window.setTimeout(() => {
       this.claimOnce().finally(() => this.claimLoop());
-    }, Je));
+    }, nt));
   }
   async claimOnce() {
     const e = this.agentApi();
     if (!(!e || !this.running) && this.registrationOk)
       try {
         this.pendingSubmit && (await this.reportResult(this.pendingSubmit.claimId, this.pendingSubmit.invocation, "completed", void 0), this.pendingSubmit = null);
-        const t = `stbg-claim-${Date.now()}-${this.claimSeq++}`, s = (await e.claim({ browserInstanceId: T, claimId: t })).invocation;
+        const t = `stbg-claim-${Date.now()}-${this.claimSeq++}`, s = (await e.claim({ browserInstanceId: M, claimId: t })).invocation;
         if (!s) return;
         let a, n;
         try {
@@ -3427,7 +3640,7 @@ class st {
             runId: s.runId,
             callId: s.callId,
             claimId: t,
-            browserInstanceId: T,
+            browserInstanceId: M,
             status: "failed",
             error: n
           });
@@ -3438,7 +3651,7 @@ class st {
             runId: s.runId,
             callId: s.callId,
             claimId: t,
-            browserInstanceId: T,
+            browserInstanceId: M,
             status: "completed",
             result: a
           });
@@ -3454,7 +3667,7 @@ class st {
       runId: t.runId,
       callId: t.callId,
       claimId: e,
-      browserInstanceId: T,
+      browserInstanceId: M,
       status: i,
       error: s
     });
@@ -3484,18 +3697,18 @@ class st {
     }
   }
 }
-const q = "st_bgloader_settings", de = "st_bgloader_settings_rev";
-class at {
+const V = "st_bgloader_settings", fe = "st_bgloader_settings_rev";
+class dt {
   isInitialized = !1;
-  settings = { ...L };
+  settings = { ...R };
   settingsRevision = 0;
-  serverSettings = new Qe();
+  serverSettings = new at();
   cacheManager;
   audioEngine;
   mediaMount;
   overlaysMounted = !1;
   settingsDrawer = null;
-  nativeAugmenter = null;
+  nativeController = null;
   miniPlayer = null;
   atmosphereFX;
   audioVisualizer;
@@ -3506,12 +3719,12 @@ class at {
   // Lazy: created in init() with real configuration. No speculative instance that init()
   // would replace.
   sceneManager = null;
-  authorityBridge = new R();
+  authorityBridge = new P();
   settingsSync = null;
   agentBridge = null;
   publicApi;
   constructor() {
-    this.cacheManager = new Te(), this.audioEngine = new ke(), this.mediaMount = new Re(this.audioEngine, (e) => this.mountOverlays(e)), this.atmosphereFX = new De(), this.audioVisualizer = new Ue(), this.parallaxController = new qe(), this.triggerManager = new ze(), this.ambientSoundGenerator = new Ne(), this.frostedGlassController = new Ve(), this.publicApi = new $e(this);
+    this.cacheManager = new Ie(), this.audioEngine = new Be(), this.mediaMount = new $e(this.audioEngine, (e) => this.mountOverlays(e)), this.atmosphereFX = new We(), this.audioVisualizer = new He(), this.parallaxController = new je(), this.triggerManager = new Ke(), this.ambientSoundGenerator = new Xe(), this.frostedGlassController = new Ye(), this.publicApi = new Ge(this);
   }
   getCacheManager() {
     return this.cacheManager;
@@ -3558,6 +3771,9 @@ class at {
   getAPI() {
     return this.publicApi;
   }
+  getNativeController() {
+    return this.nativeController;
+  }
   clearActiveBackground() {
     this.settings.activeMediaId = null, this.mediaMount.clear(), this.saveSettings(), this.settingsDrawer && this.settingsDrawer.refreshMediaGrid();
   }
@@ -3574,28 +3790,31 @@ class at {
       this.audioVisualizer.setAnalyser(i);
     };
     const t = (await this.cacheManager.listMedia()).filter((i) => i.type === "audio");
-    if (this.audioEngine.setPlaylist(t), this.miniPlayer = new Fe(this.audioEngine), this.miniPlayer.render(this.settings.showMiniPlayer, this.settings.capsuleOnPlayOnly), this.audioEngine.addTrackListener((i) => {
+    if (this.audioEngine.setPlaylist(t), this.miniPlayer = new Ve(this.audioEngine), this.miniPlayer.render(this.settings.showMiniPlayer, this.settings.capsuleOnPlayOnly), this.audioEngine.addTrackListener((i) => {
       this.publicApi.emit("track-change", i);
     }), this.audioEngine.addPlayStateListener((i) => {
       this.publicApi.emit("play-state-change", i);
     }), this.triggerManager.setRules(this.settings.triggerRules || []), this.triggerManager.setTriggerCallback(async (i, s) => {
       console.log(`[ST-BgLoader] Executing trigger rule: "${s.name}"`), i.mediaIdOrUrl && await this.publicApi.setBackground(i.mediaIdOrUrl), i.bgmUrl && await this.publicApi.playBGM(i.bgmUrl), i.weather && this.publicApi.setWeather(i.weather), i.preset && this.publicApi.applyPreset(i.preset), i.filters && this.publicApi.setFilters(i.filters);
-    }), this.sceneManager = new We(this.settings.scenes || {}, async (i) => {
+    }), this.sceneManager = new Qe(this.settings.scenes || {}, async (i) => {
       if (i.mediaId) {
         const s = await this.cacheManager.getMedia(i.mediaId);
         s && await this.applyMedia(s);
       } else i.mediaUrl && await this.publicApi.setBackground(i.mediaUrl);
       i.bgmUrl && await this.publicApi.playBGM(i.bgmUrl), i.presetId && this.publicApi.applyPreset(i.presetId), i.filters && this.publicApi.setFilters(i.filters), i.weather && this.publicApi.setWeather(i.weather), i.visualizer && this.publicApi.setVisualizer(i.visualizer), i.parallax && this.publicApi.setParallax(i.parallax.enabled, i.parallax.intensity), i.ambientSound && this.publicApi.setAmbientSound(i.ambientSound), typeof i.frostedChat == "boolean" && this.publicApi.setFrostedChat(i.frostedChat);
-    }), this.settingsDrawer = new Pe(this.settings, this.cacheManager, {
+    }), this.settingsDrawer = new Ne(this.settings, this.cacheManager, {
       onSettingsChanged: (i) => {
         this.settings = i, this.saveSettings(), this.applySettingsToSubsystems(), this.enforceQuotaIfChanged();
       },
-      // Replaces the removed Alt+B shortcut: visibility is MediaMount's controlled state
-      // (finding A1), and routing the panel through the PublicAPI keeps one write path and
-      // one event for third-party callers.
+      // Replaces the removed Alt+B shortcut. `settings.backgroundVisible` is the durable
+      // truth (MediaMount mirrors it); routing the panel through the PublicAPI keeps one
+      // write path and one event for third-party callers.
       getBackgroundVisible: () => this.settings.backgroundVisible,
       onBackgroundVisibilityChanged: (i) => {
         this.publicApi.setBackgroundVisible(i);
+      },
+      onNativeTakeoverChanged: (i) => {
+        this.nativeController?.setLevel(i);
       },
       onPresetChanged: (i) => {
         this.mediaMount.applyFilters(i.filters), this.publicApi.emit("preset-change", i.id, i.filters);
@@ -3646,21 +3865,21 @@ class at {
         }
         await this.applyMedia(i);
       }
-    }, this.authorityBridge), this.settingsDrawer.render(), this.nativeAugmenter = new Oe(async (i, s, a) => {
-      const n = {
-        id: "native_" + a,
-        name: a,
+    }, this.authorityBridge), this.settingsDrawer.render(), this.nativeController = new ze(async (i, s) => {
+      const a = v(i), n = {
+        id: "native_" + i,
+        name: i,
         type: s,
         source: "server",
-        url: i,
-        cacheKey: i,
+        url: a,
+        cacheKey: a,
         size: 0,
         mimeType: "",
         addedTimestamp: Date.now(),
         lastUsedTimestamp: Date.now()
       };
       await this.applyMedia(n);
-    }), this.nativeAugmenter.start(), document.addEventListener("visibilitychange", () => {
+    }), this.nativeController.start(this.settings.nativeTakeover), document.addEventListener("visibilitychange", () => {
       this.audioEngine.handleVisibilityChange(document.hidden, this.settings.pauseOnBlur);
     }), this.authorityBridge.onCapabilitiesChanged(() => this.settingsDrawer?.updateCloudPanel()), this.serverSettings.onRemoteNewer = () => void this.reconcileRemoteConflict(), await this.startSettingsSync(), this.syncAgentTools(), this.hookSillyTavernEvents(), this.settings.activeMediaId) {
       const i = await this.cacheManager.getMedia(this.settings.activeMediaId);
@@ -3671,7 +3890,7 @@ class at {
   async applyMedia(e, t = !0) {
     t && (this.settings.activeMediaId = e.id, this.saveSettings());
     const i = await this.cacheManager.getMediaBlobUrl(e);
-    await this.mediaMount.mountMedia(e, i), this.settingsDrawer && (this.settingsDrawer.refreshMediaGrid(), this.settingsDrawer.updateCacheStats());
+    await this.mediaMount.mountMedia(e, i), this.nativeController?.refreshSelection(e.name), this.nativeController?.clearNativeBackgroundImage(), this.settingsDrawer && (this.settingsDrawer.refreshMediaGrid(), this.settingsDrawer.updateCacheStats());
   }
   /** Mounted-once guard for the onHostReady callback path (idempotent across late hosts). */
   mountOverlaysIfHostReady() {
@@ -3685,7 +3904,7 @@ class at {
     t && (this.atmosphereFX.mount(t), this.audioVisualizer.mount(t, this.mediaMount.getPumpWrapperElement() ?? e)), this.parallaxController.attach(e);
   }
   applySettingsToSubsystems() {
-    this.mediaMount.applyFilters(this.settings.filters), this.mediaMount.setInteractive(this.settings.interactiveBackground), this.mediaMount.setVisible(this.settings.backgroundVisible), this.mediaMount.setTransition(this.settings.transitionEffect, this.settings.transitionDurationMs), this.audioEngine.setVolume(this.settings.volume), this.audioEngine.setMuted(this.settings.muted), this.audioEngine.setMuffled(this.settings.muffleBGM), this.audioEngine.setPlaybackMode(this.settings.playbackMode), this.atmosphereFX.setWeather(this.settings.weather), this.audioVisualizer.setOptions(this.settings.visualizer), this.parallaxController.setOptions(this.settings.parallax), this.ambientSoundGenerator.setSound(this.settings.ambientSound), this.frostedGlassController.setOptions(this.settings.frostedChat), this.triggerManager.setRules(this.settings.triggerRules || []), this.sceneManager?.setUserScenes(this.settings.scenes || {}), this.syncAgentTools();
+    this.mediaMount.applyFilters(this.settings.filters), this.mediaMount.setInteractive(this.settings.interactiveBackground), this.mediaMount.setVisible(this.settings.backgroundVisible), this.mediaMount.setTransition(this.settings.transitionEffect, this.settings.transitionDurationMs), this.audioEngine.setVolume(this.settings.volume), this.audioEngine.setMuted(this.settings.muted), this.audioEngine.setMuffled(this.settings.muffleBGM), this.audioEngine.setPlaybackMode(this.settings.playbackMode), this.atmosphereFX.setWeather(this.settings.weather), this.audioVisualizer.setOptions(this.settings.visualizer), this.parallaxController.setOptions(this.settings.parallax), this.ambientSoundGenerator.setSound(this.settings.ambientSound), this.frostedGlassController.setOptions(this.settings.frostedChat), this.triggerManager.setRules(this.settings.triggerRules || []), this.sceneManager?.setUserScenes(this.settings.scenes || {}), this.nativeController?.setLevel(this.settings.nativeTakeover), this.syncAgentTools();
   }
   /**
    * Shows/hides the background layer. MediaMount owns the applied state (finding A1) while
@@ -3712,7 +3931,7 @@ class at {
   /** Opt-in Agent Runtime ambient tools (AI director mode); requires the cloud backend. */
   syncAgentTools() {
     const e = this.authorityBridge.getClient(), t = this.settings.agentToolsEnabled && !!e;
-    t && !this.agentBridge && e ? (this.agentBridge = new st(e, this.buildAgentHost(), (i, s) => {
+    t && !this.agentBridge && e ? (this.agentBridge = new ht(e, this.buildAgentHost(), (i, s) => {
       this.authorityBridge.reportAgentToolsState(i, s);
     }), this.agentBridge.start(), console.log("[ST-BgLoader] Agent ambient tools enabled.")) : !t && this.agentBridge && (this.agentBridge.stop(), this.agentBridge = null, console.log("[ST-BgLoader] Agent ambient tools disabled."));
   }
@@ -3733,10 +3952,10 @@ class at {
   }
   async startSettingsSync() {
     const e = this.authorityBridge.getClient();
-    e && (this.settingsSync = new He(e, (t) => {
+    e && (this.settingsSync = new et(e, (t) => {
       this.settings = t;
       try {
-        localStorage.setItem(q, JSON.stringify(this.settings));
+        localStorage.setItem(V, JSON.stringify(this.settings));
       } catch {
       }
       this.applySettingsToSubsystems(), this.settingsDrawer?.applyRemoteSettings(this.settings), this.publicApi.emit("settings-sync", this.settings);
@@ -3777,10 +3996,10 @@ class at {
   }
   loadSettings() {
     try {
-      const e = localStorage.getItem(q);
-      e && (this.settings = z(JSON.parse(e))), this.settingsRevision = parseInt(localStorage.getItem(de) || "0", 10) || 0;
+      const e = localStorage.getItem(V);
+      e && (this.settings = G(JSON.parse(e))), this.settingsRevision = parseInt(localStorage.getItem(fe) || "0", 10) || 0;
     } catch (e) {
-      console.error("[ST-BgLoader] Failed to parse saved settings:", e), this.settings = { ...L }, this.settingsRevision = 0;
+      console.error("[ST-BgLoader] Failed to parse saved settings:", e), this.settings = { ...R }, this.settingsRevision = 0;
     }
   }
   /**
@@ -3792,14 +4011,14 @@ class at {
     this.loadSettings();
     try {
       const e = await this.serverSettings.load();
-      e && e.revision >= this.settingsRevision ? (this.settings = z(e.settings), this.settingsRevision = e.revision, this.persistLocalSettings()) : this.settingsRevision > 0 && this.serverSettings.scheduleSave(this.settings, this.settingsRevision);
+      e && e.revision >= this.settingsRevision ? (this.settings = G(e.settings), this.settingsRevision = e.revision, this.persistLocalSettings()) : this.settingsRevision > 0 && this.serverSettings.scheduleSave(this.settings, this.settingsRevision);
     } catch (e) {
       console.warn("[ST-BgLoader] Server settings unavailable, using local settings:", e);
     }
   }
   persistLocalSettings() {
     try {
-      localStorage.setItem(q, JSON.stringify(this.settings)), localStorage.setItem(de, String(this.settingsRevision));
+      localStorage.setItem(V, JSON.stringify(this.settings)), localStorage.setItem(fe, String(this.settingsRevision));
     } catch (e) {
       console.error("[ST-BgLoader] Failed to save settings:", e);
     }
@@ -3808,10 +4027,10 @@ class at {
     this.settingsRevision += 1, this.persistLocalSettings(), this.serverSettings.scheduleSave(this.settings, this.settingsRevision), this.settingsSync?.schedulePush(this.settings);
   }
 }
-const W = new at(), ue = () => W.init().catch((l) => console.error("[ST-BgLoader] Initialization failed:", l));
-document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", ue) : ue();
-window.STBgLoader = W;
-window.stBgLoader = W.getAPI();
+const j = new dt(), ye = () => j.init().catch((l) => console.error("[ST-BgLoader] Initialization failed:", l));
+document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", ye) : ye();
+window.STBgLoader = j;
+window.stBgLoader = j.getAPI();
 export {
-  at as STBgLoaderExtension
+  dt as STBgLoaderExtension
 };
