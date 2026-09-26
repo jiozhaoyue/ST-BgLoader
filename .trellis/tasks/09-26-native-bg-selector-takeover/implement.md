@@ -4,10 +4,13 @@
 
 ## Phase A：激活与前置核对
 
-- [ ] A1 确认子任务 1 已提交、子任务 2 的 A3 最小修复已落地（本方案将取代它）
-- [ ] A2 任务激活（`task.py start`）
-- [ ] A3 基线：`git status` 干净、`npm run type-check && npm run build` 绿
-- [ ] A4 用户已就 Open Questions 1–3 裁定，并把裁定结果记入 `research/decisions.md`
+- [x] A1 确认子任务 1 已提交、子任务 2 的 A3 最小修复已落地（本方案将取代它）
+- [x] A2 任务激活（`task.py start`）
+- [x] A3 基线：`git status` 干净、`npm run type-check && npm run build` 绿
+- [x] A4 用户已就 Open Questions 1–3 裁定，并把裁定结果记入 `research/decisions.md`
+      > 执行期另新增裁定 **D-1（聊天锁定背景 → 放行给原生）** 与 **D-2（不派子代理）**，已一并留档。
+      > A4 同时记录了**宿主漂移**复核结论：实例 `backgrounds.js` 1865 → **2039 行**，行号全失配、
+      > 接缝全存活；并订正 PRD 的「`getContext()` 不暴露背景相关内容」（`chatMetadata` 实为公开）。
 
 ## Phase B：源码证据留档
 
@@ -35,7 +38,8 @@
 ## Phase E：拦截实现
 
 - [ ] E1 注册唯一 document **捕获阶段** click 监听（`{ capture: true }`）
-- [ ] E2 `shouldTakeOver()` 四条放行规则（多选模式 / 菜单与文件夹 / custom / 层级）
+- [ ] E2 `shouldTakeOver()` 放行规则：多选模式 / **聊天锁定背景（D-1）** / 菜单与文件夹 / custom / 层级
+- [ ] E2b `isChatBackgroundLocked()` 经 `getContext().chatMetadata['custom_background']` 读取（公开接缝，**不得**嗅探宿主私有实现，**不得**用 `.locked-background` 类作为真值）
 - [ ] E3 命中后 `preventDefault()` + `stopPropagation()` + 走扩展管线
 - [ ] E4 `stop()` 移除监听（`removeEventListener` 必须带同样的 `capture: true`，否则移除不掉）
 - [ ] E5 确认全仓**只有一处** `.bg_example` 点击绑定：`grep -rn "bg_example" src/`
@@ -43,7 +47,7 @@
 
 ## Phase F：叠层清理
 
-- [ ] F1 `clearNativeBackgroundImage()` 幂等实现
+- [ ] F1 `clearNativeBackgroundImage()` 幂等实现，且**带 D-1 豁免**（`isChatBackgroundLocked()` 为真时不清，避免与宿主抢写 `#bg1`）
 - [ ] F2 `#bg1` 的 `style` 属性观察者 + **自写保护**标志位（避免自己的清空动作再次触发）
 - [ ] F3 调用点接线：`start()` 后、每次 `applyMedia()` 后、`CHAT_CHANGED` 后
 - [ ] F4 `stop()` 移除观察者并尝试恢复原生背景图；实测「不刷新页面能否完全恢复」
@@ -62,6 +66,7 @@
 
 - [ ] H1 接缝探测降级验证（Dev 上临时移除 `#bg_menu_content` → 接管不安装、功能正常）
 - [ ] H2 拦截矩阵逐条验证（按 `design.md` §9 的 12 条场景表）
+- [ ] H2b **锁定态验证（D-1）**：在 Dev 上给当前聊天锁一张背景 → 点别的缩略图应改「聊天锁定背景」（原生语义）且 `#bg1` 不被清空、无抖动；解锁后点缩略图立即回到接管路径
 - [ ] H3 动图（GIF/APNG）纳入管线后的观感验证（PRD R-6）
 - [ ] H4 `npm run type-check && npm run build`
 - [ ] H5 CSS 裸选择器门禁为 0；新增样式无溢光

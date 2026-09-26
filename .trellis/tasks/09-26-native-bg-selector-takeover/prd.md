@@ -20,6 +20,11 @@
 
 ### 可用接缝（逐条核验）
 
+> **执行期复核（2026-09-26）**：实例上的 `backgrounds.js` 已从规划期的 **1865 行**漂移到 **2039 行**
+> （宿主 `v2.7.0-605-ge1dbd1904`），下表与 `design.md` 中的 `backgrounds.js:NNNN` 引用**行号已全部失配**。
+> 逐条复核后**接缝全部存活**，方案无需改设计；当前行号见
+> `research/decisions.md` §二.2。下表保留了规划期行号以便对照，引用时以那份为准。
+
 | 能力 | 可行性 | 机制 / 证据 |
 | --- | --- | --- |
 | 读取当前原生背景 | ✅ | `#bg1` 的内联 `background-image` |
@@ -31,7 +36,9 @@
 | 显示扩展的选中态 | ✅ | 给匹配的 `.bg_example` 加自定义类。**注意**：原生 `highlightSelectedBackground()` 会重算并覆盖选中态，因此须在每次重渲染后重新施加（既有 MutationObserver 可复用） |
 | 匹配原生缩略图 ↔ 扩展媒体 | ✅ | 用 `.bg_example` 的 **`bgfile` 属性**（文件名）与扩展目录条目的文件名匹配。**不要用 URL 匹配**——原生 `data-url` 是缩略图 CSS 串，与扩展的媒体 URL 不同 |
 | 替换 `setBackground()` | ❌ | 模块私有、未导出、未挂 `window` |
-| 访问 `background_settings` | ❌ | 模块作用域。`getContext()`（`st-context.js:115`）**不暴露**任何 backgrounds 相关内容；`background_settings` 仅出现在设置**保存载荷**中（`script.js:8091`） |
+| `background_settings`（全局背景设置态） | ❌ | 模块作用域。`getContext()` **不暴露** `background_settings` 本身；它仅出现在设置**保存载荷**中（`script.js:8091`） |
+| **chat 元数据（含锁定背景）** | ✅ | `getContext().chatMetadata`（`st-context.js:2477`）是公开 getter。**订正**：规划期原写「`getContext()` 不暴露任何 backgrounds 相关内容」，该结论对 `background_settings` 成立、对 chat 元数据**不成立** —— 见 `research/decisions.md` §二.4 |
+| 聊天锁定背景 | ✅ 可判定 | `isChatBackgroundLocked()` = `chat_metadata['custom_background']`（`backgrounds.js:403`、键 `:14`）。它是 `onSelectBackgroundClick` 的**第二分支**（`:431`），规划期遗漏 → 已补放行规则（裁定 D-1） |
 
 ### 结论
 
@@ -60,6 +67,7 @@
    - 拦截命中 → `e.preventDefault()` + `e.stopPropagation()`，然后走扩展 `applyMedia()`。
    - 不命中（如处于原生「背景群组多选模式」`isBackgroundSelectionMode`、或点的是文件夹磁贴/菜单按钮）→ **不拦截**，放行给原生。
    - 需识别并放行非「选择背景」语义的点击：`.bg_folder_tile`、`.jg-button`（lock/edit/delete/copy/folder/set-cover）、`.mobile-only-menu-toggle`。
+   - **当前聊天已锁定背景 → 放行**（裁定 D-1）。`onSelectBackgroundClick` 实为**三分支**（多选 / 聊天锁定或专属 / 全局），规划期只识别了首末两支；锁定分支被拦截会让原生「把背景锁定给本聊天」的功能静默失效。放行范围同时覆盖 `#bg1` 的叠层清理（否则会与宿主抢写）。
 5. **R5 选中态标记**：扩展当前背景对应的 `.bg_example`（按 `bgfile` 匹配）加自定义类（如 `st-bg-takeover-selected`），样式遵循子任务 1 落盘的原生视觉规范（**无溢光**）。每次原生网格重渲染后重新施加。
 6. **R6 叠层清理**：接管期间清空 `#bg1` 的内联 `background-image`，避免原生图片与扩展图层同时加载；但须容忍宿主在 `CHAT_CHANGED` 时重写它（`onChatChanged` → `backgrounds.js:266`），即清空动作需可重复执行。
 7. **R7 用户开关**：设置面板提供 `接管原生背景选择器` 开关（默认开启，因用户明确要求）；关闭后立即卸载拦截、恢复原生行为，扩展媒体库照常可用。
@@ -82,10 +90,12 @@
 | 接管层级 | **T2 — 接管全部选择** | `nativeTakeover` 默认 `'all'`；图片点击路由进扩展 `ImageRenderer`；**T3 不做** |
 | 优先级语义 | **方案 α** —— 接管期间以扩展状态为准；回到原生靠关闭接管开关 | `shouldTakeOver()` **不实现**「点原生图片即退出接管」分支；R7 开关是唯一退出手段 |
 | `FORCE_SET_BACKGROUND` 回写 | **不启用** | R8 保持默认关闭，`probe()` 仍探测该事件存在性（供将来使用） |
+| **聊天锁定背景（D-1，执行期新增）** | **锁定期间放行给原生** | `shouldTakeOver()` 增第 2 条放行规则；`#bg1` 叠层清理同判定豁免。理由与代价见 `research/decisions.md` §一 D-1 |
 
 ## Open Questions
 
-无未决项。
+无未决项。执行期新增的 U-1（`stop()` 能否不刷新页面完全恢复原生背景图）在 Phase F 实测裁定，
+见 `research/decisions.md` §三。
 
 
 ## Acceptance Criteria
@@ -94,6 +104,7 @@
 - [ ] 用户已就 Open Questions 1–3 给出裁定，方案按裁定实施。
 - [ ] 接缝探测生效：人为破坏接缝（Dev 上临时移除 `#bg_menu_content` 或改 `.bg_example` 结构）→ 接管不安装、扩展其余功能完全正常。
 - [ ] 原生面板点击行为符合所选层级：按选定范围，命中项走扩展管线；未命中项（文件夹磁贴、菜单按钮、群组多选模式）行为与原生完全一致。
+- [ ] **聊天锁定背景放行生效（D-1）**：当前聊天有锁定背景时，点缩略图改的是该聊天锁定的背景（原生语义），且 `#bg1` **不被**扩展清空、无抖动；解锁后接管立即恢复生效。
 - [ ] `NativeBgAugmenter` 的逐元素 click 监听已删除，全仓仅一个 document 捕获阶段拦截器。
 - [ ] 扩展当前背景在原生面板有选中标记；原生网格重渲染（点刷新/重进面板）后标记仍在。
 - [ ] 开启接管后 `#bg1` 不再保留原生背景图；关掉开关后原生行为完整恢复。

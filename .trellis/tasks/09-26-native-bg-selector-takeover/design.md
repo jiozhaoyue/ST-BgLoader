@@ -90,14 +90,34 @@ private onDocumentClickCapture = (e: MouseEvent): void => {
 private shouldTakeOver(example: HTMLElement, target: HTMLElement): boolean {
     // 1) 原生「多选背景加分组」模式 → 放行（宿主信号：#Backgrounds.bg-selection-mode）
     if (document.querySelector('#Backgrounds.bg-selection-mode')) return false;
-    // 2) 非「选择背景」语义的点击 → 放行
+    // 2) 当前聊天已锁定背景 → 放行（裁定 D-1；见 research/decisions.md §一）
+    if (this.isChatBackgroundLocked()) return false;
+    // 3) 非「选择背景」语义的点击 → 放行
     if (target.closest('.jg-button, .bg_folder_tile, .mobile-only-menu-toggle')) return false;
-    // 3) 聊天专属（custom）背景 → 不接管，交回宿主语义
+    // 4) 聊天专属（custom）背景 → 不接管，交回宿主语义
     if (example.getAttribute('custom') === 'true') return false;
-    // 4) 层级：non-image 只接管非图片
+    // 5) 层级：non-image 只接管非图片
     const bgFile = example.getAttribute('bgfile') || '';
     if (this.level === 'non-image' && detectMediaType(bgFile) === 'image') return false;
     return true;
+}
+
+/**
+ * Chat-locked background.
+ *
+ * Host signal: `chat_metadata['custom_background']` (backgrounds.js:403, key at :14). Read through
+ * the PUBLIC context API — `getContext().chatMetadata` (st-context.js:2477) — never by sniffing
+ * host internals, so the PRD Non-goals (no monkey-patching) hold.
+ *
+ * Ruling D-1 (2026-09-26): while the current chat has a locked background, the native picker keeps
+ * its own semantics, so the takeover yields for that chat. `onSelectBackgroundClick`'s second
+ * branch (backgrounds.js:431) writes chat metadata + `#bg1` directly instead of changing the global
+ * background; intercepting it would make the host's "lock background to this chat" feature fail
+ * silently.
+ */
+private isChatBackgroundLocked(): boolean {
+    const meta = (window as any).SillyTavern?.getContext?.()?.chatMetadata;
+    return !!meta?.['custom_background'];
 }
 ```
 
@@ -111,13 +131,36 @@ private shouldTakeOver(example: HTMLElement, target: HTMLElement): boolean {
 
 ### 放行信号的核验依据
 
-| 放行条件 | 宿主信号 | 证据 |
+| 放行条件 | 宿主信号 | 证据（行号按**执行期实测**的 2039 行版本，见 `research/decisions.md` §二） |
 | --- | --- | --- |
-| 多选分组模式 | `#Backgrounds` 带 `bg-selection-mode` 类 | `backgrounds.js:924` `$('#Backgrounds').toggleClass('bg-selection-mode', isBackgroundSelectionMode)` |
-| 菜单按钮 | `.jg-button` | `backgrounds.js:1773` 起 `$(document).on('click','.jg-button', …)` 处理 lock/edit/delete/copy/folder/set-cover |
-| 文件夹磁贴 | `.bg_folder_tile` | `backgrounds.js:1701` 起 |
-| 移动端菜单开关 | `.mobile-only-menu-toggle` | `backgrounds.js:1734` |
-| 聊天专属背景 | `.bg_example[custom="true"]` | `backgrounds.js:371` `$(this).attr('custom') === 'true'` |
+| 多选分组模式 | `#Backgrounds` 带 `bg-selection-mode` 类 | `backgrounds.js:1033` `$('#Backgrounds').toggleClass('bg-selection-mode', isBackgroundSelectionMode)` |
+| **当前聊天已锁定背景** | `chat_metadata['custom_background']` 非空 | 判定 `backgrounds.js:403`；键值 `:14`；被拦截的分支 `:431`；读法见下 §3.1 |
+| 菜单按钮 | `.jg-button` | `backgrounds.js:1901` 起 `$(document).on('click','.jg-button', …)` 处理 lock/edit/delete/copy/folder/set-cover（宿主自己在该处理器内 `e.stopPropagation()`） |
+| 文件夹磁贴 | `.bg_folder_tile:not(.bg_new_folder_tile)` | `backgrounds.js:1849`；宿主在同处就用 `if ($(e.target).closest('.jg-button').length) return;` 放行按钮点击 |
+| 移动端菜单开关 | `.mobile-only-menu-toggle` | `backgrounds.js:1885`（`.bg_example` 内）、`:1871`（`.bg_folder_tile` 内），两处宿主均自行 `e.stopPropagation()` |
+| 聊天专属背景 | `.bg_example[custom="true"]` | `backgrounds.js:423` `const isCustom = $(this).attr('custom') === 'true';` |
+
+### 3.1 锁定态的读取接缝（裁定 D-1）
+
+```ts
+const meta = (window as any).SillyTavern?.getContext?.()?.chatMetadata;
+return !!meta?.['custom_background'];
+```
+
+**为什么走 context API**：`getContext()` 的返回对象里就有 `get chatMetadata() { return chat_metadata; }`
+（`public/scripts/st-context.js:2477`，`getContext` 定义在 `:2411`）。这是**公开**接缝，不是嗅探宿主私有实现
+——不违反 PRD Non-goals。注意 PRD 原写「`getContext()` 不暴露任何背景相关内容」，该结论对
+`background_settings` 成立、对 **chat 元数据不成立**（已订正，见 `research/decisions.md` §二.4）。
+
+**为什么不用 `.bg_example.locked-background` 类**：那是 `highlightLockedBackground()`（`:355`）产出的
+**渲染结果**，只在若干时机刷新；`chatMetadata` 才是权威真值。
+
+**键值 `'custom_background'` 的稳定性**：它是**落盘在聊天文件里**的元数据键（配合
+`saveMetadataDebounced()`，`:409`），改名会让所有历史聊天的锁定背景失效 → 宿主实际上不可能在不做迁移
+的前提下改它。比任何 DOM 类名都稳。
+
+**`e.shiftKey` 绕过**：原生允许 `Shift+点击` 绕过锁定（`bypassGlobalLock`，`:427`）。放行后这是宿主的
+内部分支，**原生行为自然生效，扩展无需处理**。
 
 ## 4. 选中态标记（PRD R5）
 
@@ -137,11 +180,19 @@ private shouldTakeOver(example: HTMLElement, target: HTMLElement): boolean {
 ```ts
 private clearNativeBackgroundImage(): void {
     if (!this.seams) return;
+    // Ruling D-1: while the chat has a locked background the host owns `#bg1`. Clearing it here
+    // would fight the host every time it restores the locked image — a visible flicker, and the
+    // locked background would never show.
+    if (this.isChatBackgroundLocked()) return;
     if (this.seams.bgHost.style.backgroundImage) {
         this.seams.bgHost.style.backgroundImage = '';
     }
 }
 ```
+
+> **D-1 的第二个落点**：`shouldTakeOver()` 放行锁定态只是「不拦点击」；`#bg1` 的观察者若仍无条件清，
+> 就会出现「接管放行 → 宿主写 `#bg1` → 扩展立刻清掉」的互斥抖动。因此**同一判定必须在两处生效**：
+> 拦截入口（§3）与叠层清理（本节）。实现上共用同一个 `isChatBackgroundLocked()`。
 
 **幂等、可重复**：宿主的 `onChatChanged`（`backgrounds.js:266`）会在 `CHAT_CHANGED` 时写回 `lockedUrl || background_settings.url`。因此不能只清一次——调用点：
 

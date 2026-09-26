@@ -1,39 +1,157 @@
-# 决策记录 — 子任务 3
+# 裁定与接缝复核记录 — 接管 ST 原生背景选择器
 
-## 2026-09-26 评审门禁裁定（用户）
+> 本文件是执行期的**裁定留痕**。规划期的三份裁定在任务 `prd.md` 的「用户裁定」表中，此处只记
+> 执行期新增的裁定与规划文档的订正项。
 
-| 编号 | 决策点 | 选项 | 裁定 | 理由 |
-| --- | --- | --- | --- | --- |
-| D-1 | 接管层级 | T1 / T2 / T3 | **T2 — 接管全部选择** | 用户在三个选项中选定 T2；图片一并纳入扩展 `ImageRenderer` 管线，滤镜/转场/天气对所有权重一致生效；T3（原生网格注入）被排除 |
-| D-2 | 优先级语义 | α / β | **α —— 接管期间以扩展状态为准** | 语义单一、无隐藏模式切换；退出途径唯一且显式（接管开关） |
-| D-3 | `FORCE_SET_BACKGROUND` 回写 | 启用 / 不启用 | **不启用** | `forceSetBackground` 会把背景推入 `chat_metadata`，语义是「聊天专属背景」，用于全局切换会污染 chat 元数据 |
-| D-4 | T3 原生网格注入 | 做 / 不做 | **不做** | 注入节点不参与原生文件夹归类、`#bg-filter` 筛选、群组多选、移动端菜单；每次 `renderSystemBackgrounds()` 都要重注入，宿主升级即失效 |
+## 一、执行期新增裁定（2026-09-26）
 
-## 裁定带来的方案简化
+### D-1 聊天锁定背景 → 锁定期间放行给原生
 
-1. **`shouldTakeOver()` 少一个分支**：不需要「点原生图片 → 退出接管」的逻辑（D-2 选 α）。
-2. **`NativeBackgroundController` 不需要任何注入能力**：模块设计中不含向 `#bg_menu_content` 添加节点的代码（D-4）。
-3. **`TakeoverLevel` 三档保留**：`'off' | 'non-image' | 'all'`，默认 `'all'`。`'non-image'` 保留为用户可选的降档，不是默认路径。
+**触发**：执行前的接缝复核发现规划期遗漏了 `onSelectBackgroundClick` 的**第三条分支**（详见 §二.3）。
+「方案 α 接管一律优先」的字面执行会让原生面板的「锁定背景给当前聊天」功能**静默失效**。
 
-## 2026-09-26 实测补充：T1 层级被证明近乎空操作（务必据此实施）
+**候选与代价**（三选一，已向用户列出）：
 
-子任务 2 的体检在 Dev 实例上实测了两件事，直接改变本子任务的实施前提：
-
-1. **原生 `/api/backgrounds/all` 只返回图片**：实测 27 项，非图片扩展名 **0 项**；响应字段恰为 `images` / `config`。
-2. **原生网格里的 `.bg_example` 全部是图片类**，唯一例外是 `.svg`——因为 `detectMediaType('*.svg')` 返回 `'svg'` 而非 `'image'`。
-
-**推论**：
-
-- **T1（只接管非图片）在当前宿主上几乎无对象** —— 原生网格中不存在 video/audio/html 条目可拦。若当初选了 T1，实施后用户会发现「什么也没变」。**用户选定 T2 是正确的**，T2 是唯一有实质效果的层级。
-- **T3（把扩展媒体注入原生网格）的动机被加强但成本不变**：扩展自有 19 个非图片条目在原生网格中完全不可见（实测），所以注入确有需求；但注入节点不参与原生的文件夹归类 / `#bg-filter` 筛选 / 群组多选 / 移动端菜单，且每次 `renderSystemBackgrounds()` 的 `empty()` 重建都要重注入。用户已裁定不做。
-- **A3 双写的实际受影响集合**：`detectMediaType(bgFile) !== 'image'` 的项，当前只有 `.svg`。子任务 2 已在本轮给 `NativeBgAugmenter` 的非图片点击处理加了阻止冒泡（消除双写），并在注释中声明**将被本子任务的 `NativeBackgroundController` 取代**。本子任务实施时**必须删除该临时处理**，不得两套并存（PRD R2 / R-4 已约定）。
-- **C8（`NativeBgAugmenter` 的处置）**：用户裁定其处置权归本子任务。因上述实测，该组件面向 video/audio/html 的功能面在现实中为零；本子任务落地后应由 `NativeBackgroundController` 完全取代并删除 `NativeBgAugmenter.ts`（`implement.md` D6 已列）。
-
-**升级期注意**：若宿主将来开始让 `/api/backgrounds/all` 返回非图片文件，则原生网格会出现真实的非图片缩略图，本子任务的拦截范围与放行规则需重新评估（见 `research/st-native-evidence.md` §4 比对清单第 3 条）。
-
-## 尚待实测裁定
-
-| 编号 | 问题 | 处置 |
+| 方案 | 做法 | 代价 |
 | --- | --- | --- |
-| U-1 | `stop()` 能否在不刷新页面的前提下完全恢复原生 `#bg1` 背景图 | 执行 Phase F 时实测；若不能，写进接管开关的 UI 文案 |
-| U-2 | 迷你播放器胶囊去掉投影后，浅色主题下 1px 边框是否足够可辨 | 归子任务 1；不足则提高边框对比度（不得加回投影） |
+| **✔ 采用** 锁定态放行 | 检测到当前聊天有锁定背景 → 该聊天内不接管：点击放行给原生，叠层清理器同样豁免（不清 `#bg1`） | 锁定期间该背景走原生路径，扩展的滤镜/天气/视差不作用于它；扩展媒体库与面板照常可用 |
+| 严格方案 α | 无视锁定，一律路由进扩展管线 | 用户在原生面板的锁定操作在接管期间完全无效，且 `#bg1` 还会被清理器清掉 |
+| 映射为扩展 per-chat 背景 | 扩展侧新建 per-chat 背景概念 | 成本 L，超出本子任务范围（子任务 2 刚把无写入方的 `chatBindings` 当死代码删除，等于重新设计） |
+
+**用户裁定**：**锁定态放行给原生**。
+
+**落地影响**：
+- `shouldTakeOver()` 新增第 5 条放行规则：当前聊天存在锁定背景 → `return false`。
+- 叠层清理器（`#bg1` 的 `style` 观察者）新增豁免条件：同一判定为真时**不清**——否则会出现
+  「接管放行 → 原生写 `#bg1` → 扩展立刻清掉」的互斥抖动。
+- 锁定态的**检测接缝**：`SillyTavern.getContext().chatMetadata['custom_background']`（见 §二.4）。
+  非空即视为「当前聊天已锁定背景」。
+- 与方案 α 的关系：α 仍然成立——接管**默认**以扩展状态为准；锁定是一个**显式的、用户主动施加的**
+  例外信号，尊重它不违反 α（α 的退出手段仍是接管开关，锁定只是就地让路）。
+
+### D-2 执行方式：主会话实施，不派子代理
+
+**用户裁定**：不用子代理，由主会话直接实施并自验。
+**理由**：执行者对模块上下文与全部接缝证据已有完整掌握，派子代理需重建上下文而无并发收益
+（本子任务是一处内聚改动，无可并行的独立工作面），符合 L0-8「无净时间收益就不开」。
+
+---
+
+## 二、接缝复核：宿主已漂移，但接缝全部存活（2026-09-26 实测）
+
+### 1. 宿主版本
+
+| 项 | 规划期 | 执行期实测 | 结论 |
+| --- | --- | --- | --- |
+| 实例 | — | `D:\Repo\Tavern-repo\Instance\Dev\Luker` | — |
+| 宿主版本 | — | `v2.7.0-605-ge1dbd1904`（commit `e1dbd1904a1e49465feb7da38115def7fdac2192`，2026-09-24） | — |
+| `public/scripts/backgrounds.js` | **1865 行** | **2039 行** | ⚠️ **行号已全部失配** |
+| `events.js` 的 `FORCE_SET_BACKGROUND` | 存在 | `:67` = `'force_set_background'` | ✅ 存活 |
+
+**影响**：`prd.md` 与 `design.md` 中的 `backgrounds.js:NNNN` 引用**不可再按原行号核对**。
+本文件 §二.2 重新给定**当前版本**的行号；凡后续再引用，一律以本节为准。
+
+### 2. 方案依赖的接缝逐条复核（当前 2039 行版本）
+
+| 接缝 | 现状 | 当前行号 | 规划期行号 |
+| --- | --- | --- | --- |
+| `.bg_example` 点击委托（**document 冒泡阶段**） | ✅ `$(document).off('click','.bg_example').on('click','.bg_example', onSelectBackgroundClick)` | `:1884` | 1733 |
+| `onSelectBackgroundClick` 定义 | ✅ | `:421` | — |
+| `#bg_menu_content` | ✅ | `:715`、`:1040`、`:1789` | 661 区 |
+| `#bg_custom_content` | ✅ | `:742`、`:1789` | — |
+| `#bg1` 写入点 | ✅ `onChatChanged :310`、`onLockBackgroundClick :380`、`forceSetBackground :288`、`onSelectBackgroundClick` 锁定分支 | — | 249/266/383 |
+| 多选分组模式信号 | ✅ `$('#Backgrounds').toggleClass('bg-selection-mode', isBackgroundSelectionMode)` | `:1033` | 924 |
+| `.jg-button` 委托（lock/edit/delete/copy/folder/set-cover） | ✅ 且其处理器自己 `e.stopPropagation()` | `:1901` | 1773 起 |
+| `.bg_folder_tile` 委托（非 `bg_new_folder_tile`） | ✅ 且**宿主自己**就用了 `if ($(e.target).closest('.jg-button').length) return;` 的放行写法 | `:1849`、`:1851` | 1701 起 |
+| `.bg_example .mobile-only-menu-toggle` | ✅ 委托 + `e.stopPropagation()` | `:1885` | 1734 |
+| `.bg_folder_tile .mobile-only-menu-toggle` | ✅ 委托 + `e.stopPropagation()` | `:1871` | — |
+| `.bg_example[custom="true"]` | ✅ 选择处理器内判定 | `:423` | 371 |
+| `highlightSelectedBackground()` | ✅ 清 `.selected-background` 后按 **`data('url')`** 匹配 `background_settings.url` 重算 | `:1773` | 1641 |
+| `highlightLockedBackground()` | ✅ 清 `.locked-background` 后按 chat 元数据重算 | `:355` | — |
+| `renderSystemBackgrounds()` | ✅ `$('#bg_menu_content').empty()` 后整块重建 | `:715` 区 | 661 |
+| `isBackgroundSelectionMode` 判定 | ✅ | `:423`、`:1903` | — |
+| `#Backgrounds` 多选类 | ✅ | `:1033` | — |
+
+**结论**：接缝全部存活，方案（T2 + 捕获阶段拦截）**无需改设计**；需要改的只有**行号引用**与 D-1 的放行规则。
+
+### 3. ⚠️ 规划期遗漏：`onSelectBackgroundClick` 实为**三分支**
+
+`backgrounds.js:421-441` 当前实现：
+
+```js
+function onSelectBackgroundClick(e) {
+    const bgFile = $(this).attr('bgfile');
+    const isCustom = $(this).attr('custom') === 'true';
+    if (isBackgroundSelectionMode && !isCustom) {          // 分支 1：多选分组
+        toggleBackgroundGroupSelection(bgFile);
+        return;
+    }
+
+    const backgroundCssUrl = getUrlParameter(this);
+    const bypassGlobalLock = !isCustom && e.shiftKey;
+
+    if ((isChatBackgroundLocked() || isCustom) && !bypassGlobalLock) {
+        // 分支 2：聊天锁定背景 或 聊天专属背景 —— 写 chat 元数据 + 直写 #bg1，不动全局
+        saveBackgroundMetadata(backgroundCssUrl);
+        $('#bg1').css('background-image', backgroundCssUrl);
+    } else {
+        // 分支 3：全局背景
+        setBackground(bgFile, backgroundCssUrl);
+    }
+
+    highlightLockedBackground();
+    highlightSelectedBackground();
+}
+```
+
+规划文档只识别了分支 1 与分支 3，**漏了分支 2 的锁定语义**（`custom` 那一半已被放行规则覆盖，
+锁定那一半没有）。D-1 即为此补的放行规则。
+
+补充证据：
+- `isChatBackgroundLocked()` = `chat_metadata['custom_background']`（`:403`，键值定义 `:14`）
+- 锁定写入口 `saveBackgroundMetadata(file)` = 写 `chat_metadata[BG_METADATA_KEY]` + `saveMetadataDebounced()`（`:407-410`）
+- `e.shiftKey` 可绕过锁定（`bypassGlobalLock`）——**放行后可原生行为自然生效，无需扩展处理**
+
+### 4. ⚠️ 订正 PRD 的一处结论：`chatMetadata` **是**公开暴露的
+
+`prd.md` 的接缝表写「`getContext()`（`st-context.js:115`）**不暴露**任何 backgrounds 相关内容」，
+并据此把 `background_settings` 与 chat 元数据一并归为「不可访问」。
+
+**实测订正**：`public/scripts/st-context.js:2477` 的 `getContext()` 返回对象内含
+
+```js
+get chatMetadata() { return chat_metadata; },
+set chatMetadata(value) { updateChatMetadata(value, true); },
+```
+
+即 **chat 元数据可经公开 context API 读取**（`:2411` 是 `getContext` 定义）。PRD 的结论对
+`background_settings`（模块私有、确实不可达）**仍然成立**，但对 chat 元数据**不成立**。
+
+**落地影响**：D-1 的锁定态检测走 `getContext().chatMetadata['custom_background']`，
+是**公开接缝**（context API），不是嗅探宿主私有实现，也不是 monkey-patch —— 不违反 PRD 的 Non-goals。
+
+**键值稳定性论证**：`'custom_background'` 是**落盘在聊天文件里的元数据键**（`saveMetadataDebounced()` 会
+持久化）。该键一旦变更就会让所有历史聊天的锁定背景失效，故宿主实际上**不可能**在不做迁移的前提下改它
+—— 读它比读任何 DOM 类名都稳定。（`'chat_backgrounds'` 同理。）
+
+**备选接缝（不采用，仅记录）**：`.bg_example.locked-background` 类由 `highlightLockedBackground()`
+维护，同样是可观测信号。不用它的原因：它是**渲染结果**而非真值，只在若干时机被刷新；而
+`chatMetadata` 是权威真值。两者在正常情况下一致，取权威者。
+
+---
+
+## 三、仍未决（执行时实测裁定）
+
+| 编号 | 内容 | 裁定方式 |
+| --- | --- | --- |
+| U-1 | `stop()`（关接管开关）后**能否在不刷新页面的前提下**完全恢复原生背景图（`design.md` §5 的已知粗糙点） | 执行 Phase F 时实测；若不能完全恢复，写进接管开关的 UI 文案 |
+
+## 四、Phase A 基线（2026-09-26）
+
+| 项 | 结果 |
+| --- | --- |
+| 前置：子任务 1 已归档 | ✅ `.trellis/tasks/archive/2026-09/09-26-native-style-and-fold-fix` |
+| 前置：子任务 2 的 A3 最小修复已落地 | ✅ `src/ui/NativeBgAugmenter.ts:60-65`（含「将被本子任务取代」的注释） |
+| `git status` | 干净 |
+| `npm run type-check` | ✅ |
+| `npm run build` | ✅ `dist/index.js` 177.36 kB、`dist/style.css` 7.41 kB |
