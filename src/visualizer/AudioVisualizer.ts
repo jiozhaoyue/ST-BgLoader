@@ -136,8 +136,6 @@ export class AudioVisualizer {
             const pump = Math.pow(bassAvg, 2) * 0.35 * sensitivity;
 
             if (this.pumpTargetEl) {
-                // Subtle reactive brightness pump
-                const brightness = 100 + pump * 25;
                 const scale = 1 + pump * 0.015;
                 this.pumpTargetEl.style.transform = `scale(${scale})`;
                 this.pumpTargetEl.style.transition = 'transform 0.06s ease-out';

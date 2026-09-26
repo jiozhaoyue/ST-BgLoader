@@ -231,6 +231,16 @@
     pointer-events: none;
 }
 
+/* Per-type colours for the native badges, matching the media-library badges (finding D2: all
+   types used to look identical). These badges live in the host's own #bg_menu_content grid,
+   i.e. OUTSIDE .st-bgloader-panel, where the panel-scoped --st-bg-badge-* custom properties do
+   not resolve — hence the literal fallback in every var() reference. The values mirror the
+   declaration on .st-bgloader-panel above and must be kept in step with it. */
+.st-bg-native-badge.video { background: var(--st-bg-badge-video, #e53935); }
+.st-bg-native-badge.audio { background: var(--st-bg-badge-audio, #8e24aa); }
+.st-bg-native-badge.html { background: var(--st-bg-badge-html, #fb8c00); }
+.st-bg-native-badge.svg { background: var(--st-bg-badge-svg, #43a047); }
+
 /* Preset & Dropdown Controls */
 .st-bgloader-preset-row {
     display: flex;

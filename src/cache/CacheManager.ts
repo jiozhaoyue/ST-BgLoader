@@ -14,6 +14,12 @@ interface CacheIndexEntry {
     size: number;
 }
 
+/** An object URL handed out for an item, plus the cache entry it points at. */
+interface ObjectUrlEntry {
+    url: string;
+    cacheKey: string;
+}
+
 /**
  * Media library facade over the server origin.
  *
@@ -28,7 +34,16 @@ export class CacheManager {
     private remoteImporter: RemoteImporter | null = null;
     private l1: Cache | null = null;
     private indexDb: IDBDatabase | null = null;
-    private objectUrls: Map<string, string> = new Map();
+    // E3: bounded by cache-entry eviction (see evictCacheEntry) instead of growing for the whole
+    // session. The cacheKey is stored next to the blob URL so eviction can release exactly the
+    // object URLs that point at the evicted entry.
+    private objectUrls: Map<string, ObjectUrlEntry> = new Map();
+    // E2: in-memory mirror of the IndexedDB LRU index. touchCache() sits on the
+    // getMediaBlobUrl() hot path and used to run a full `getAll()` plus a write-back per call;
+    // the mirror is read once on first use and kept in sync by indexPut/indexDelete/indexClear.
+    // Multi-tab caveat: another tab can rewrite the store behind our back, so the entry point
+    // that makes a decision from it (cleanLRU) re-reads it first.
+    private indexMirror: Map<string, CacheIndexEntry> | null = null;
 
     constructor() {
         this.origin = new ServerOrigin();
@@ -84,10 +99,10 @@ export class CacheManager {
     }
 
     public async getMediaBlobUrl(item: MediaItem): Promise<string> {
-        const existingUrl = this.objectUrls.get(item.id);
-        if (existingUrl) {
+        const existing = this.objectUrls.get(item.id);
+        if (existing) {
             await this.touchCache(item.cacheKey);
-            return existingUrl;
+            return existing.url;
         }
 
         // Hot cache hit: instant playback from local bytes.
@@ -96,7 +111,7 @@ export class CacheManager {
             if (hit) {
                 const blob = await hit.blob();
                 const blobUrl = URL.createObjectURL(blob);
-                this.objectUrls.set(item.id, blobUrl);
+                this.objectUrls.set(item.id, { url: blobUrl, cacheKey: item.cacheKey });
                 await this.touchCache(item.cacheKey);
                 return blobUrl;
             }
@@ -107,25 +122,24 @@ export class CacheManager {
         return item.url;
     }
 
-    public async touchMedia(_id: string): Promise<void> {
-        // LRU is tracked per cache entry (touchCache); the server library has no eviction.
-    }
-
     public async deleteMedia(id: string): Promise<void> {
         const item = await this.getMedia(id);
         await this.origin.deleteMedia(id);
 
         if (item) {
             await this.evictCacheEntry(item.cacheKey);
-            if (this.objectUrls.has(id)) {
-                URL.revokeObjectURL(this.objectUrls.get(id)!);
-                this.objectUrls.delete(id);
-            }
+        }
+        // Release anything still tracked under this id: evictCacheEntry only covers the entries
+        // of a cacheKey, and the catalog lookup above may have failed.
+        const tracked = this.objectUrls.get(id);
+        if (tracked) {
+            URL.revokeObjectURL(tracked.url);
+            this.objectUrls.delete(id);
         }
     }
 
     public async getCacheUsage(): Promise<{ usedBytes: number; itemCount: number }> {
-        const entries = await this.indexAll();
+        const entries = [...(await this.getIndex()).values()];
         return {
             usedBytes: entries.reduce((sum, e) => sum + (e.size || 0), 0),
             itemCount: entries.length,
@@ -133,7 +147,9 @@ export class CacheManager {
     }
 
     public async cleanLRU(maxQuotaBytes: number): Promise<void> {
-        const entries = await this.indexAll();
+        // Re-read first: this decision must not be made from a mirror another tab may have
+        // rewritten since (see indexMirror).
+        const entries = [...(await this.reloadIndex()).values()];
         let totalBytes = entries.reduce((sum, e) => sum + (e.size || 0), 0);
         if (totalBytes <= maxQuotaBytes) return;
 
@@ -147,8 +163,8 @@ export class CacheManager {
 
     /** Clears the browser cache only — server files are never touched by maintenance. */
     public async clearAll(): Promise<void> {
-        for (const url of this.objectUrls.values()) {
-            URL.revokeObjectURL(url);
+        for (const entry of this.objectUrls.values()) {
+            URL.revokeObjectURL(entry.url);
         }
         this.objectUrls.clear();
 
@@ -208,7 +224,8 @@ export class CacheManager {
     }
 
     private async touchCache(cacheKey: string): Promise<void> {
-        const entry = (await this.indexAll()).find(e => e.cacheKey === cacheKey);
+        // Mirror instead of a full IDB read: this runs on every getMediaBlobUrl() call (E2).
+        const entry = (await this.getIndex()).get(cacheKey);
         if (entry) {
             entry.lastUsed = Date.now();
             await this.indexPut(entry);
@@ -218,8 +235,31 @@ export class CacheManager {
     private async evictCacheEntry(cacheKey: string): Promise<void> {
         if (this.l1) await this.l1.delete(cacheKey);
         await this.indexDelete(cacheKey);
-        // Object URLs stay valid until deleteMedia/init revokes them: an evicted entry may be
-        // the currently mounted background, and the blob is already resident in memory.
+        this.releaseObjectUrls(cacheKey);
+    }
+
+    /**
+     * E3: an object URL is only kept for a cache entry the LRU still tracks, so eviction
+     * releases it — that is what bounds `objectUrls` for a long session (previously every
+     * uploaded item kept its blob URL alive until an explicit delete or Clear Cache).
+     *
+     * Honest limits of that rule (review correction, 2026-09-26): LRU order is by lastUsed, and
+     * it gives NO guarantee that the currently mounted background is evicted last — a background
+     * mounted a while ago while other media were touched in between is a legitimate early
+     * candidate. Revoking a URL that is still in use is nevertheless benign for the media
+     * mounted here (measured 2026-09-26: fully buffered BGM, mid-track BGM, a mounted image and
+     * a mounted svg/iframe all kept playing/rendering across revocation). The residual window is
+     * BGM that is still buffering: a revoked URL stops the stream, and nothing re-resolves the
+     * URL of an already-mounted element. Accepted as the cost of bounding the map; the
+     * alternative is an unbounded leak for the whole session.
+     */
+    private releaseObjectUrls(cacheKey: string): void {
+        for (const [id, entry] of this.objectUrls) {
+            if (entry.cacheKey === cacheKey) {
+                URL.revokeObjectURL(entry.url);
+                this.objectUrls.delete(id);
+            }
+        }
     }
 
     private async openIndex(): Promise<void> {
@@ -236,7 +276,19 @@ export class CacheManager {
         });
     }
 
-    private async indexAll(): Promise<CacheIndexEntry[]> {
+    /** The in-memory mirror; loaded from IndexedDB once, then kept in sync by the writers. */
+    private async getIndex(): Promise<Map<string, CacheIndexEntry>> {
+        return this.indexMirror ?? await this.reloadIndex();
+    }
+
+    /** Forces a fresh read of the whole index (multi-tab safety for decision points). */
+    private async reloadIndex(): Promise<Map<string, CacheIndexEntry>> {
+        const entries = await this.indexReadAll();
+        this.indexMirror = new Map(entries.map(e => [e.cacheKey, { ...e }]));
+        return this.indexMirror;
+    }
+
+    private async indexReadAll(): Promise<CacheIndexEntry[]> {
         if (!this.indexDb) await this.openIndex();
         return new Promise<CacheIndexEntry[]>((resolve, reject) => {
             const tx = this.indexDb!.transaction(INDEX_STORE, 'readonly');
@@ -254,6 +306,9 @@ export class CacheManager {
             request.onsuccess = () => resolve();
             request.onerror = () => reject(request.error);
         });
+        // Only mirror into an already-loaded index: creating one here would drop the entries
+        // this tab has not read yet.
+        this.indexMirror?.set(entry.cacheKey, { ...entry });
     }
 
     private async indexDelete(cacheKey: string): Promise<void> {
@@ -264,6 +319,7 @@ export class CacheManager {
             request.onsuccess = () => resolve();
             request.onerror = () => reject(request.error);
         });
+        this.indexMirror?.delete(cacheKey);
     }
 
     private async indexClear(): Promise<void> {
@@ -274,5 +330,6 @@ export class CacheManager {
             request.onsuccess = () => resolve();
             request.onerror = () => reject(request.error);
         });
+        this.indexMirror = new Map();
     }
 }

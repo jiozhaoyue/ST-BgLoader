@@ -27,6 +27,9 @@ export interface SettingsDrawerCallbacks {
     onMediaSelected: (item: MediaItem) => void;
     onMediaDeleted: (id: string) => void;
     onMediaUploaded: (item: MediaItem) => void;
+    /** Initial/current background visibility (MediaMount owns the state, not settings). */
+    getBackgroundVisible?: () => boolean;
+    onBackgroundVisibilityChanged?: (visible: boolean) => void;
     onPresetChanged: (preset: FilterPreset) => void;
     onInteractiveChanged: (enabled: boolean) => void;
     onMiniPlayerToggle: (visible: boolean) => void;
@@ -62,6 +65,15 @@ export class SettingsDrawer {
         this.render();
     }
 
+    /**
+     * Mirrors an API-driven background visibility change into the panel checkbox. Writing
+     * `checked` programmatically fires no 'change' event, so this cannot loop back into the API.
+     */
+    public syncBackgroundVisible(visible: boolean): void {
+        const cb = this.container?.querySelector('#st_bg_visible') as HTMLInputElement | null;
+        if (cb) cb.checked = visible;
+    }
+
     public render(): void {
         const target = document.querySelector('#extensions_settings');
         if (!target) {
@@ -85,6 +97,10 @@ export class SettingsDrawer {
         const drawer = document.createElement('div');
         drawer.id = 'st_bgloader_settings';
         drawer.className = 'st-bgloader-panel';
+
+        // Read from MediaMount, not from settings: visibility is controlled runtime state
+        // (finding A1), and the panel only mirrors it.
+        const backgroundVisible = this.callbacks.getBackgroundVisible?.() ?? true;
 
         drawer.innerHTML = `
             <div class="inline-drawer">
@@ -114,6 +130,12 @@ export class SettingsDrawer {
                     <!-- Media Library Grid -->
                     <div class="st-bgloader-section">
                         <h4><i class="fa-solid fa-layer-group"></i> Media Library</h4>
+                        <div class="st-bgloader-check-stack">
+                            <label class="st-bgloader-check">
+                                <input type="checkbox" id="st_bg_visible" ${backgroundVisible ? 'checked' : ''} />
+                                <span>Show background layer (显示背景)</span>
+                            </label>
+                        </div>
                         <div class="st-bgloader-media-grid" id="st_bgloader_grid">
                             <!-- Injected dynamically -->
                         </div>
@@ -352,10 +374,6 @@ export class SettingsDrawer {
                                 <span>Pause when tab inactive</span>
                             </label>
                             <label class="st-bgloader-check">
-                                <input type="checkbox" id="st_shortcuts_enabled" ${this.settings.shortcutsEnabled ? 'checked' : ''} />
-                                <span>Enable Alt Shortcuts (Alt+B: 背景, Alt+P: 播放, Alt+M: 隔音, Alt+W: 天气, Alt+F: 毛玻璃)</span>
-                            </label>
-                            <label class="st-bgloader-check">
                                 <input type="checkbox" id="st_mini_player_toggle" ${this.settings.showMiniPlayer ? 'checked' : ''} />
                                 <span>Show floating mini player capsule</span>
                             </label>
@@ -406,6 +424,17 @@ export class SettingsDrawer {
                             <div>Used: <strong id="st_cache_used">Calculating...</strong> (<span id="st_cache_count">0</span> items)</div>
                             <button id="st_cache_clear_btn" class="menu_button menu_button_danger">Clear Cache</button>
                         </div>
+                        <div class="st-bgloader-slider-row">
+                            <label>Cache quota</label>
+                            <input type="range" id="st_cache_quota" min="128" max="8192" step="128" value="${this.settings.cacheQuotaMB}" />
+                            <span class="st-bgloader-slider-val" id="st_cache_quota_val">${this.settings.cacheQuotaMB} MB</span>
+                        </div>
+                        <div class="st-bgloader-check-stack">
+                            <label class="st-bgloader-check">
+                                <input type="checkbox" id="st_cache_autoclean" ${this.settings.lruAutoClean ? 'checked' : ''} />
+                                <span>Auto-clean the browser cache above this quota (服务端文件不受影响)</span>
+                            </label>
+                        </div>
                         <div class="st-bgloader-btn-row">
                             <button id="st_backup_export_btn" class="menu_button"><i class="fa-solid fa-download"></i> Export Settings JSON</button>
                             <button id="st_backup_import_btn" class="menu_button"><i class="fa-solid fa-upload"></i> Import Settings JSON</button>
@@ -429,8 +458,6 @@ export class SettingsDrawer {
 
         target.appendChild(drawer);
         this.container = drawer;
-        // The grid DOM was just rebuilt empty — force the next refresh to repopulate.
-        this.lastGridSignature = '';
         this.bindEvents();
         this.populatePresets();
         this.populateScenes();
@@ -818,9 +845,21 @@ export class SettingsDrawer {
             this.callbacks.onSettingsChanged(this.settings);
         });
 
-        const shortcutsCb = this.container.querySelector('#st_shortcuts_enabled') as HTMLInputElement;
-        shortcutsCb?.addEventListener('change', () => {
-            this.settings.shortcutsEnabled = shortcutsCb.checked;
+        // Background layer visibility (replaces the removed Alt+B shortcut). Visibility is
+        // MediaMount's controlled runtime state, not a settings field, so this deliberately
+        // does NOT go through onSettingsChanged — nothing is persisted and no save is needed.
+        const bgVisibleCb = this.container.querySelector('#st_bg_visible') as HTMLInputElement;
+        bgVisibleCb?.addEventListener('change', () => {
+            this.callbacks.onBackgroundVisibilityChanged?.(bgVisibleCb.checked);
+        });
+
+        // Cache quota & auto-clean (B5: both fields drove cleanLRU but had no panel control, so
+        // they sat at their defaults forever).
+        bindSlider('#st_cache_quota', '#st_cache_quota_val', ' MB', (v) => this.settings.cacheQuotaMB = v);
+
+        const autoCleanCb = this.container.querySelector('#st_cache_autoclean') as HTMLInputElement;
+        autoCleanCb?.addEventListener('change', () => {
+            this.settings.lruAutoClean = autoCleanCb.checked;
             this.callbacks.onSettingsChanged(this.settings);
         });
 
@@ -1024,21 +1063,40 @@ export class SettingsDrawer {
         setVal('#st_filter_saturate', '#st_filter_saturate_val', filters.saturate, '%');
     }
 
-    private lastGridSignature = '';
-
+    /**
+     * Populates the media grid.
+     *
+     * The guard state lives ON the grid element (dataset), never on this drawer instance: the
+     * element is rebuilt by every render() (init, then a cloud sync calling
+     * applyRemoteSettings), so an instance-level field described a grid that no longer existed
+     * — a slower, older refresh wrote its snapshot into the detached node while the fresh grid
+     * was skipped by the guard, leaving the panel intermittently empty (finding A4). The
+     * refresh ticket makes concurrent refreshes converge on the NEWEST snapshot (S1): it is
+     * reserved before the await, and the caller must still own it after.
+     */
     public async refreshMediaGrid(): Promise<void> {
-        const grid = this.container?.querySelector('#st_bgloader_grid');
+        const grid = this.container?.querySelector('#st_bgloader_grid') as HTMLElement | null;
         if (!grid) return;
 
+        const seq = String((Number(grid.dataset.refreshSeq) || 0) + 1);
+        grid.dataset.refreshSeq = seq;
+
         const items = await this.cacheManager.listMedia();
+
+        // After the await this call may no longer own the grid: a re-render replaced the
+        // element, or a newer refresh reserved the next ticket (its snapshot is the newer one).
+        // Bail in both cases — whoever owns the grid now fills it.
+        if (this.container?.querySelector('#st_bgloader_grid') !== grid) return;
+        if (grid.dataset.refreshSeq !== seq) return;
+
         // Signature guard: applyMedia refreshes the grid on every background switch; a
         // full DOM rebuild per switch is wasted work when nothing visible changed.
         const signature = JSON.stringify([
             this.settings.activeMediaId,
             items.map(i => [i.id, i.name, i.type, i.url]),
         ]);
-        if (signature === this.lastGridSignature) return;
-        this.lastGridSignature = signature;
+        if (signature === grid.dataset.gridSignature) return;
+        grid.dataset.gridSignature = signature;
 
         grid.innerHTML = '';
 

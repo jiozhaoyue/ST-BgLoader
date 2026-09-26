@@ -44,8 +44,22 @@ export class NativeBgAugmenter {
                 badge.textContent = type.toUpperCase();
                 item.appendChild(badge);
 
-                // Add click listener
-                item.addEventListener('click', () => {
+                // Add click listener.
+                //
+                // A3: the host binds its own DOCUMENT-level delegated handler for these same
+                // thumbnails (`onSelectBackgroundClick`), which writes `#bg1`'s
+                // background-image. Without stopping the event here both writers ran for one
+                // click (verified on a native .svg thumbnail: the host rewrote the inline
+                // background-image AND the extension switched its own layer). This element
+                // listener runs in the target/bubble phase, so stopping propagation keeps the
+                // event from ever reaching the document phase where the host listens.
+                //
+                // NOTE (2026-09-26, audit A3): this is the minimal de-duplication fix. Subtask 3
+                // takes the native picker over entirely (`NativeBackgroundController`, plan T2);
+                // when that lands it replaces this listener — and this component goes with it.
+                item.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
                     const dataUrl = item.dataset.url || `/backgrounds/${bgFile}`;
                     this.onNativeMediaSelect(dataUrl, type, bgFile);
                 });

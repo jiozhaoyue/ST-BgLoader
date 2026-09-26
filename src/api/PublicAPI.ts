@@ -15,6 +15,7 @@ import {
     AmbientSoundOptions,
     AmbientSoundType,
     SceneSnapshot,
+    WEATHER_TYPES,
 } from '../types';
 import type { STBgLoaderExtension } from '../index';
 import { detectMediaType } from '../core/mediaType';
@@ -36,9 +37,6 @@ export interface AudioOptions {
 
 export type EventCallback = (...args: any[]) => void;
 
-/** Runtime whitelist mirroring the WeatherType union (see src/types). */
-const WEATHER_TYPES: WeatherType[] = ['off', 'rain', 'snow', 'sakura', 'cyber_motes', 'scanlines'];
-
 export class PublicAPI {
     private ext: STBgLoaderExtension;
     private eventListeners: Map<string, Set<EventCallback>> = new Map();
@@ -50,10 +48,16 @@ export class PublicAPI {
     /**
      * Switch background to a URL, cached media ID, or local file.
      * Supports MP4/WebM video, HTML/Canvas sandboxed pages, SVG animations, and images.
+     *
+     * Without `saveToLibrary` the background is TRANSIENT: it is rendered from an in-memory
+     * item whose id exists nowhere in the catalog, so it is deliberately NOT recorded in
+     * `activeMediaId` (a persisted id that cannot be resolved came back as a dangling
+     * reference after every reload — finding A2). Choose `saveToLibrary: true` to keep it.
      */
     public async setBackground(urlOrId: string, options?: BackgroundOptions): Promise<void> {
         const items = await this.ext.getCacheManager().listMedia();
         let targetItem = items.find(i => i.id === urlOrId || i.name === urlOrId || i.url === urlOrId || i.cacheKey === urlOrId);
+        let transient = false;
 
         if (!targetItem) {
             const name = options?.name || urlOrId.split('/').pop()?.split('?')[0] || 'remote_background';
@@ -62,6 +66,7 @@ export class PublicAPI {
             if (options?.saveToLibrary) {
                 targetItem = await this.ext.getCacheManager().saveMedia(new Blob([]), name, type, 'url', urlOrId);
             } else {
+                transient = true;
                 targetItem = {
                     id: 'custom_' + Date.now(),
                     name,
@@ -85,7 +90,7 @@ export class PublicAPI {
             this.setInteractive(options.interactive);
         }
 
-        await this.ext.applyMediaItem(targetItem);
+        await this.ext.applyMediaItem(targetItem, !transient);
         this.emit('media-change', targetItem);
     }
 
@@ -95,6 +100,19 @@ export class PublicAPI {
     public clearBackground(): void {
         this.ext.clearActiveBackground();
         this.emit('media-change', null);
+    }
+
+    /**
+     * Shows or hides the background layer WITHOUT unloading the mounted media (the removed
+     * Alt+B shortcut used to do this; the settings panel checkbox and this method replace it).
+     */
+    public setBackgroundVisible(visible: boolean): void {
+        this.ext.setBackgroundVisible(visible);
+        this.emit('background-visibility-change', visible);
+    }
+
+    public isBackgroundVisible(): boolean {
+        return this.ext.getMediaMount().isVisible();
     }
 
     /**
@@ -424,10 +442,9 @@ export class PublicAPI {
      * Quick cycle through weather types
      */
     public cycleWeather(): WeatherType {
-        const types: WeatherType[] = ['off', 'rain', 'snow', 'sakura', 'cyber_motes', 'scanlines'];
         const current = this.ext.getSettings().weather.type;
-        const nextIdx = (types.indexOf(current) + 1) % types.length;
-        const nextType = types[nextIdx];
+        const nextIdx = (WEATHER_TYPES.indexOf(current) + 1) % WEATHER_TYPES.length;
+        const nextType = WEATHER_TYPES[nextIdx];
         this.setWeather(nextType);
         return nextType;
     }

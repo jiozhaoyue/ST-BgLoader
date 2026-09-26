@@ -9,10 +9,6 @@ export class SceneManager {
         this.onApplySceneCallback = onApply;
     }
 
-    public setApplyCallback(cb: (scene: SceneSnapshot) => void): void {
-        this.onApplySceneCallback = cb;
-    }
-
     public setUserScenes(scenes: Record<string, SceneSnapshot>): void {
         this.userScenes = { ...scenes };
     }

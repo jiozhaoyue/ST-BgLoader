@@ -17,6 +17,12 @@ export class MediaMount {
     private layerA: HTMLElement | null = null;
     private layerB: HTMLElement | null = null;
     private activeLayer: 'A' | 'B' = 'A';
+    // Controlled visibility state. It used to be a stray inline `display` written onto the
+    // container from outside: MediaMount never learned about it, doMountMedia() did not reset
+    // it, and the container is created only once — so hiding the background once meant every
+    // later mount rendered into a display:none container (finding A1; toggling twice
+    // cancelled out). Rendering and visibility are now orthogonal: mounts never touch it.
+    private visible = true;
 
     private videoRendererA: VideoRenderer | null = null;
     private videoRendererB: VideoRenderer | null = null;
@@ -26,7 +32,6 @@ export class MediaMount {
     private imageRendererB: ImageRenderer | null = null;
 
     private audioEngine: AudioEngine;
-    private observer: MutationObserver | null = null;
     private crossfadeTimer: number | null = null;
     private onHostReady: ((container: HTMLElement) => void) | null;
     // Serializes concurrent mounts (rapid media double-click): interleaved mounts would
@@ -57,6 +62,22 @@ export class MediaMount {
 
     public getHostElement(): HTMLElement | null {
         return this.hostEl;
+    }
+
+    /** Shows/hides the whole background layer stack (panel checkbox, PublicAPI). */
+    public setVisible(visible: boolean): void {
+        this.visible = visible;
+        this.applyVisibility();
+    }
+
+    public isVisible(): boolean {
+        return this.visible;
+    }
+
+    private applyVisibility(): void {
+        if (this.containerEl) {
+            this.containerEl.style.display = this.visible ? 'block' : 'none';
+        }
     }
 
     public init(): void {
@@ -142,9 +163,9 @@ export class MediaMount {
         this.imageRendererA = new ImageRenderer(this.layerA!);
         this.imageRendererB = new ImageRenderer(this.layerB!);
 
-        this.observer = new MutationObserver(() => this.syncFitting());
-        this.observer.observe(this.hostEl, { attributes: true, attributeFilter: ['class'] });
-        this.syncFitting();
+        // Re-apply the controlled visibility: the container is created/reused once, so its
+        // display must reflect MediaMount's state rather than whatever the DOM kept (A1).
+        this.applyVisibility();
         this.onHostReady?.(container);
     }
 
@@ -178,10 +199,6 @@ export class MediaMount {
         if (this.hostEl.classList.contains('stretch')) return 'stretch';
         if (this.hostEl.classList.contains('center')) return 'center';
         return 'cover';
-    }
-
-    public syncFitting(): void {
-        // Fitted via CSS cover/contain
     }
 
     public mountMedia(item: MediaItem, mediaUrl: string): Promise<void> {

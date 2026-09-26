@@ -122,10 +122,6 @@ export class AudioEngine {
         }
     }
 
-    public getAnalyserNode(): AnalyserNode | null {
-        return this.analyserNode;
-    }
-
     public setMuffled(muffled: boolean): void {
         this.isMuffled = muffled;
         if (this.biquadFilter && this.audioContext) {
@@ -154,40 +150,29 @@ export class AudioEngine {
             }
         }
         this.currentIndex = idx;
-        const url = mediaUrl || (this.urlResolver ? await this.urlResolver(item) : item.url);
-        await this.playTrack(url, this.playbackMode === 'single');
-        this.emitTrackChange(item);
+        await this.startTrack(item, mediaUrl);
     }
 
     public async playCurrentTrack(): Promise<void> {
         const item = this.getCurrentTrack();
-        if (!item || !this.audioElement) return;
+        if (!item) return;
+        await this.startTrack(item);
+    }
 
-        this.clearFade();
-        const url = this.urlResolver ? await this.urlResolver(item) : item.url;
-        this.audioElement.src = url;
-        this.audioElement.loop = this.playbackMode === 'single';
-
-        if (!this.userHasInteracted && !this.muted) {
-            this.isWaitingForInteractionUnmute = true;
-            this.audioElement.muted = true;
-        } else {
-            this.applyVolume();
-        }
-
-        try {
-            this.initWebAudio();
-            this.resumeAudioContext();
-            await Promise.race([
-                this.audioElement.play().catch((err) => {
-                    console.warn('[ST-BgLoader AudioEngine] Autoplay was prevented by browser policy:', err);
-                }),
-                new Promise((resolve) => window.setTimeout(resolve, PLAY_SETTLE_TIMEOUT_MS)),
-            ]);
-            this.emitTrackChange(item);
-        } catch (err) {
-            console.warn('[ST-BgLoader AudioEngine] Autoplay was prevented by browser policy:', err);
-        }
+    /**
+     * The single entry point behind playMediaItem()/playCurrentTrack() (finding D3: the two
+     * public methods held near-identical copies of the same sequence, so a fix to one silently
+     * missed the other). The src/loop/unmute/play sequence itself stays in playTrack(), which
+     * was a third copy of it; the only thing the callers differed on is who supplies the media
+     * URL — playMediaItem may already have it (the item it just mounted), otherwise it is
+     * resolved here through the same urlResolver. Track-change emission is unchanged: exactly
+     * one per successful call, none when there is no audio element to play into.
+     */
+    private async startTrack(item: MediaItem, mediaUrl?: string): Promise<void> {
+        if (!this.audioElement) return;
+        const url = mediaUrl || (this.urlResolver ? await this.urlResolver(item) : item.url);
+        await this.playTrack(url, this.playbackMode === 'single');
+        this.emitTrackChange(item);
     }
 
     constructor() {

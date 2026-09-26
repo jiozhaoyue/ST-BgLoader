@@ -14,7 +14,6 @@ import { TriggerManager } from './triggers/TriggerManager';
 import { AmbientSoundGenerator } from './audio/AmbientSoundGenerator';
 import { FrostedGlassController } from './ui/FrostedGlassController';
 import { SceneManager } from './core/SceneManager';
-import { ShortcutManager } from './core/ShortcutManager';
 import { AuthorityBridge } from './backend/AuthorityBridge';
 import { SettingsSync } from './backend/SettingsSync';
 import { ServerSettings } from './backend/ServerSettings';
@@ -42,12 +41,9 @@ export class STBgLoaderExtension {
     private triggerManager: TriggerManager;
     private ambientSoundGenerator: AmbientSoundGenerator;
     private frostedGlassController: FrostedGlassController;
-    // Lazy: created in init() with real configuration. Same discipline as ShortcutManager —
-    // no speculative instance that init() would replace.
+    // Lazy: created in init() with real configuration. No speculative instance that init()
+    // would replace.
     private sceneManager: SceneManager | null = null;
-    // Lazy: the constructor registers a window keydown listener, so creating a throwaway
-    // instance here would leak an orphan listener when init() replaces it.
-    private shortcutManager: ShortcutManager | null = null;
     private authorityBridge: AuthorityBridge = new AuthorityBridge();
     private settingsSync: SettingsSync | null = null;
     private agentBridge: AgentBridge | null = null;
@@ -78,7 +74,6 @@ export class STBgLoaderExtension {
     public getAmbientSoundGenerator(): AmbientSoundGenerator { return this.ambientSoundGenerator; }
     public getFrostedGlassController(): FrostedGlassController { return this.frostedGlassController; }
     public getSceneManager(): SceneManager | null { return this.sceneManager; }
-    public getShortcutManager(): ShortcutManager | null { return this.shortcutManager; }
     public getAuthorityBridge(): AuthorityBridge { return this.authorityBridge; }
     public getServerSettings(): ServerSettings { return this.serverSettings; }
     public getAPI(): PublicAPI { return this.publicApi; }
@@ -92,8 +87,13 @@ export class STBgLoaderExtension {
         }
     }
 
-    public async applyMediaItem(item: MediaItem): Promise<void> {
-        await this.applyMedia(item);
+    /**
+     * Mounts a media item as the background. `persist` = false is for TRANSIENT items that
+     * exist only in memory (PublicAPI.setBackground without saveToLibrary): recording their
+     * id in the durable `activeMediaId` left a reference no reload could resolve (finding A2).
+     */
+    public async applyMediaItem(item: MediaItem, persist: boolean = true): Promise<void> {
+        await this.applyMedia(item, persist);
     }
 
     public async init(): Promise<void> {
@@ -207,37 +207,20 @@ export class STBgLoaderExtension {
             }
         });
 
-        // 8. Setup Shortcut Manager (Alt+B, Alt+P, Alt+M, Alt+W, Alt+F)
-        this.shortcutManager = new ShortcutManager({
-            onToggleBackground: () => {
-                const cont = this.mediaMount.getContainerElement();
-                if (cont) {
-                    cont.style.display = cont.style.display === 'none' ? 'block' : 'none';
-                }
-            },
-            onTogglePlay: () => {
-                this.audioEngine.togglePlay();
-            },
-            onToggleMuffle: () => {
-                const current = this.audioEngine.getMuffled();
-                this.publicApi.setMuffled(!current);
-            },
-            onCycleWeather: () => {
-                this.publicApi.cycleWeather();
-            },
-            onToggleFrostedChat: () => {
-                const current = this.settings.frostedChat.enabled;
-                this.publicApi.setFrostedChat(!current);
-            },
-        });
-        this.shortcutManager?.setEnabled(this.settings.shortcutsEnabled);
-
-        // 9. Setup Settings Drawer
+        // 8. Setup Settings Drawer
         this.settingsDrawer = new SettingsDrawer(this.settings, this.cacheManager, {
             onSettingsChanged: (updated) => {
                 this.settings = updated;
                 this.saveSettings();
                 this.applySettingsToSubsystems();
+                this.enforceQuotaIfChanged();
+            },
+            // Replaces the removed Alt+B shortcut: visibility is MediaMount's controlled state
+            // (finding A1), and routing the panel through the PublicAPI keeps one write path and
+            // one event for third-party callers.
+            getBackgroundVisible: () => this.mediaMount.isVisible(),
+            onBackgroundVisibilityChanged: (visible) => {
+                this.publicApi.setBackgroundVisible(visible);
             },
             onPresetChanged: (preset) => {
                 this.mediaMount.applyFilters(preset.filters);
@@ -303,7 +286,7 @@ export class STBgLoaderExtension {
         }, this.authorityBridge);
         this.settingsDrawer.render();
 
-        // 10. Setup Native Background Augmenter
+        // 9. Setup Native Background Augmenter
         this.nativeAugmenter = new NativeBgAugmenter(async (url, type, name) => {
             const virtualItem: MediaItem = {
                 id: 'native_' + name,
@@ -321,12 +304,12 @@ export class STBgLoaderExtension {
         });
         this.nativeAugmenter.start();
 
-        // 11. Register Global Lifecycle Hooks
+        // 10. Register Global Lifecycle Hooks
         document.addEventListener('visibilitychange', () => {
             this.audioEngine.handleVisibilityChange(document.hidden, this.settings.pauseOnBlur);
         });
 
-        // 11.5 Cross-device settings sync (Authority cloud mirror; no-op in local mode)
+        // 10.5 Cross-device settings sync (Authority cloud mirror; no-op in local mode)
         this.authorityBridge.onCapabilitiesChanged(() => this.settingsDrawer?.updateCloudPanel());
         // Server settings document written newer by another tab/device → converge now
         // instead of letting the pending write silently revert it (S7-style conflict).
@@ -334,14 +317,21 @@ export class STBgLoaderExtension {
         await this.startSettingsSync();
         this.syncAgentTools();
 
-        // 12. Hook into SillyTavern EventSource
+        // 11. Hook into SillyTavern EventSource
         this.hookSillyTavernEvents();
 
-        // 13. Auto-restore active media if set
+        // 12. Auto-restore active media if set
         if (this.settings.activeMediaId) {
             const activeItem = await this.cacheManager.getMedia(this.settings.activeMediaId);
             if (activeItem) {
                 await this.applyMedia(activeItem);
+            } else {
+                // Self-heal (A2): the persisted id resolves to nothing — the media was deleted,
+                // or the reference was written by an older release / a stale cloud mirror.
+                // Keeping it would re-persist a dangling pointer forever, so clear it now.
+                console.warn(`[ST-BgLoader] Active background "${this.settings.activeMediaId}" no longer exists; clearing the reference.`);
+                this.settings.activeMediaId = null;
+                this.saveSettings();
             }
         }
 
@@ -349,9 +339,11 @@ export class STBgLoaderExtension {
         console.log('[ST-BgLoader] All Modular Subsystems fully initialized.');
     }
 
-    private async applyMedia(item: MediaItem): Promise<void> {
-        this.settings.activeMediaId = item.id;
-        this.saveSettings();
+    private async applyMedia(item: MediaItem, persist: boolean = true): Promise<void> {
+        if (persist) {
+            this.settings.activeMediaId = item.id;
+            this.saveSettings();
+        }
 
         const mediaUrl = await this.cacheManager.getMediaBlobUrl(item);
         await this.mediaMount.mountMedia(item, mediaUrl);
@@ -396,11 +388,38 @@ export class STBgLoaderExtension {
         this.parallaxController.setOptions(this.settings.parallax);
         this.ambientSoundGenerator.setSound(this.settings.ambientSound);
         this.frostedGlassController.setOptions(this.settings.frostedChat);
-        this.shortcutManager?.setEnabled(this.settings.shortcutsEnabled);
         this.triggerManager.setRules(this.settings.triggerRules || []);
         this.sceneManager?.setUserScenes(this.settings.scenes || {});
         this.syncAgentTools();
     }
+
+    /**
+     * Shows/hides the background layer (MediaMount owns the state — finding A1). The panel
+     * checkbox calls this through PublicAPI so both entry points share one write path.
+     */
+    public setBackgroundVisible(visible: boolean): void {
+        this.mediaMount.setVisible(visible);
+        // Reflect API-driven changes back into the panel (the checkbox does not emit an event
+        // when written programmatically, so there is no feedback loop).
+        this.settingsDrawer?.syncBackgroundVisible(visible);
+    }
+
+    /**
+     * Applies a changed cache quota immediately (S2: the slider used to write the setting and
+     * nothing happened until the next upload). Runs only when the quota really changed — an
+     * unrelated settings change must not trigger a sweep — and only while auto-clean is on,
+     * because the quota is meaningless with it off (the panel documents that gating).
+     */
+    private enforceQuotaIfChanged(): void {
+        if (!this.settings.lruAutoClean) return;
+        const maxBytes = this.settings.cacheQuotaMB * 1024 * 1024;
+        if (maxBytes === this.lastEnforcedQuotaBytes) return;
+        this.lastEnforcedQuotaBytes = maxBytes;
+        void this.cacheManager.cleanLRU(maxBytes);
+    }
+
+    /** null = nothing enforced yet, so the first change under auto-clean compares honestly. */
+    private lastEnforcedQuotaBytes: number | null = null;
 
     /** Opt-in Agent Runtime ambient tools (AI director mode); requires the cloud backend. */
     public syncAgentTools(): void {
@@ -450,8 +469,20 @@ export class STBgLoaderExtension {
             this.applySettingsToSubsystems();
             this.settingsDrawer?.applyRemoteSettings(this.settings);
             this.publicApi.emit('settings-sync', this.settings);
-        });
+        }, () => this.hasServerSettingsDocument());
         await this.settingsSync.start();
+    }
+
+    /**
+     * Precedence fact handed to SettingsSync (finding A5): the KV mirror carries its own
+     * revision counter, which cannot be compared with the server document's (observed 41 vs
+     * 202), so it must not be applied unconditionally at startup — that resurrected state the
+     * server document had already corrected (a deleted background came back as a dangling id).
+     * The server document is this machine's source of truth; the mirror is only a fallback
+     * for a missing/unreadable document.
+     */
+    private async hasServerSettingsDocument(): Promise<boolean> {
+        return (await this.serverSettings.load()) !== null;
     }
 
     private reconcilingRemote = false;
@@ -478,15 +509,9 @@ export class STBgLoaderExtension {
 
             if (globalAny.event_types && globalAny.event_types.CHAT_CHANGED) {
                 globalAny.eventSource.on(globalAny.event_types.CHAT_CHANGED, async () => {
-                    const chatId = globalAny.getCurrentChatId ? globalAny.getCurrentChatId() : null;
-                    if (chatId && this.settings.chatBindings[chatId]) {
-                        const boundId = this.settings.chatBindings[chatId];
-                        const item = await this.cacheManager.getMedia(boundId);
-                        if (item) {
-                            await this.applyMedia(item);
-                            return;
-                        }
-                    }
+                    // (B4, 2026-09-26: the per-chat binding branch that used to run first here
+                    // was removed with `settings.chatBindings` — it had no writer anywhere, so
+                    // it was unreachable.)
                     if (this.settings.activeMediaId) {
                         const defaultItem = await this.cacheManager.getMedia(this.settings.activeMediaId);
                         if (defaultItem) {

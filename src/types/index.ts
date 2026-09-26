@@ -77,7 +77,14 @@ export interface PreloadResult {
     error?: string;
 }
 
-export type WeatherType = 'off' | 'rain' | 'snow' | 'sakura' | 'cyber_motes' | 'scanlines';
+/**
+ * The weather vocabulary — the ONE source of truth (finding D1). The runtime whitelist must
+ * exist as a value (agent-tool schemas, `PublicAPI.setWeather`'s validation gate for untrusted
+ * callers), and the union is derived from it, so adding a weather type can no longer leave the
+ * value list or the literal in `cycleWeather` behind.
+ */
+export const WEATHER_TYPES = ['off', 'rain', 'snow', 'sakura', 'cyber_motes', 'scanlines'] as const;
+export type WeatherType = (typeof WEATHER_TYPES)[number];
 export type VisualizerMode = 'off' | 'pulse' | 'spectrum';
 export type TransitionType = 'fade' | 'zoom_fade' | 'blur_fade' | 'slide_left' | 'slide_right';
 
@@ -130,7 +137,6 @@ export interface PlaybackState {
 }
 
 export interface BgLoaderSettings {
-    enabled: boolean;
     activeMediaId: string | null;
     volume: number;               // 0.0 to 1.0
     muted: boolean;
@@ -142,10 +148,8 @@ export interface BgLoaderSettings {
     showMiniPlayer: boolean;
     capsuleOnPlayOnly: boolean;
     playbackMode: PlaybackMode;
-    playlist: string[];           // IDs of MediaItems in playlist
     cacheQuotaMB: number;
     lruAutoClean: boolean;
-    chatBindings: Record<string, string>; // chatId -> mediaId
 
     // New Modular Subsystems
     weather: WeatherOptions;
@@ -157,7 +161,6 @@ export interface BgLoaderSettings {
     transitionEffect: TransitionType;
     transitionDurationMs: number;
     muffleBGM: boolean;
-    muffleOnDrawer: boolean;
     triggerRules: TriggerRule[];
     // Ambient Sound Generator
     ambientSound: AmbientSoundOptions;
@@ -172,9 +175,6 @@ export interface BgLoaderSettings {
     // Scene Snapshots
     scenes: Record<string, SceneSnapshot>;
     activeSceneId?: string;
-
-    // Keyboard Shortcuts
-    shortcutsEnabled: boolean;
 
     // Authority backend (opt-in): register ambient tools into the Agent Runtime
     agentToolsEnabled: boolean;
@@ -211,9 +211,9 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
  * Merges a stored/partial settings object onto DEFAULT_SETTINGS: top-level spread plus
  * ONE level of nested-object merge. Persisted settings from older versions lack keys
  * added later, and a shallow spread left those nested objects (weather/visualizer/…)
- * with missing fields at runtime. Arrays (triggerRules/playlist) and records
- * (userPresets/scenes/chatBindings) replace wholesale — merging them with defaults is
- * meaningless; nested option objects are all flat, so one level is enough.
+ * with missing fields at runtime. Arrays (triggerRules) and records (userPresets/scenes)
+ * replace wholesale — merging them with defaults is meaningless; nested option objects are all
+ * flat, so one level is enough.
  */
 export function mergeSettings(stored: unknown): BgLoaderSettings {
     const merged: BgLoaderSettings = { ...DEFAULT_SETTINGS };
@@ -280,7 +280,6 @@ export const BUILTIN_SCENES: Record<string, SceneSnapshot> = {
 };
 
 export const DEFAULT_SETTINGS: BgLoaderSettings = {
-    enabled: true,
     activeMediaId: null,
     volume: 0.8,
     muted: false,
@@ -297,10 +296,8 @@ export const DEFAULT_SETTINGS: BgLoaderSettings = {
     showMiniPlayer: true,
     capsuleOnPlayOnly: true,
     playbackMode: 'loop',
-    playlist: [],
     cacheQuotaMB: 1024,
     lruAutoClean: true,
-    chatBindings: {},
 
     // Subsystem Defaults
     weather: {
@@ -322,7 +319,6 @@ export const DEFAULT_SETTINGS: BgLoaderSettings = {
     transitionEffect: 'fade',
     transitionDurationMs: 400,
     muffleBGM: false,
-    muffleOnDrawer: false,
     triggerRules: [],
 
     ambientSound: {
@@ -335,6 +331,5 @@ export const DEFAULT_SETTINGS: BgLoaderSettings = {
         opacity: 75,
     },
     scenes: {},
-    shortcutsEnabled: true,
     agentToolsEnabled: false,
 };

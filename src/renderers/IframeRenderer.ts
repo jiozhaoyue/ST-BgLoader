@@ -16,6 +16,18 @@ export class IframeRenderer {
 
         const iframe = document.createElement('iframe');
         iframe.className = 'st-bg-iframe-element';
+        // Trust boundary (restated 2026-09-26, audit F1 — the previous wording understated it).
+        // `allow-scripts` + `allow-same-origin` together mean the frame is NOT sandboxed in any
+        // meaningful sense: being same-origin, it can reach `parent.document` and the host's
+        // globals/APIs, so any script it runs is effectively host-privileged. That was justified
+        // as "the user's OWN same-origin media", but the justification does not cover the whole
+        // input surface: CacheManager.saveMedia / ServerOrigin.putMedia persist a
+        // `source: 'url'` import (arbitrary third-party HTML) into the SAME backgrounds/
+        // directory we serve from, so imported external HTML ends up with exactly those powers.
+        // Tightening this is a deliberate trade, not a free win: dropping `allow-same-origin`
+        // removes the frame's same-origin capability (parent DOM + host APIs) but does NOT
+        // remove script execution — and it breaks HTML backgrounds that manipulate the DOM,
+        // which is the feature. Left as-is pending a user decision on that trade.
         iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin');
         iframe.style.position = 'absolute';
         iframe.style.top = '0';
@@ -54,23 +66,6 @@ export class IframeRenderer {
                 iframe.srcdoc = contentOrUrl;
             }
         });
-    }
-
-    public postMessage(message: unknown): void {
-        if (this.iframeElement && this.iframeElement.contentWindow) {
-            // Trust boundary: the sandbox combination (allow-scripts + allow-same-origin) is
-            // accepted for the user's OWN same-origin media; for remote-URL iframes the
-            // wildcard target would let the frame receive messages from anywhere — target
-            // the frame's actual origin instead (inline srcdoc content is same-origin).
-            let targetOrigin = window.location.origin;
-            try {
-                const src = new URL(this.iframeElement.src, window.location.href);
-                if (src.protocol === 'http:' || src.protocol === 'https:') {
-                    targetOrigin = src.origin;
-                }
-            } catch { /* keep same-origin fallback */ }
-            this.iframeElement.contentWindow.postMessage(message, targetOrigin);
-        }
     }
 
     public destroy(): void {
