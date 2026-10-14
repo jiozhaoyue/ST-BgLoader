@@ -550,3 +550,38 @@ Added procedural WebAudio ambient soundscape synthesizer, frosted glass transpar
 ### Status
 
 [OK] **Completed**
+
+
+## Session 21: 全功能文档补齐与原生对齐加固父任务整体收官
+<!-- trellis-session: v=2 fp=feat-docs-and-parent-archive-20261014 -->
+
+**Date**: 2026-10-14
+**Task**: 09-26-native-alignment-and-hardening
+**Branch**: `master`
+
+### Summary
+
+全功能文档补齐与父任务整体收官。编写并补齐了 4 篇核心技术文档（Settings-Reference.md 全量 27 个设置项及默认值表格、Storage-and-Authority-Integration.md 纠正存储真源与客户端热缓存、Native-Background-Integration.md 顶栏抽屉夺舍与跨宿主适配、UI-Components-and-Transitions.md 迷你播放器与毛玻璃）；修订了既有全套文档（Home.md、_Sidebar.md、README.md、Architecture-and-Design.md、Performance-and-Caching-Guide.md、FAQ-and-Troubleshooting.md、Smart-Triggers-and-Scene-Automation.md、Public-API-Reference.md）；将顶栏抽屉夺舍与 HostBridge 契约规范沉淀至 .trellis/spec/frontend/host-native-ui.md §9；运行并通过全套自检验证（零死链、零过期存储表述、CSS 裸选择器门禁 0、box-shadow 门禁 0、tsc + vite build 绿）。成功归档子任务 09-26-feature-documentation 与父任务 09-26-native-alignment-and-hardening，所有提交均同步推送至远程 origin master。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `2bd21a9` | docs: complete full feature documentation and spec alignment |
+| `90c953a` | chore(task): archive 09-26-feature-documentation |
+| `902df53` | chore(task): archive 09-26-native-alignment-and-hardening |
+
+### Verification
+
+- [OK] `node -e` 设置项对照脚本：`DEFAULT_SETTINGS` 27 键集合无缺失
+- [OK] `node -e` 死链脚本：全部相对链接目标文件均存在，零死链
+- [OK] `git grep` 存储表述扫描：无过期本地真源表述
+- [OK] `npm run type-check && npm run build` 通过（dist/index.js 197.92 kB, dist/style.css 11.13 kB）
+- [OK] CSS 裸选择器门禁：0（全带 `st-bg` 前缀）
+- [OK] CSS `box-shadow` 门禁：0（零溢光）
+- [OK] Trellis 任务状态：全部子任务与父任务已规范归档
+
+### Status
+
+[OK] **Completed**
+
