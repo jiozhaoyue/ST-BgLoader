@@ -297,8 +297,17 @@ a pass-through assertion succeed for the wrong reason.
 
 ### 9.3 扩展设置面板单总开关设计 (`SettingsDrawer`)
 
-1. **单一开关原则**：在 `#extensions_settings` 扩展设置列表面板中，不再塞入冗长的全套参数表单，仅提供：
-   - 主总开关复选框（`st_bg_master_enable`）
+1. **宿主容器契约 (`.extension_container`)**:
+   - 挂载入 `#extensions_settings` 的外层容器必须使用 `<div id="st_bgloader_container" class="extension_container" data-extension-name="ST-BgLoader">`；
+   - 宿主样式（`public/css/extensions-panel.css:120`）定义 `.extension_container { display: contents; }`；
+   - **禁止在外层容器上添加 `padding`、`margin` 或 `flex` 容器约束**。外层容器若有 `padding: 10px`，会导致内部抽屉标题宽度比同一列所有原生/第三方扩展缩窄整整 20px（两侧各缩进 10px），并在标题四周产生点击无效的死区；
+   - 抽屉根节点使用 `<div id="st_bgloader_settings" class="inline-drawer">`，占满整列 100% 宽度，像素级对齐相邻扩展。
+2. **单一开关原则**：在 `#extensions_settings` 扩展设置列表面板中，不再塞入冗长的全套参数表单，仅提供：
+   - 主总开关复选框（`st_bgloader_master_enable`）
    - 当前激活背景状态提示
    - 「打开背景与详细设置」便捷直达按钮（点击直接调用 `HostBridge.openBackgroundDrawer()` 呼出顶栏抽屉）
-2. **视觉继承**：必须严格继承 `--SmartTheme*` 颜色变量，且禁止任何 `box-shadow` 溢光按钮特效，保持与酒馆原生扩展设置卡片 100% 视觉一致。
+3. **视觉继承**：必须严格继承 `--SmartTheme*` 颜色变量，且禁止任何 `box-shadow` 溢光按钮特效，保持与酒馆原生扩展设置卡片 100% 视觉一致。
+4. **稳健的双重折叠支持**：
+   - 优先交由宿主 jQuery 委托监听器（`$(document).on('click', '.inline-drawer-toggle')`）执行平滑 `slideToggle()`；
+   - 本身监听宿主触发的 `inline-drawer-toggle` 事件，若在无 jQuery 宿主环境或宿主委托未响应时，50ms 安全定时器回退为原生 class/display 切换，确保互斥不冲突且 100% 可展开。
+

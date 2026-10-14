@@ -689,7 +689,7 @@ function ve(o) {
     return null;
   }
 }
-const N = "st-bg-cache-v1", we = "st_bg_cache_index", b = "entries";
+const q = "st-bg-cache-v1", we = "st_bg_cache_index", b = "entries";
 class _e {
   origin;
   remoteImporter = null;
@@ -709,7 +709,7 @@ class _e {
     this.origin = new V();
   }
   async init(e) {
-    "caches" in window && (this.l1 = await caches.open(N)), await this.openIndex(), e && (await e.detectAndInit()).available && e.getClient() && (this.remoteImporter = new be(e)), await this.origin.init(), console.log("[ST-BgLoader] Media library source of truth: server backgrounds/ directory (browser keeps cache only).");
+    "caches" in window && (this.l1 = await caches.open(q)), await this.openIndex(), e && (await e.detectAndInit()).available && e.getClient() && (this.remoteImporter = new be(e)), await this.origin.init(), console.log("[ST-BgLoader] Media library source of truth: server backgrounds/ directory (browser keeps cache only).");
   }
   async listMedia() {
     return this.origin.listCatalog();
@@ -764,7 +764,7 @@ class _e {
   async clearAll() {
     for (const e of this.objectUrls.values())
       URL.revokeObjectURL(e.url);
-    this.objectUrls.clear(), "caches" in window && (await caches.delete(N), this.l1 = await caches.open(N)), await this.indexClear();
+    this.objectUrls.clear(), "caches" in window && (await caches.delete(q), this.l1 = await caches.open(q)), await this.indexClear();
   }
   async preloadUrl(e, t) {
     const s = await this.origin.findByUrl(e);
@@ -1403,15 +1403,15 @@ class Ie {
       const l = window.setTimeout(() => r.disconnect(), 3e4);
       return;
     }
-    const s = document.querySelector("#st_bgloader_settings");
+    const s = document.querySelector("#st_bgloader_container, #st_bgloader_settings");
     s && s.remove();
     const i = document.createElement("div");
-    i.id = "st_bgloader_settings", i.className = "st-bgloader-panel";
+    i.id = "st_bgloader_container", i.className = "extension_container", i.setAttribute("data-extension-name", "ST-BgLoader");
     const a = this.activeMediaName || "默认 / 未设置", n = this.settings.enabled ?? !0;
     i.innerHTML = `
-            <div class="inline-drawer">
+            <div id="st_bgloader_settings" class="inline-drawer">
                 <div class="inline-drawer-toggle inline-drawer-header">
-                    <b><i class="fa-solid fa-photo-film"></i> ST-BgLoader (富媒体背景与视听增强)</b>
+                    <b><i class="fa-solid fa-photo-film"></i> <span data-i18n="ST-BgLoader (富媒体背景与视听增强)">ST-BgLoader (富媒体背景与视听增强)</span></b>
                     <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
                 </div>
                 <div class="inline-drawer-content">
@@ -1445,11 +1445,34 @@ class Ie {
     if (!this.container) return;
     const e = this.container.querySelector("#st_bgloader_master_enable");
     e?.addEventListener("change", () => {
-      const s = e.checked;
-      this.settings.enabled = s, this.syncMasterToggle(s), this.callbacks.onMasterToggle(s), this.callbacks.onSettingsChanged(this.settings);
+      const r = e.checked;
+      this.settings.enabled = r, this.syncMasterToggle(r), this.callbacks.onMasterToggle(r), this.callbacks.onSettingsChanged(this.settings);
     }), this.container.querySelector("#st_bgloader_open_topbar_btn")?.addEventListener("click", () => {
       this.settings.enabled && v.getInstance().openBackgroundDrawer();
     });
+    const s = this.container.querySelector(".inline-drawer-toggle"), i = this.container.querySelector(".inline-drawer"), a = this.container.querySelector(".inline-drawer-content"), n = this.container.querySelector(".inline-drawer-icon");
+    if (s && i && a && n) {
+      let r = !1;
+      i.addEventListener("inline-drawer-toggle", () => {
+        r = !0;
+      });
+      const l = window.$ || window.jQuery;
+      if (typeof l == "function")
+        try {
+          l(i).on("inline-drawer-toggle", () => {
+            r = !0;
+          });
+        } catch {
+        }
+      s.addEventListener("click", () => {
+        r = !1, window.setTimeout(() => {
+          if (!r) {
+            const c = a.style.display === "none" || window.getComputedStyle(a).display === "none";
+            a.style.display = c ? "block" : "none", n.classList.toggle("down", !c), n.classList.toggle("up", c), n.classList.toggle("fa-circle-chevron-down", !c), n.classList.toggle("fa-circle-chevron-up", c);
+          }
+        }, 50);
+      });
+    }
   }
 }
 const ee = "st-bg-native-hidden";
@@ -2261,7 +2284,7 @@ class Le {
     e.innerHTML = '<span class="st-bgloader-success-text"><i class="fa-solid fa-cloud-check"></i> Authority 云端就绪，支持跨设备同步与 AI 导演</span>';
   }
 }
-const L = "data-st-bg-augmented", te = "data-st-bg-badge", q = "data-st-bg-current", M = "st-bg-takeover-selected", Be = "custom_background", Re = 3e4;
+const L = "data-st-bg-augmented", te = "data-st-bg-badge", N = "data-st-bg-current", M = "st-bg-takeover-selected", Be = "custom_background", Re = 3e4;
 class Pe {
   constructor(e) {
     this.onSelect = e;
@@ -2335,7 +2358,7 @@ class Pe {
     if (this.level = "off", this.stopWaitingForSeams(), !this.active) return;
     this.active = !1, document.removeEventListener("click", this.onDocumentClickCapture, !0), this.gridObserver?.disconnect(), this.gridObserver = null, this.bgHostObserver?.disconnect(), this.bgHostObserver = null;
     const e = this.seams;
-    e && (e.menuContent.querySelectorAll(`[${te}]`).forEach((t) => t.remove()), e.menuContent.querySelectorAll(`[${q}]`).forEach((t) => t.remove()), e.menuContent.querySelectorAll(`.${M}`).forEach((t) => t.classList.remove(M)), e.menuContent.querySelectorAll(`[${L}]`).forEach((t) => t.removeAttribute(L)), this.restoreNativeBackgroundImage(e.bgHost)), this.seams = null;
+    e && (e.menuContent.querySelectorAll(`[${te}]`).forEach((t) => t.remove()), e.menuContent.querySelectorAll(`[${N}]`).forEach((t) => t.remove()), e.menuContent.querySelectorAll(`.${M}`).forEach((t) => t.classList.remove(M)), e.menuContent.querySelectorAll(`[${L}]`).forEach((t) => t.removeAttribute(L)), this.restoreNativeBackgroundImage(e.bgHost)), this.seams = null;
   }
   setLevel(e) {
     if (e === "off") {
@@ -2389,10 +2412,10 @@ class Pe {
     this.activeFileName = e;
     const t = this.seams;
     t && t.menuContent.querySelectorAll(".bg_example").forEach((s) => {
-      const i = !!e && s.getAttribute("bgfile") === e, a = s.classList.contains(M), n = s.querySelector(`[${q}]`);
+      const i = !!e && s.getAttribute("bgfile") === e, a = s.classList.contains(M), n = s.querySelector(`[${N}]`);
       if (i && !a && s.classList.add(M), !i && a && s.classList.remove(M), i && !n) {
         const r = document.createElement("span");
-        r.className = "st-bg-native-current", r.setAttribute(q, "true"), s.appendChild(r);
+        r.className = "st-bg-native-current", r.setAttribute(N, "true"), s.appendChild(r);
       }
       !i && n && n.remove();
     });
@@ -3184,7 +3207,7 @@ class $e {
     this.stop(), window.removeEventListener("resize", this.onResize), this.canvas.parentElement && this.canvas.parentElement.removeChild(this.canvas), this.pumpTargetEl && (this.pumpTargetEl.style.transform = "", this.pumpTargetEl.style.transition = "", this.pumpTargetEl = null);
   }
 }
-class Ne {
+class qe {
   targetEl = null;
   options = {
     enabled: !1,
@@ -3238,7 +3261,7 @@ class Ne {
     this.disable(), this.targetEl = null;
   }
 }
-class qe {
+class Ne {
   rules = [];
   onTriggerCallback;
   eventSourceUnlisteners = [];
@@ -3942,7 +3965,7 @@ class it {
   agentBridge = null;
   publicApi;
   constructor() {
-    this.cacheManager = new _e(), this.audioEngine = new Ee(), this.mediaMount = new Ce(this.audioEngine, (e) => this.mountOverlays(e)), this.atmosphereFX = new De(), this.audioVisualizer = new $e(), this.parallaxController = new Ne(), this.triggerManager = new qe(), this.ambientSoundGenerator = new Ue(), this.frostedGlassController = new ze(), this.publicApi = new Oe(this);
+    this.cacheManager = new _e(), this.audioEngine = new Ee(), this.mediaMount = new Ce(this.audioEngine, (e) => this.mountOverlays(e)), this.atmosphereFX = new De(), this.audioVisualizer = new $e(), this.parallaxController = new qe(), this.triggerManager = new Ne(), this.ambientSoundGenerator = new Ue(), this.frostedGlassController = new ze(), this.publicApi = new Oe(this);
   }
   getCacheManager() {
     return this.cacheManager;

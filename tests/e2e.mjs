@@ -37,7 +37,27 @@ async function runE2ETests() {
 
     try {
         console.log('⏳ Navigating to SillyTavern...');
-        await page.goto(TARGET_URL, { waitUntil: 'domcontentloaded', timeout: 30000 });
+        await page.goto(TARGET_URL, { waitUntil: 'networkidle2', timeout: 35000 });
+
+        // Ensure loader clears
+        await page.waitForFunction(() => {
+            const loader = document.querySelector('#loader, #loading');
+            return !loader || loader.style.display === 'none' || window.getComputedStyle(loader).display === 'none';
+        }, { timeout: 35000 });
+
+        // Enable extension in context if not yet active
+        await page.evaluate(async () => {
+            const ctx = window.SillyTavern?.getContext?.();
+            if (ctx && typeof ctx.enableExtension === 'function') {
+                await ctx.enableExtension('third-party/ST-BgLoader');
+            } else if (!window.STBgLoader) {
+                await import('/scripts/extensions/third-party/ST-BgLoader/dist/index.js');
+                const link = document.createElement('link');
+                link.rel = 'stylesheet';
+                link.href = '/scripts/extensions/third-party/ST-BgLoader/dist/style.css';
+                document.head.appendChild(link);
+            }
+        });
 
         // Wait for SillyTavern to bootstrap extensions (waiting for STBgLoader)
         console.log('⏳ Waiting for SillyTavern to activate third-party/ST-BgLoader...');

@@ -694,6 +694,27 @@
    Extensions Settings (#extensions_settings) Master Toggle Styles
    ------------------------------------------------------------------------- */
 
+#st_bgloader_container.extension_container {
+    display: contents;
+    padding: 0;
+    margin: 0;
+}
+
+#st_bgloader_settings.inline-drawer {
+    width: 100%;
+    margin: 0;
+    padding: 0;
+}
+
+#st_bgloader_settings .inline-drawer-toggle.inline-drawer-header {
+    cursor: pointer;
+    width: 100%;
+}
+
+#st_bgloader_settings .inline-drawer-content {
+    padding: 6px 0 10px 0;
+}
+
 .st-bgloader-master-card {
     background: rgba(0, 0, 0, 0.2);
     border: 1px solid var(--SmartThemeBorderColor, rgba(255, 255, 255, 0.1));

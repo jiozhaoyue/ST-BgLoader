@@ -77,20 +77,21 @@ export class SettingsDrawer {
             return;
         }
 
-        const existing = document.querySelector('#st_bgloader_settings');
+        const existing = document.querySelector('#st_bgloader_container, #st_bgloader_settings');
         if (existing) existing.remove();
 
-        const drawer = document.createElement('div');
-        drawer.id = 'st_bgloader_settings';
-        drawer.className = 'st-bgloader-panel';
+        const container = document.createElement('div');
+        container.id = 'st_bgloader_container';
+        container.className = 'extension_container';
+        container.setAttribute('data-extension-name', 'ST-BgLoader');
 
         const activeName = this.activeMediaName || '默认 / 未设置';
         const isEnabled = this.settings.enabled ?? true;
 
-        drawer.innerHTML = `
-            <div class="inline-drawer">
+        container.innerHTML = `
+            <div id="st_bgloader_settings" class="inline-drawer">
                 <div class="inline-drawer-toggle inline-drawer-header">
-                    <b><i class="fa-solid fa-photo-film"></i> ST-BgLoader (富媒体背景与视听增强)</b>
+                    <b><i class="fa-solid fa-photo-film"></i> <span data-i18n="ST-BgLoader (富媒体背景与视听增强)">ST-BgLoader (富媒体背景与视听增强)</span></b>
                     <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
                 </div>
                 <div class="inline-drawer-content">
@@ -120,8 +121,8 @@ export class SettingsDrawer {
             </div>
         `;
 
-        target.appendChild(drawer);
-        this.container = drawer;
+        target.appendChild(container);
+        this.container = container;
         this.bindEvents();
     }
 
@@ -142,5 +143,46 @@ export class SettingsDrawer {
             if (!this.settings.enabled) return;
             HostBridge.getInstance().openBackgroundDrawer();
         });
+
+        // Robust dual-channel toggle support:
+        // Host SillyTavern / Luker binds `$(document).on('click', '.inline-drawer-toggle', ...)`
+        // which fires `drawer.trigger('inline-drawer-toggle')` and `drawerContent.slideToggle()`.
+        // To guarantee toggle works even if host delegation is blocked or missing (e.g. non-jQuery host),
+        // we listen for host execution and safely fall back if no action occurred.
+        const toggleEl = this.container.querySelector('.inline-drawer-toggle') as HTMLElement | null;
+        const drawerEl = this.container.querySelector('.inline-drawer') as HTMLElement | null;
+        const contentEl = this.container.querySelector('.inline-drawer-content') as HTMLElement | null;
+        const iconEl = this.container.querySelector('.inline-drawer-icon') as HTMLElement | null;
+
+        if (toggleEl && drawerEl && contentEl && iconEl) {
+            let hostHandled = false;
+            drawerEl.addEventListener('inline-drawer-toggle', () => {
+                hostHandled = true;
+            });
+            const jq = (window as any).$ || (window as any).jQuery;
+            if (typeof jq === 'function') {
+                try {
+                    jq(drawerEl).on('inline-drawer-toggle', () => {
+                        hostHandled = true;
+                    });
+                } catch {
+                    // ignore if jQuery error
+                }
+            }
+
+            toggleEl.addEventListener('click', () => {
+                hostHandled = false;
+                window.setTimeout(() => {
+                    if (!hostHandled) {
+                        const isHidden = contentEl.style.display === 'none' || window.getComputedStyle(contentEl).display === 'none';
+                        contentEl.style.display = isHidden ? 'block' : 'none';
+                        iconEl.classList.toggle('down', !isHidden);
+                        iconEl.classList.toggle('up', isHidden);
+                        iconEl.classList.toggle('fa-circle-chevron-down', !isHidden);
+                        iconEl.classList.toggle('fa-circle-chevron-up', isHidden);
+                    }
+                }, 50);
+            });
+        }
     }
 }
