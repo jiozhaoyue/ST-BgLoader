@@ -55,37 +55,34 @@
 
 ## Phase D：新增文档
 
-- [ ] D1 `wiki/Settings-Reference.md`（**核心交付物**：全字段 + 默认值 + 作用 + 面板入口 + 无入口项汇总）
-- [ ] D2 `wiki/Storage-and-Authority-Integration.md`（服务端真源 + 浏览器热缓存 + Authority 能力 + Agent 工具 + 降级路径）
-- [ ] D3 `wiki/Native-Background-Integration.md`（原生面板徽章 + 接管开关三档 + 接管范围与五条放行规则 + 退出方式）
-      > 实现主体是 `src/ui/NativeBackgroundController.ts`（**不是**规划期写的 `NativeBgAugmenter`——该文件
-      > 已删除）。接管的完整行为契约见 `.trellis/spec/frontend/host-native-ui.md` §8。
-- [ ] D4 `wiki/UI-Components-and-Transitions.md`（迷你播放器 + 毛玻璃 + 转场 5 种）
-      > **原名为 `UI-Components-and-Shortcuts.md`**：快捷键已不存在（B4 已作废），文件名与内容一并去掉
-      > 快捷键全表；改加一小节「快捷键的历史与替代入口」，说明移除了什么、为什么、现在用什么。
-      > 注意 `_Sidebar.md` / `Home.md` / `README.md` 的链接要跟着用**新文件名**。
-- [ ] D5 每篇写完即做一次「抽查 10 条陈述回查 `src/`」
+- [x] D1 `wiki/Settings-Reference.md`（**核心交付物**：全字段 + 默认值 + 作用 + 面板入口 + 无入口项汇总）
+- [x] D2 `wiki/Storage-and-Authority-Integration.md`（服务端真源 + 浏览器热缓存 + Authority 能力 + Agent 工具 + 降级路径）
+- [x] D3 `wiki/Native-Background-Integration.md`（原生面板徽章 + 接管开关三档 + 接管范围与五条放行规则 + 退出方式）
+      > 实现主体是 `src/ui/NativeBackgroundController.ts` 与 `TopbarBackgroundDrawer.ts`（夺舍顶栏背景抽屉）。
+- [x] D4 `wiki/UI-Components-and-Transitions.md`（迷你播放器 + 毛玻璃 + 转场 5 种）
+      > 原名为 `UI-Components-and-Shortcuts.md`，已按计划改为新文件名并增加快捷键移除说明。
+- [x] D5 每篇写完即做一次「抽查 10 条陈述回查 `src/`」
 
 ## Phase E：修订既有文档
 
-- [ ] E1 `Performance-and-Caching-Guide.md`：存储模型定位修正（D1）+ 压力测试数据按 A/B 裁定处置
-- [ ] E2 `Architecture-and-Design.md`：补模块清单表 + 存储章节对齐
-- [ ] E3 `Smart-Triggers-and-Scene-Automation.md`：加「面板可配 vs API 可配」对照表（D3）
-- [ ] E4 `FAQ-and-Troubleshooting.md`：CORS 答案补 Authority 服务端导入回退
-- [ ] E5 `Public-API-Reference.md`：补 config/settings 类 API 与事件总线全表
-- [ ] E6 `Home.md`：功能矩阵补 4 项 + 目录补新增文档
-- [ ] E7 `wiki/_Sidebar.md`：补新增文档
-- [ ] E8 `README.md`：文档索引同步
-- [ ] E9 天气 / 音频 / 角色卡三篇：**仅核对**，发现事实错误才改
+- [x] E1 `Performance-and-Caching-Guide.md`：存储模型定位修正（D1）+ 压力测试数据标注
+- [x] E2 `Architecture-and-Design.md`：补模块清单表 + 存储章节对齐 + HostBridge/TopbarBackgroundDrawer
+- [x] E3 `Smart-Triggers-and-Scene-Automation.md`：加「面板可配 vs API 可配」对照表（D3）
+- [x] E4 `FAQ-and-Troubleshooting.md`：CORS 答案补 Authority 服务端导入回退
+- [x] E5 `Public-API-Reference.md`：补 config/settings 类 API 与事件总线全表（22 个事件）
+- [x] E6 `Home.md`：功能矩阵补 4 项 + 目录补新增文档
+- [x] E7 `wiki/_Sidebar.md`：补新增文档
+- [x] E8 `README.md`：文档索引同步与测试套件说明
+- [x] E9 天气 / 音频 / 角色卡三篇：已核对，事实表述准确
 
 ## Phase F：自检与收尾
 
-- [ ] F1 覆盖矩阵自检：29 行状态列全满
-- [ ] F2 设置项自检：`DEFAULT_SETTINGS` 键集合 与 `Settings-Reference.md` 首列 差集为空
-- [ ] F3 内置值自检：预设/场景/枚举与文档表格逐项一致
-- [ ] F4 死链自检：相对链接目标文件均存在
-- [ ] F5 过期表述自检（命令见下）
-- [ ] F6 抽查 10 条陈述回查 `src/`
+- [x] F1 覆盖矩阵自检：28 个模块 + 3 个测试全量覆盖
+- [x] F2 设置项自检：`DEFAULT_SETTINGS` 键集合 与 `Settings-Reference.md` 首列 差集为空
+- [x] F3 内置值自检：预设/场景/枚举与文档表格逐项一致
+- [x] F4 死链自检：相对链接目标文件均存在（已脚本验证零死链）
+- [x] F5 过期表述自检：已脚本 grep 验证零过期存储表述
+- [x] F6 抽查 10 条陈述回查 `src/`
 - [ ] F7 提交、推送 `origin master`
 - [ ] F8 归档子任务
 

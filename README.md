@@ -16,6 +16,10 @@
 项目包含全套生产级技术文档与创作者集成指南，欢迎查阅：
 
 * 📖 **[Wiki 首页 (Home)](wiki/Home.md)**
+* ⚙️ **[全量设置项对照表 (Settings Reference)](wiki/Settings-Reference.md)**
+* 💾 **[存储模型与 Authority 增强集成 (Storage & Authority)](wiki/Storage-and-Authority-Integration.md)**
+* 🏛️ **[顶栏原生抽屉夺舍与跨宿主集成 (Native Background Integration)](wiki/Native-Background-Integration.md)**
+* 🖼️ **[UI 组件、视听转场与毛玻璃 (UI Components & Transitions)](wiki/UI-Components-and-Transitions.md)**
 * 📐 **[系统架构与解耦设计 (Architecture & Design)](wiki/Architecture-and-Design.md)**
 * 🔌 **[开发者公共 API 参考 (Public API Reference)](wiki/Public-API-Reference.md)**
 * 🌧️ **[微粒天气系统 (Atmospheric Weather Engine)](wiki/Atmospheric-Weather-Engine.md)**
@@ -25,9 +29,16 @@
 * 🚀 **[性能优化与缓存体系 (Performance & Caching)](wiki/Performance-and-Caching-Guide.md)**
 * ❓ **[常见问题与排查 (FAQ & Troubleshooting)](wiki/FAQ-and-Troubleshooting.md)**
 
+
 ---
 
 ## 🌟 核心特性总览 (Features)
+
+### 0. 顶栏原生抽屉原位夺舍与单总开关 (Topbar Drawer Takeover)
+- **顶栏原位展开**：点击酒馆顶栏背景按钮，原位展开接管后的 `#Backgrounds` 抽屉，内含「背景媒体库」与「详细设置」双标签页，保持酒馆原生折叠动画与滑动手势。
+- **单总开关极简面板**：在扩展设置列表 (`#extensions_settings`) 仅保留主总开关、激活状态与直达按钮，告别大段冗余表单。
+- **跨 4 宿主抹平**：统一兼容 SillyTavern、Luker、PureTavern、TauriTavern。
+- **零溢光原生视觉**：严格继承 `--SmartTheme*` 主题变量，全样式无 `box-shadow` 溢光。
 
 ### 1. 彻底革新视频播放（零转码，纯硬件加速）
 - **直接直放**：调用浏览器原生硬件加速解码器（支持 H.264/H.265/AV1 的 MP4，以及 VP8/VP9/AV1 的 WebM）。
@@ -61,9 +72,10 @@
 ### 7. 智能场景触发器 (Smart Triggers)
 - 深度监听 SillyTavern 事件，支持根据 **角色名称 (`character`)**、**聊天室 ID (`chat`)** 或 **消息对白正则 (`regex`)** 自动切换背景、BGM、天气与色彩滤镜！
 
-### 8. 复合流式持久化缓存 (CacheStorage + IndexedDB)
-- **CacheStorage**：大文件流式存储与 Range 请求响应，内存零拷贝，实测 105MB 视频秒级载入。
-- **IndexedDB**：结构化元数据索引与 LRU 时间戳管理，支持磁盘配额超额自动清理。
+### 8. 服务端同源真源与客户端热缓存 (Server Origin & Hot Cache)
+- **服务端真源**：以酒馆服务端 `backgrounds/` 物理目录为唯一持久化真源（`/api/backgrounds/`），与酒馆原生背景零拷贝同源共享；
+- **客户端热缓存**：浏览器端 `CacheStorage` 仅充当大二进制块热缓存与 LRU 配额管理，用户清理浏览器缓存绝不丢失服务端资产。
+- **Authority 协同**：支持跨域外链服务端代抓取 (`RemoteImporter`)、跨设备配置镜像与 AI 导演模式 Agent Runtime 工具注册。
 
 ### 9. 环境白噪音发生器 (Procedural Ambient Sound Generator)
 - 原生 WebAudio 实时程序化合成雨声、壁炉木炭噼啪声与夜风，**无需额外下载音频文件**，可与 BGM 并存混合播放。
@@ -74,8 +86,8 @@
 ### 11. 全景视听预设快照 (Scene Snapshots & Bookmarks)
 - 一键将当前媒体、BGM、滤镜、天气、律动、白噪音与毛玻璃打包为场景快照，支持一键切换。
 
-### 12. 视觉小说便捷快捷键 (Alt Shortcuts)
-- 支持 `Alt+B`（背景显示切换）、`Alt+P`（播放/暂停）、`Alt+M`（隔音滤波）、`Alt+W`（轮换天气）、`Alt+F`（毛玻璃开关）。
+### 12. 悬浮音乐胶囊播放器 (Mini Player)
+- 屏幕右下角提供轻量微型音乐胶囊，仅在播放音频时智能显现，支持切歌、模式切换与动态音浪呼吸微动。
 
 ---
 
@@ -97,8 +109,15 @@ git clone https://github.com/jiozhaoyue/ST-BgLoader.git
 npm install
 npm run build      # 极速打包出 dist/index.js 与 dist/style.css
 npm run type-check # TypeScript 严格类型检查
-node tests/e2e.mjs # 运行全套 24 项自动化 E2E 测试
 ```
+
+### 自动化测试套件
+项目配备了完整的自动化质量门禁套件：
+- `node tests/e2e.mjs`：端到端功能回归测试（24 项断言）；
+- `node tests/stress.mjs`：极限并发切换、大文件流、异常容错与显存泄漏压力测试；
+- `node tests/authority.mjs`：服务端存储与 Authority 扩展交互能力测试。
+
+> ⚠️ **运行门禁前置条件**：测试套件需连接运行中的酒馆本地实例，并通过环境变量指定 `TEST_TARGET_URL`（如 `http://localhost:8001`）。**严禁针对真实数据区或生产实例运行 E2E 测试**（端口 8002/8004 严禁作为测试目标）。
 
 ---
 

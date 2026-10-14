@@ -23,6 +23,20 @@ ST-BgLoader 内置了事件驱动的智能场景联动引擎 (`TriggerManager`)�
 - **`preset`**：自动应用色彩滤镜预设（如 `cyberpunk`, `cinema_dark`, `vintage_sepia`）；
 - **`filters`**：微调特定虚化、亮度或饱和度。
 
+### 面板可配 vs API 可配对照表
+
+为了保持界面简洁与高频操作便捷性，图形化设置抽屉与底层 `PublicAPI` 的配置能力范围有所区分：
+
+| 触发动作字段 | 类型 | 顶栏抽屉面板配置 | Public API / 规则导入配置 | 说明 |
+| :--- | :--- | :---: | :---: | :--- |
+| `weather` | `WeatherType` | ✅ 支持 | ✅ 支持 | 可选雨/雪/樱花/赛博微粒/扫描线 |
+| `preset` | `string` | ✅ 支持 | ✅ 支持 | 可选内置与自定义滤镜预设 |
+| `mediaIdOrUrl` | `string` | ⚠️ 自动继承 | ✅ 支持直接指定 | API 可直接指定特定背景媒体文件名或完整外链 |
+| `bgmUrl` | `string` | ⚠️ 自动继承 | ✅ 支持直接指定 | API 可直接指定特定音频文件地址 |
+| `filters` | `VisualFilters` | ⚠️ 随预设应用 | ✅ 支持直接指定 | API 可覆盖局部单项滤镜（如仅修改亮度） |
+
+> **提示**：若需要更精细的多媒体联动（如某角色登场时固定换指定背景并播放特定 BGM），可使用全景视听预设（Scenes）或调用 `window.stBgLoader.addTriggerRule(...)` 注入完整的动作对象。
+
 ---
 
 ## ⚡ 对白正则触发实战案例 (Regex Example)

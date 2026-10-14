@@ -271,3 +271,34 @@ For pass-through cases, assert the host's effect *did* appear (and pick a tile t
 selected — otherwise "nothing happened" and "the host handled it" look identical). Re-query elements
 before each click: dispatching on a detached node bypasses document-level listeners entirely and makes
 a pass-through assertion succeed for the wrong reason.
+
+---
+
+## 9. 顶栏抽屉原位夺舍与跨宿主适配（Topbar Drawer Takeover & HostBridge）
+
+### 9.1 跨 4 种酒馆环境抹平 (`HostBridge`)
+
+扩展支持四种宿主：SillyTavern、Luker、PureTavern、TauriTavern。所有宿主相关的环境探测、DOM 查找与请求头逻辑必须收敛于单一桥接模块 `HostBridge`：
+
+1. **环境检测**：通过读取全局变量（如 `window.Tauri`、宿主版本与特征对象）识别当前运行环境（`sillytavern` / `luker` / `puretavern` / `tauritavern`）。
+2. **选择器统一契约**：4 种酒馆在顶栏背景触发按钮与抽屉上保持相同或相似的 DOM 契约：
+   - 按钮：`#backgrounds-button`, `#backgrounds-drawer-toggle`
+   - 抽屉：`#Backgrounds`, `#bg_menu_content`
+   - 扩展设置挂载点：`#extensions_settings`
+3. **安全 CSRF 处理**：统一由 `HostBridge.getCSRFHeaders()` 提取安全 CSRF 校验头，屏蔽宿主上下文内部变量差异。
+
+### 9.2 `#Backgrounds` 原位夺舍与无损还原 (`TopbarBackgroundDrawer`)
+
+1. **原位接管**：点击顶栏背景按钮时，展开的是酒馆原生抽屉 `#Backgrounds`，但在其内部挂载由插件接管的视听双选项卡容器：
+   - **Tab 1「背景媒体库」**：同源 `/api/backgrounds/` 后端文件存储管理、搜索筛选、文件上传、URL 导入与卡片激活管理；
+   - **Tab 2「详细设置」**：视听滤镜与调色、环境天气、音频频谱、视差、BGM与环境白噪音、全景视听预设、转场、毛玻璃与缓存管理等。
+2. **原生子节点隐藏**：通过向原生抽屉的原生子元素追加 `.st-bg-native-hidden` 类名（CSS 中显式 `display: none !important;`）进行视觉隐藏。严禁直接 `remove()` 原生 DOM，确保关闭总开关时能瞬间、零损耗还原酒馆原生背景网格。
+3. **抽屉动画与滑动契约**：遵循 §1 与 §2 铁律，严禁在抽屉外层或 `.inline-drawer-toggle` 拦截滑动事件或写入内联 `display` 样式，完全借用酒馆原生抽屉的折叠滑动与手势支持。
+
+### 9.3 扩展设置面板单总开关设计 (`SettingsDrawer`)
+
+1. **单一开关原则**：在 `#extensions_settings` 扩展设置列表面板中，不再塞入冗长的全套参数表单，仅提供：
+   - 主总开关复选框（`st_bg_master_enable`）
+   - 当前激活背景状态提示
+   - 「打开背景与详细设置」便捷直达按钮（点击直接调用 `HostBridge.openBackgroundDrawer()` 呼出顶栏抽屉）
+2. **视觉继承**：必须严格继承 `--SmartTheme*` 颜色变量，且禁止任何 `box-shadow` 溢光按钮特效，保持与酒馆原生扩展设置卡片 100% 视觉一致。

@@ -14,8 +14,9 @@
 
 ### Q2: 导入网络 URL 时提示 CORS 跨域错误怎么办？
 **答**：某些第三方图床或视频站点配置了严格的防盗链（缺少 `Access-Control-Allow-Origin: *` 响应头）。
-- **解决方案 1**：建议直接将视频/音频文件下载到本地，然后通过拖拽上传方式直接存入 ST-BgLoader 的本地持久化离线缓存；
-- **解决方案 2**：使用支持公共 CORS 访问的图床（如 Catbox、Imgur 等）。
+- **方案 1（Authority 自动代拉取）**：如果当前酒馆安装了 Authority 宿主扩展，ST-BgLoader 会自动启用服务端回退通道 (`RemoteImporter`)，由酒馆服务端代为抓取并保存至服务端 `backgrounds/` 物理目录，彻底免疫跨域阻断；
+- **方案 2（直接拖拽上传）**：将媒体文件下载到本地电脑，然后在顶栏背景抽屉中直接拖拽上传，文件将持久化保存在服务端的 `/api/backgrounds/` 存储中；
+- **方案 3**：使用支持公共 CORS 访问的图床（如 Catbox、Imgur 等）。
 
 ---
 
@@ -47,15 +48,15 @@
 按 `F12` 打开浏览器控制台，可运行以下命令快速自检插件状态：
 
 ```javascript
-// 1. 检查插件是否已正确就绪
-console.log(window.STBgLoader.isInitialized); // 应输出 true
-
-// 2. 查看当前播放状态与滤镜
+// 1. 查看当前播放状态与全套视听参数
 console.log(window.stBgLoader.getPlaybackState());
 
-// 3. 查看本地缓存空间占用
-window.STBgLoader.getCacheManager().getCacheUsage().then(console.log);
+// 2. 查看当前已加载的媒体列表
+window.stBgLoader.getMediaList().then(console.log);
 
-// 4. 手动切换天气排查
+// 3. 手动切换天气排查
 window.stBgLoader.setWeather('rain');
+
+// 4. 测试隔壁房间 Lo-Fi 隔音滤波器
+window.stBgLoader.setMuffled(true);
 ```

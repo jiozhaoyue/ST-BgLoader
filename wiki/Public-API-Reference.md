@@ -268,7 +268,17 @@ await window.stBgLoader.preloadMedia([
 
 ---
 
-## 📡 8. 事件监听总线 (Event Bus)
+### `api.setBackgroundVisible(visible: boolean): void`
+控制背景图层的显示与隐藏。隐藏时背景媒体停止呈现但不会终止音频。
+
+### `api.isBackgroundVisible(): boolean`
+获取当前背景图层是否可见。
+
+---
+
+## 📡 11. 事件监听总线 (Event Bus)
+
+`window.stBgLoader` 提供了强类型的事件总线监听支持：
 
 ```javascript
 // 监听媒体变更
@@ -281,9 +291,39 @@ window.stBgLoader.on('track-change', (trackItem) => {
     console.log('播放曲目更新:', trackItem);
 });
 
+// 监听播放/暂停状态
+window.stBgLoader.on('play-state-change', (isPlaying) => {
+    console.log('播放状态变更为:', isPlaying);
+});
+
 // 取消监听
 unsub();
 ```
 
-**支持的事件列表**：
-`media-change`, `track-change`, `play-state-change`, `volume-change`, `mute-change`, `muffle-change`, `weather-change`, `visualizer-change`, `parallax-change`, `transition-change`, `preload-progress`, `preload-complete`
+### 全量 22 个事件对照表
+
+| 事件名 (`Event Name`) | 回调参数 | 触发时机 |
+| --- | --- | --- |
+| `media-change` | `(item: MediaItem \| null)` | 背景媒体发生切换或被清空时 |
+| `background-visibility-change` | `(visible: boolean)` | 背景图层显隐状态切换时 |
+| `track-change` | `(item: MediaItem \| null)` | 当前播放的 BGM 音轨发生切换时 |
+| `play-state-change` | `(isPlaying: boolean)` | 音频开始播放或暂停时 |
+| `volume-change` | `(volume: number)` | 主音量滑块被调节时 (0.0~1.0) |
+| `mute-change` | `(muted: boolean)` | 切换全局静音状态时 |
+| `muffle-change` | `(muffled: boolean)` | 隔壁房间低通隔音滤波器开启/关闭时 |
+| `filters-change` | `(filters: VisualFilters)` | 模糊/亮度/饱和度/不透明度数值变化时 |
+| `preset-change` | `(presetId: string, filters: VisualFilters)` | 应用新的调色预设时 |
+| `interactive-change` | `(enabled: boolean)` | HTML/SVG 交互背景鼠标事件穿透开启/关闭时 |
+| `weather-change` | `(opts: WeatherOptions)` | 天气类型或粒子风速密度变化时 |
+| `visualizer-change` | `(opts: VisualizerOptions)` | 音频律动模式或灵敏度变化时 |
+| `parallax-change` | `(parallax: { enabled: boolean; intensity: number })` | 2.5D 景深视差开启/关闭或强度变化时 |
+| `transition-change` | `(type: TransitionType, durationMs: number)` | 转场特效类型或过渡时长变化时 |
+| `trigger-rules-change`| `(rules: TriggerRule[])` | 场景自动化触发器规则新增、编辑或删除时 |
+| `ambient-sound-change` | `(opts: AmbientSoundOptions)` | 环境白噪音类型或音量发生改变时 |
+| `frosted-chat-change` | `(opts: { enabled: boolean; blur: number; opacity: number })` | 对话框毛玻璃通透度参数变化时 |
+| `scene-change` | `(sceneId: string)` | 激活全新的全景视听场景时 |
+| `scenes-change` | `(scenes: Record<string, SceneSnapshot>)` | 场景快照列表更新（新增或删除）时 |
+| `preload-progress` | `(completed: number, total: number, currentUrl: string)` | 批量预热流式资源进度更新时 |
+| `preload-complete` | `(results: PreloadResult[])` | 批量预热全部完成时 |
+| `settings-sync` | `(settings: BgLoaderSettings)` | 全局配置持久化保存或跨设备同步完成时 |
+
