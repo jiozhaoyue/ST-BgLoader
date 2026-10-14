@@ -4,6 +4,8 @@ import { CacheManager } from './cache/CacheManager';
 import { AudioEngine } from './audio/AudioEngine';
 import { MediaMount } from './core/MediaMount';
 import { SettingsDrawer } from './ui/SettingsDrawer';
+import { TopbarBackgroundDrawer } from './ui/TopbarBackgroundDrawer';
+import { HostBridge } from './bridge/HostBridge';
 import { NativeBackgroundController } from './ui/NativeBackgroundController';
 import { MiniPlayer } from './ui/MiniPlayer';
 import { PublicAPI } from './api/PublicAPI';
@@ -34,6 +36,7 @@ export class STBgLoaderExtension {
     private mediaMount: MediaMount;
     private overlaysMounted = false;
     private settingsDrawer: SettingsDrawer | null = null;
+    private topbarDrawer: TopbarBackgroundDrawer | null = null;
     private nativeController: NativeBackgroundController | null = null;
     private miniPlayer: MiniPlayer | null = null;
     private atmosphereFX: AtmosphereFX;
@@ -79,6 +82,22 @@ export class STBgLoaderExtension {
     public getServerSettings(): ServerSettings { return this.serverSettings; }
     public getAPI(): PublicAPI { return this.publicApi; }
     public getNativeController(): NativeBackgroundController | null { return this.nativeController; }
+    public getTopbarDrawer(): TopbarBackgroundDrawer | null { return this.topbarDrawer; }
+
+    public setMasterEnabled(enabled: boolean): void {
+        this.settings.enabled = enabled;
+        this.saveSettings();
+        if (enabled) {
+            this.topbarDrawer?.mount();
+            this.nativeController?.start(this.settings.nativeTakeover);
+            this.mediaMount.setVisible(this.settings.backgroundVisible);
+        } else {
+            this.topbarDrawer?.unmount();
+            this.nativeController?.stop();
+            this.mediaMount.clear();
+            this.nativeController?.releaseNativeBackground();
+        }
+    }
 
     public clearActiveBackground(): void {
         this.settings.activeMediaId = null;
@@ -87,8 +106,9 @@ export class STBgLoaderExtension {
         // background layer back, otherwise the user is left with no background at all.
         this.nativeController?.releaseNativeBackground();
         this.saveSettings();
-        if (this.settingsDrawer) {
-            this.settingsDrawer.refreshMediaGrid();
+        this.settingsDrawer?.updateActiveMedia(null);
+        if (this.topbarDrawer) {
+            void this.topbarDrawer.refreshMediaGrid();
         }
     }
 
@@ -213,23 +233,20 @@ export class STBgLoaderExtension {
             }
         });
 
-        // 8. Setup Settings Drawer
-        this.settingsDrawer = new SettingsDrawer(this.settings, this.cacheManager, {
+        // 8. Setup Topbar Background Drawer Takeover
+        this.topbarDrawer = new TopbarBackgroundDrawer(this.settings, this.cacheManager, {
             onSettingsChanged: (updated) => {
                 this.settings = updated;
                 this.saveSettings();
                 this.applySettingsToSubsystems();
                 this.enforceQuotaIfChanged();
             },
-            // Replaces the removed Alt+B shortcut. `settings.backgroundVisible` is the durable
-            // truth (MediaMount mirrors it); routing the panel through the PublicAPI keeps one
-            // write path and one event for third-party callers.
             getBackgroundVisible: () => this.settings.backgroundVisible,
             onBackgroundVisibilityChanged: (visible) => {
                 this.publicApi.setBackgroundVisible(visible);
             },
-            onNativeTakeoverChanged: (level) => {
-                this.nativeController?.setLevel(level);
+            onClearActiveBackground: () => {
+                this.clearActiveBackground();
             },
             onPresetChanged: (preset) => {
                 this.mediaMount.applyFilters(preset.filters);
@@ -268,6 +285,15 @@ export class STBgLoaderExtension {
                 this.audioEngine.setMuffled(muffled);
                 this.publicApi.emit('muffle-change', muffled);
             },
+            onAmbientSoundChanged: (options) => {
+                this.ambientSoundGenerator.setSound(options);
+            },
+            onFrostedChatChanged: (options) => {
+                this.frostedGlassController.setOptions(options);
+            },
+            onSceneApplied: (sceneId) => {
+                this.publicApi.applyScene(sceneId);
+            },
             onMediaSelected: async (item) => {
                 await this.applyMedia(item);
             },
@@ -293,6 +319,21 @@ export class STBgLoaderExtension {
                 await this.applyMedia(item);
             },
         }, this.authorityBridge);
+
+        if (this.settings.enabled !== false) {
+            this.topbarDrawer.mount();
+        }
+
+        // 8.5 Minimalist Extensions Settings Drawer (single master switch)
+        this.settingsDrawer = new SettingsDrawer(this.settings, {
+            onMasterToggle: (enabled) => {
+                this.setMasterEnabled(enabled);
+            },
+            onSettingsChanged: (updated) => {
+                this.settings = updated;
+                this.saveSettings();
+            },
+        });
         this.settingsDrawer.render();
 
         // 9. Setup native background takeover
@@ -326,7 +367,7 @@ export class STBgLoaderExtension {
         });
 
         // 10.5 Cross-device settings sync (Authority cloud mirror; no-op in local mode)
-        this.authorityBridge.onCapabilitiesChanged(() => this.settingsDrawer?.updateCloudPanel());
+        this.authorityBridge.onCapabilitiesChanged(() => this.topbarDrawer?.updateCloudPanel());
         // Server settings document written newer by another tab/device → converge now
         // instead of letting the pending write silently revert it (S7-style conflict).
         this.serverSettings.onRemoteNewer = () => void this.reconcileRemoteConflict();
@@ -371,9 +412,10 @@ export class STBgLoaderExtension {
         this.nativeController?.refreshSelection(item.name);
         this.nativeController?.clearNativeBackgroundImage();
 
-        if (this.settingsDrawer) {
-            this.settingsDrawer.refreshMediaGrid();
-            this.settingsDrawer.updateCacheStats();
+        this.settingsDrawer?.updateActiveMedia(item.name);
+        if (this.topbarDrawer) {
+            void this.topbarDrawer.refreshMediaGrid();
+            void this.topbarDrawer.updateCacheStats();
         }
     }
 
@@ -428,9 +470,8 @@ export class STBgLoaderExtension {
         this.settings.backgroundVisible = visible;
         this.mediaMount.setVisible(visible);
         this.saveSettings();
-        // Reflect API-driven changes back into the panel (the checkbox does not emit an event
-        // when written programmatically, so there is no feedback loop).
-        this.settingsDrawer?.syncBackgroundVisible(visible);
+        // Reflect API-driven changes back into topbar drawer
+        this.topbarDrawer?.syncBackgroundVisible(visible);
     }
 
     /**
@@ -496,6 +537,7 @@ export class STBgLoaderExtension {
                 localStorage.setItem(SETTINGS_KEY, JSON.stringify(this.settings));
             } catch { /* quota errors keep the cloud copy authoritative */ }
             this.applySettingsToSubsystems();
+            this.topbarDrawer?.applyRemoteSettings(this.settings);
             this.settingsDrawer?.applyRemoteSettings(this.settings);
             this.publicApi.emit('settings-sync', this.settings);
         }, () => this.hasServerSettingsDocument());

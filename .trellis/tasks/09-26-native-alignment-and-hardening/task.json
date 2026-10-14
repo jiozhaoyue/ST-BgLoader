@@ -22,7 +22,8 @@
     "09-26-native-style-and-fold-fix",
     "09-26-full-audit-and-hardening",
     "09-26-native-bg-selector-takeover",
-    "09-26-feature-documentation"
+    "09-26-feature-documentation",
+    "10-14-topbar-bg-drawer-takeover"
   ],
   "parent": null,
   "relatedFiles": [],

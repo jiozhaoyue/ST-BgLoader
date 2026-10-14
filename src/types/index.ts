@@ -159,6 +159,8 @@ export interface PlaybackState {
 }
 
 export interface BgLoaderSettings {
+    /** Master toggle: when false, the plugin releases takeover and restores native host behavior */
+    enabled: boolean;
     activeMediaId: string | null;
     volume: number;               // 0.0 to 1.0
     muted: boolean;
@@ -313,6 +315,7 @@ export const BUILTIN_SCENES: Record<string, SceneSnapshot> = {
 };
 
 export const DEFAULT_SETTINGS: BgLoaderSettings = {
+    enabled: true,
     activeMediaId: null,
     volume: 0.8,
     muted: false,

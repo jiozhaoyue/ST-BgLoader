@@ -1,5 +1,6 @@
 import { MediaItem, MediaSource, MediaType } from '../types';
 import { detectMediaType } from '../core/mediaType';
+import { HostBridge } from '../bridge/HostBridge';
 
 const MANIFEST_NAME = 'st-bg-loader-manifest.json';
 const MANIFEST_VERSION = 1;
@@ -41,13 +42,7 @@ function isHostOwnedFilename(filename: string | null | undefined): boolean {
 }
 
 function serverCsrfHeaders(): Record<string, string> {
-    try {
-        const st = (window as unknown as { SillyTavern?: { getContext?: () => { getRequestHeaders?: (o?: { omitContentType?: boolean }) => Record<string, string> } } }).SillyTavern;
-        const headers = st?.getContext?.().getRequestHeaders?.({ omitContentType: true });
-        return headers ? { ...headers } : {};
-    } catch {
-        return {};
-    }
+    return HostBridge.getInstance().getRequestHeaders({ omitContentType: true });
 }
 
 /**
