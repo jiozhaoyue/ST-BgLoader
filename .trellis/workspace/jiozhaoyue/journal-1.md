@@ -528,3 +528,25 @@ Added procedural WebAudio ambient soundscape synthesizer, frosted glass transpar
 ### Status
 
 [OK] **Completed**
+
+
+## Session 20: 夺舍顶栏背景设置抽屉与极简单开关面板
+<!-- trellis-session: v=2 fp=dbe6360061de3c9e -->
+
+**Date**: 2026-10-14
+**Task**: 夺舍顶栏背景设置抽屉与极简单开关面板
+**Branch**: `master`
+
+### Summary
+
+实现 4 种酒馆统一 HostBridge 探测与 DOM 抽象，在顶栏背景抽屉 (#Backgrounds) 内原位夺舍并呈现背景媒体库与全套详细视听设置；扩展设置列表 (#extensions_settings) 精简为单一主开关与直达按钮，UI 100% 对齐酒馆原生视觉无溢光
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `c771311` | feat(ui): 夺舍顶栏背景设置（背景媒体库+详细设置）并精简扩展面板为单一主开关 |
+
+### Status
+
+[OK] **Completed**

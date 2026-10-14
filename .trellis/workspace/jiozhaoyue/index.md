@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 19
-- **Last Active**: 2026-09-26
+- **Total Sessions**: 20
+- **Last Active**: 2026-10-14
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~530 | Active |
+| `journal-1.md` | ~552 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 20 | 2026-10-14 | 夺舍顶栏背景设置抽屉与极简单开关面板 | `c771311` | `master` |
 | 19 | 2026-09-26 | 子任务 3：接管原生背景选择器（T2） | `c0eab8e`, `5ac14e2`, `7009fb3`, `f0a7d22`, `763fcd9`, `d79bc81`, `fb2e675` | `master` |
 | 18 | 2026-09-26 | 体检子任务 2 收尾：G2 性能量化 + G6 冒烟 + 归档 | `067483a`, `48d156e`, `589785f` | `master` |
 | 17 | 2026-09-26 | 子任务 1：折叠修复 + 去溢光 + 原生风格对齐（P3-10 结项） | `ceb9eec`, `6486550`, `8d2f322`, `2023a25` | `master` |
