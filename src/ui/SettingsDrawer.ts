@@ -1,6 +1,7 @@
 import { BgLoaderSettings } from '../types';
 import { HostBridge } from '../bridge/HostBridge';
 import { escapeHtml } from '../core/sanitize';
+import { UIComponents } from './UIComponents';
 
 export interface SettingsDrawerCallbacks {
     onMasterToggle: (enabled: boolean) => void;
@@ -35,7 +36,8 @@ export class SettingsDrawer {
         this.activeMediaName = name;
         const nameEl = this.container?.querySelector('#st_bgloader_active_name');
         if (nameEl) {
-            nameEl.textContent = name || '默认 / 未设置';
+            const raw = name || '默认';
+            nameEl.textContent = raw.replace(/[\(\（][^\)\）]*[\)\）]/g, '').trim() || '默认';
         }
     }
 
@@ -47,7 +49,7 @@ export class SettingsDrawer {
         const pill = this.container?.querySelector('#st_bgloader_status_pill');
         if (pill) {
             pill.className = `st-bgloader-status-pill ${enabled ? 'active' : ''}`;
-            pill.textContent = enabled ? '已接管顶栏' : '未接管';
+            pill.textContent = enabled ? '已启用' : '已停用';
         }
 
         const openBtn = this.container?.querySelector('#st_bgloader_open_topbar_btn');
@@ -85,13 +87,21 @@ export class SettingsDrawer {
         container.className = 'extension_container';
         container.setAttribute('data-extension-name', 'ST-BgLoader');
 
-        const activeName = this.activeMediaName || '默认 / 未设置';
+        const rawName = this.activeMediaName || '默认';
+        const activeName = rawName.replace(/[\(\（][^\)\）]*[\)\）]/g, '').trim() || '默认';
         const isEnabled = this.settings.enabled ?? true;
+
+        const buttonHtml = UIComponents.renderButton({
+            id: 'st_bgloader_open_topbar_btn',
+            icon: 'fa-arrow-up-right-from-square',
+            label: '打开设置',
+            disabled: !isEnabled,
+        });
 
         container.innerHTML = `
             <div id="st_bgloader_settings" class="inline-drawer">
                 <div class="inline-drawer-toggle inline-drawer-header">
-                    <b><i class="fa-solid fa-photo-film"></i> <span data-i18n="ST-BgLoader (富媒体背景与视听增强)">ST-BgLoader (富媒体背景与视听增强)</span></b>
+                    <b><i class="fa-solid fa-photo-film"></i> <span>ST-BgLoader</span></b>
                     <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
                 </div>
                 <div class="inline-drawer-content">
@@ -99,22 +109,17 @@ export class SettingsDrawer {
                         <div class="st-bgloader-master-row">
                             <label class="st-bgloader-check st-bgloader-master-label">
                                 <input type="checkbox" id="st_bgloader_master_enable" ${isEnabled ? 'checked' : ''} />
-                                <span><strong>启用 ST-BgLoader 背景增强与顶栏接管</strong></span>
+                                <span><strong>启用背景增强</strong></span>
                             </label>
                         </div>
-                        <div class="st-bgloader-master-desc">
-                            <small class="st-bgloader-dim-text">顶栏背景设置按钮已替换为本插件的背景存储与详细视听配置。</small>
-                        </div>
                         <div class="st-bgloader-master-status">
-                            <span>当前背景: <strong id="st_bgloader_active_name">${escapeHtml(activeName)}</strong></span>
+                            <span>背景: <strong id="st_bgloader_active_name">${escapeHtml(activeName)}</strong></span>
                             <span class="st-bgloader-status-pill ${isEnabled ? 'active' : ''}" id="st_bgloader_status_pill">
-                                ${isEnabled ? '已接管顶栏' : '未接管'}
+                                ${isEnabled ? '已启用' : '已停用'}
                             </span>
                         </div>
                         <div class="st-bgloader-master-actions">
-                            <button type="button" id="st_bgloader_open_topbar_btn" class="menu_button ${isEnabled ? '' : 'st-bgloader-disabled'}">
-                                <i class="fa-solid fa-arrow-up-right-from-square"></i> 打开背景与详细设置
-                            </button>
+                            ${buttonHtml}
                         </div>
                     </div>
                 </div>

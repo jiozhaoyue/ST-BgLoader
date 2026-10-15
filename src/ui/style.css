@@ -3,10 +3,10 @@
 .st-bgloader-panel {
     display: flex;
     flex-direction: column;
-    gap: 15px;
-    padding: 10px;
+    gap: 6px;
+    padding: 6px;
     color: var(--SmartThemeBodyColor, #e0e0e0);
-    font-size: 0.95em;
+    font-size: 0.9em;
     /* Semantic media-type badge colors: deliberately NOT theme variables (they must stay
        readable on every theme and not drift with it) — declared here to single-source
        the values instead of hardcoding them per rule. */
@@ -29,11 +29,11 @@
      2. `flex` + `gap` are therefore unavailable; block-level children plus margin-bottom
         give the same single-column spacing without touching any animated property. */
 .st-bgloader-panel .inline-drawer-content {
-    padding-top: 10px;
+    padding-top: 4px;
 }
 
 .st-bgloader-panel .inline-drawer-content > .st-bgloader-section {
-    margin-bottom: 12px;
+    margin-bottom: 6px;
 }
 
 .st-bgloader-panel .inline-drawer-content > .st-bgloader-section:last-child {
@@ -43,25 +43,26 @@
 .st-bgloader-section {
     background: rgba(0, 0, 0, 0.2);
     border: 1px solid var(--SmartThemeBorderColor, rgba(255, 255, 255, 0.1));
-    border-radius: 8px;
-    padding: 12px;
+    border-radius: 6px;
+    padding: 6px 8px;
+    margin-bottom: 6px;
 }
 
 .st-bgloader-section h4 {
-    margin: 0 0 10px 0;
-    font-size: 1.05em;
+    margin: 0 0 4px 0;
+    font-size: 0.95em;
     font-weight: 600;
     color: var(--SmartThemeQuoteColor, #4fa3d1);
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
 }
 
 /* Upload & URL Import Area */
 .st-bgloader-dropzone {
     border: 2px dashed var(--SmartThemeBorderColor, #555);
-    border-radius: 6px;
-    padding: 20px;
+    border-radius: 4px;
+    padding: 10px;
     text-align: center;
     cursor: pointer;
     background: rgba(255, 255, 255, 0.03);
@@ -81,17 +82,18 @@
 
 .st-bgloader-url-import {
     display: flex;
-    gap: 8px;
-    margin-top: 10px;
+    gap: 4px;
+    margin-top: 6px;
 }
 
 .st-bgloader-url-import input {
     flex: 1;
-    padding: 6px 10px;
+    padding: 4px 8px;
     border-radius: 4px;
     border: 1px solid var(--SmartThemeBorderColor, #444);
     background: rgba(0, 0, 0, 0.3);
     color: inherit;
+    font-size: 0.9em;
 }
 
 /* Slider rows */
@@ -99,13 +101,13 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 8px;
-    gap: 10px;
+    margin-bottom: 4px;
+    gap: 6px;
 }
 
 .st-bgloader-slider-row label {
-    flex: 0 0 110px;
-    font-size: 0.9em;
+    flex: 0 0 65px;
+    font-size: 0.85em;
 }
 
 .st-bgloader-slider-row input[type="range"] {
@@ -271,18 +273,19 @@
 /* Preset & Dropdown Controls */
 .st-bgloader-preset-row {
     display: flex;
-    gap: 8px;
-    margin-bottom: 12px;
+    gap: 4px;
+    margin-bottom: 4px;
     align-items: center;
 }
 
 .st-bgloader-preset-row select, .st-bgloader-preset-row input[type="text"] {
     flex: 1;
-    padding: 6px 10px;
+    padding: 4px 8px;
     border-radius: 4px;
     border: 1px solid var(--SmartThemeBorderColor, #444);
     background: rgba(0, 0, 0, 0.3);
     color: inherit;
+    font-size: 0.9em;
 }
 
 /* Mini Player Capsule — the capsule keeps its own dark-glass look on every theme
@@ -416,22 +419,23 @@
 .st-bgloader-check-stack {
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    margin-top: 8px;
+    gap: 4px;
+    margin-top: 4px;
 }
 
 /* One checkbox + label row */
 .st-bgloader-check {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 4px;
     cursor: pointer;
+    font-size: 0.88em;
 }
 
 /* A nested/indented option belonging to the check above it */
 .st-bgloader-check-sub {
-    margin-left: 18px;
-    font-size: 0.9em;
+    margin-left: 14px;
+    font-size: 0.85em;
     opacity: 0.85;
 }
 
@@ -439,46 +443,44 @@
 .st-bgloader-check-inline {
     display: flex;
     align-items: center;
-    gap: 8px;
-    font-size: 0.9em;
-    margin-top: 6px;
+    gap: 6px;
+    font-size: 0.85em;
+    margin-top: 4px;
 }
 
-/* A check row that leads a group of controls (extra breathing room below) */
+/* A check row that leads a group of controls */
 .st-bgloader-check-lead {
-    margin-bottom: 8px;
+    margin-bottom: 4px;
 }
 
 /* Section-internal separator */
 .st-bgloader-divider {
-    margin-top: 10px;
+    margin-top: 4px;
     border-top: 1px solid var(--SmartThemeBorderColor, rgba(255, 255, 255, 0.08));
-    padding-top: 8px;
+    padding-top: 4px;
 }
 
-/* Small top gaps for a control that follows another one. Two variants so the original
-   6px / 8px values are preserved exactly rather than rounded to one value. */
+/* Small top gaps */
 .st-bgloader-gap-top {
-    margin-top: 6px;
+    margin-top: 4px;
 }
 
 .st-bgloader-gap-top-md {
-    margin-top: 8px;
+    margin-top: 4px;
 }
 
-/* Preset/scene control row labels. 90px is the default width; the two narrower
-   variants below override it. */
+/* Preset/scene control row labels */
 .st-bgloader-preset-row > label {
-    font-size: 0.9em;
-    flex: 0 0 90px;
+    font-size: 0.85em;
+    flex: 0 0 50px;
 }
 
 .st-bgloader-preset-row > label.st-bgloader-label-sm {
-    flex: 0 0 60px;
+    flex: 0 0 45px;
 }
 
 .st-bgloader-preset-row > label.st-bgloader-label-md {
-    flex: 0 0 80px;
+    flex: 0 0 50px;
 }
 
 /* Full-width button */
@@ -560,7 +562,7 @@
     height: 100%;
     min-height: 420px;
     max-height: 85vh;
-    color: var(--SmartThemeBodyColor-text, var(--SmartThemeBodyColor, #e0e0e0));
+    color: var(--SmartThemeBodyColor, #e0e0e0);
     background: var(--SmartThemeBlurTintColor, rgba(20, 20, 25, 0.95));
     border-radius: 6px;
     box-sizing: border-box;
@@ -587,20 +589,24 @@
 .st-bgloader-tab-btn {
     cursor: pointer;
     border: 1px solid var(--SmartThemeBorderColor, rgba(255, 255, 255, 0.15));
-    background: var(--SmartThemeBodyColor, #2a2a30);
-    color: var(--SmartThemeBodyColor-text, inherit);
-    padding: 6px 12px;
+    background: rgba(0, 0, 0, 0.25);
+    color: var(--SmartThemeBodyColor, #e0e0e0);
+    padding: 5px 12px;
     border-radius: 4px;
-    display: flex;
+    display: inline-flex;
     align-items: center;
     gap: 6px;
-    font-size: 0.95em;
+    font-size: 0.9em;
     transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.st-bgloader-tab-btn:hover {
+    background: rgba(255, 255, 255, 0.08);
 }
 
 .st-bgloader-tab-btn.active {
     border-color: var(--SmartThemeQuoteColor, #4fa3d1);
-    background: color-mix(in srgb, var(--SmartThemeQuoteColor, #4fa3d1) 20%, var(--SmartThemeBodyColor, #2a2a30));
+    background: color-mix(in srgb, var(--SmartThemeQuoteColor, #4fa3d1) 22%, rgba(0, 0, 0, 0.4));
     color: var(--SmartThemeQuoteColor, #4fa3d1);
     font-weight: 600;
 }
@@ -614,7 +620,7 @@
 .st-bgloader-topbar-body {
     flex: 1;
     overflow-y: auto;
-    padding: 12px;
+    padding: 6px;
 }
 
 .st-bgloader-tab-content {
@@ -627,9 +633,9 @@
 
 .st-bgloader-toolbar-row {
     display: flex;
-    gap: 8px;
+    gap: 4px;
     align-items: center;
-    margin-bottom: 12px;
+    margin-bottom: 6px;
 }
 
 .st-bgloader-search-wrap {
@@ -639,32 +645,34 @@
 .st-bgloader-search-wrap input {
     width: 100%;
     box-sizing: border-box;
+    padding: 4px 8px;
+    font-size: 0.9em;
 }
 
 .st-bgloader-upload-box {
-    margin-bottom: 14px;
-    padding: 10px;
+    margin-bottom: 6px;
+    padding: 6px;
     background: rgba(0, 0, 0, 0.2);
     border: 1px solid var(--SmartThemeBorderColor, rgba(255, 255, 255, 0.1));
-    border-radius: 6px;
+    border-radius: 4px;
 }
 
 .st-bgloader-empty-state {
     grid-column: 1 / -1;
     text-align: center;
-    padding: 30px 10px;
-    color: var(--SmartThemeBodyColor-text, #aaa);
+    padding: 14px 6px;
+    color: var(--SmartThemeBodyColor, #aaa);
     opacity: 0.7;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 8px;
+    gap: 4px;
 }
 
 .st-bgloader-grid-loading {
     grid-column: 1 / -1;
     text-align: center;
-    padding: 24px;
+    padding: 12px;
     opacity: 0.7;
 }
 
@@ -682,12 +690,12 @@
 
 .st-bgloader-dim-text {
     opacity: 0.7;
-    font-size: 0.9em;
+    font-size: 0.85em;
 }
 
 .st-bgloader-success-text {
     color: var(--st-bg-status-ok, #4fae6b);
-    font-size: 0.9em;
+    font-size: 0.85em;
 }
 
 /* -------------------------------------------------------------------------
@@ -712,17 +720,17 @@
 }
 
 #st_bgloader_settings .inline-drawer-content {
-    padding: 6px 0 10px 0;
+    padding: 4px 0 6px 0;
 }
 
 .st-bgloader-master-card {
     background: rgba(0, 0, 0, 0.2);
     border: 1px solid var(--SmartThemeBorderColor, rgba(255, 255, 255, 0.1));
-    border-radius: 6px;
-    padding: 14px;
+    border-radius: 4px;
+    padding: 8px;
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 6px;
 }
 
 .st-bgloader-master-row {
@@ -734,30 +742,26 @@
     cursor: pointer;
     display: flex;
     align-items: center;
-    gap: 8px;
-    font-size: 1.05em;
-}
-
-.st-bgloader-master-desc {
-    margin-left: 26px;
+    gap: 6px;
+    font-size: 0.95em;
 }
 
 .st-bgloader-master-status {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding-top: 8px;
+    padding-top: 4px;
     border-top: 1px solid var(--SmartThemeBorderColor, rgba(255, 255, 255, 0.08));
-    font-size: 0.9em;
+    font-size: 0.85em;
 }
 
 .st-bgloader-status-pill {
-    padding: 2px 8px;
-    border-radius: 12px;
-    font-size: 0.85em;
+    padding: 1px 6px;
+    border-radius: 10px;
+    font-size: 0.8em;
     background: rgba(255, 255, 255, 0.1);
     border: 1px solid var(--SmartThemeBorderColor, rgba(255, 255, 255, 0.2));
-    color: var(--SmartThemeBodyColor-text, #aaa);
+    color: var(--SmartThemeBodyColor, #aaa);
 }
 
 .st-bgloader-status-pill.active {

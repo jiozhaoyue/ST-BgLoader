@@ -91,10 +91,14 @@ export class STBgLoaderExtension {
             this.topbarDrawer?.mount();
             this.nativeController?.start(this.settings.nativeTakeover);
             this.mediaMount.setVisible(this.settings.backgroundVisible);
+            this.atmosphereFX.handleBackgroundVisibilityChange(this.settings.backgroundVisible);
+            this.audioVisualizer.handleBackgroundVisibilityChange(this.settings.backgroundVisible);
         } else {
             this.topbarDrawer?.unmount();
             this.nativeController?.stop();
             this.mediaMount.clear();
+            this.atmosphereFX.handleBackgroundVisibilityChange(false);
+            this.audioVisualizer.handleBackgroundVisibilityChange(false);
             this.nativeController?.releaseNativeBackground();
         }
     }
@@ -363,7 +367,10 @@ export class STBgLoaderExtension {
 
         // 10. Register Global Lifecycle Hooks
         document.addEventListener('visibilitychange', () => {
-            this.audioEngine.handleVisibilityChange(document.hidden, this.settings.pauseOnBlur);
+            const hidden = document.hidden;
+            this.audioEngine.handleVisibilityChange(hidden, this.settings.pauseOnBlur);
+            this.atmosphereFX.handleVisibilityChange(hidden);
+            this.audioVisualizer.handleVisibilityChange(hidden);
         });
 
         // 10.5 Cross-device settings sync (Authority cloud mirror; no-op in local mode)
@@ -469,6 +476,8 @@ export class STBgLoaderExtension {
     public setBackgroundVisible(visible: boolean): void {
         this.settings.backgroundVisible = visible;
         this.mediaMount.setVisible(visible);
+        this.atmosphereFX.handleBackgroundVisibilityChange(visible);
+        this.audioVisualizer.handleBackgroundVisibilityChange(visible);
         this.saveSettings();
         // Reflect API-driven changes back into topbar drawer
         this.topbarDrawer?.syncBackgroundVisible(visible);

@@ -18,6 +18,10 @@ export class AudioVisualizer {
         sensitivity: 1.0,
     };
 
+    private isTabHidden = false;
+    private isBgHidden = false;
+    private isSilent = false;
+
     private width = 0;
     private height = 0;
     private dpr = 1;
@@ -61,7 +65,29 @@ export class AudioVisualizer {
         this.canvas.height = Math.floor(this.height * this.dpr);
 
         if (this.ctx) {
-            this.ctx.scale(this.dpr, this.dpr);
+            this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+        }
+    }
+
+    public handleVisibilityChange(hidden: boolean): void {
+        this.isTabHidden = hidden;
+        if (hidden) {
+            this.stop();
+        } else if (!this.isBgHidden && this.currentOptions.mode !== 'off') {
+            this.start();
+        }
+    }
+
+    public handleBackgroundVisibilityChange(visible: boolean): void {
+        this.isBgHidden = !visible;
+        if (!visible) {
+            this.stop();
+            this.canvas.style.display = 'none';
+        } else if (!this.isTabHidden && this.currentOptions.mode !== 'off') {
+            if (this.currentOptions.mode === 'spectrum') {
+                this.canvas.style.display = 'block';
+            }
+            this.start();
         }
     }
 
@@ -71,6 +97,7 @@ export class AudioVisualizer {
             this.analyser.fftSize = 256;
             const bufferLength = this.analyser.frequencyBinCount;
             this.dataArray = new Uint8Array(new ArrayBuffer(bufferLength));
+            this.isSilent = false;
         } else {
             this.dataArray = null;
         }
@@ -78,15 +105,14 @@ export class AudioVisualizer {
 
     public setOptions(options: VisualizerOptions): void {
         this.currentOptions = { ...options };
+        this.isSilent = false;
 
-        if (this.currentOptions.mode === 'off') {
+        if (this.currentOptions.mode === 'off' || this.isBgHidden || this.isTabHidden) {
             this.stop();
             this.canvas.style.display = 'none';
             if (this.ctx) {
                 this.ctx.clearRect(0, 0, this.width, this.height);
             }
-            // Note: never touch the container's CSS filter here — that channel belongs to the
-            // user's visual presets (MediaMount.applyFilters); pulse mode only writes transform.
         } else {
             if (this.currentOptions.mode === 'spectrum') {
                 this.canvas.style.display = 'block';
@@ -98,11 +124,13 @@ export class AudioVisualizer {
     }
 
     private start(): void {
-        if (this.animFrameId !== null) return;
+        if (this.animFrameId !== null || this.isTabHidden || this.isBgHidden) return;
         const tick = () => {
             this.render();
-            if (this.currentOptions.mode !== 'off') {
+            if (this.currentOptions.mode !== 'off' && !this.isTabHidden && !this.isBgHidden) {
                 this.animFrameId = requestAnimationFrame(tick);
+            } else {
+                this.animFrameId = null;
             }
         };
         this.animFrameId = requestAnimationFrame(tick);
@@ -113,6 +141,10 @@ export class AudioVisualizer {
             cancelAnimationFrame(this.animFrameId);
             this.animFrameId = null;
         }
+        if (this.pumpTargetEl) {
+            this.pumpTargetEl.style.transform = '';
+            this.pumpTargetEl.style.transition = '';
+        }
     }
 
     private render(): void {
@@ -122,6 +154,30 @@ export class AudioVisualizer {
         }
 
         this.analyser.getByteFrequencyData(this.dataArray);
+        let hasSignal = false;
+        const checkCount = Math.min(32, this.dataArray.length);
+        for (let i = 0; i < checkCount; i++) {
+            if (this.dataArray[i] > 1) {
+                hasSignal = true;
+                break;
+            }
+        }
+
+        if (!hasSignal) {
+            if (!this.isSilent) {
+                this.isSilent = true;
+                if (this.ctx) {
+                    this.ctx.clearRect(0, 0, this.width, this.height);
+                }
+                if (this.pumpTargetEl) {
+                    this.pumpTargetEl.style.transform = '';
+                    this.pumpTargetEl.style.transition = '';
+                }
+            }
+            return;
+        }
+        this.isSilent = false;
+
         const mode = this.currentOptions.mode;
         const sensitivity = this.currentOptions.sensitivity;
 
@@ -167,7 +223,11 @@ export class AudioVisualizer {
                     const y = this.height - barHeight;
                     ctx.beginPath();
                     const radius = Math.min(barWidth / 2, 3);
-                    ctx.roundRect(x, y, barWidth - 1.5, barHeight, [radius, radius, 0, 0]);
+                    if (typeof ctx.roundRect === 'function') {
+                        ctx.roundRect(x, y, barWidth - 1.5, barHeight, [radius, radius, 0, 0]);
+                    } else {
+                        ctx.rect(x, y, barWidth - 1.5, barHeight);
+                    }
                     ctx.fill();
                 }
 

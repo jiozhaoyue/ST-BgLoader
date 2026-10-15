@@ -27,7 +27,8 @@ export class MiniPlayer {
         el.className = 'st-bg-mini-player';
 
         const currentTrack = this.audioEngine.getCurrentTrack();
-        const trackTitle = currentTrack ? currentTrack.name : 'No Audio Selected';
+        const rawTitle = currentTrack ? currentTrack.name : '无音频';
+        const trackTitle = rawTitle.replace(/[\(\（][^\)\）]*[\)\）]/g, '').trim();
         const isPlaying = this.audioEngine.isPlaying();
         const mode = this.audioEngine.getPlaybackMode();
 
@@ -37,17 +38,17 @@ export class MiniPlayer {
 
         el.innerHTML = `
             <div class="st-bg-mini-capsule">
-                <button class="st-bg-mini-btn" id="st_mini_prev" title="Previous Track">
+                <button class="st-bg-mini-btn" id="st_mini_prev" title="上一曲">
                     <i class="fa-solid fa-backward-step"></i>
                 </button>
-                <button class="st-bg-mini-btn st-bg-mini-play" id="st_mini_play" title="Play/Pause">
+                <button class="st-bg-mini-btn st-bg-mini-play" id="st_mini_play" title="${isPlaying ? '暂停' : '播放'}">
                     <i class="fa-solid ${isPlaying ? 'fa-pause' : 'fa-play'}"></i>
                 </button>
-                <button class="st-bg-mini-btn" id="st_mini_next" title="Next Track">
+                <button class="st-bg-mini-btn" id="st_mini_next" title="下一曲">
                     <i class="fa-solid fa-forward-step"></i>
                 </button>
                 <div class="st-bg-mini-track" id="st_mini_title" title="${escapeHtml(trackTitle)}">${escapeHtml(trackTitle)}</div>
-                <button class="st-bg-mini-btn st-bg-mini-mode" id="st_mini_mode" title="Mode: ${mode}">
+                <button class="st-bg-mini-btn st-bg-mini-mode" id="st_mini_mode" title="模式">
                     <i class="fa-solid ${this.getModeIcon(mode)}"></i>
                 </button>
             </div>
@@ -64,7 +65,8 @@ export class MiniPlayer {
         this.unsubscribeTrack = this.audioEngine.addTrackListener((item) => {
             const titleEl = this.container?.querySelector('#st_mini_title');
             if (titleEl) {
-                const name = item ? item.name : 'No Audio';
+                const raw = item ? item.name : '无音频';
+                const name = raw.replace(/[\(\（][^\)\）]*[\)\）]/g, '').trim();
                 titleEl.textContent = name;
                 titleEl.setAttribute('title', name);
             }
@@ -115,7 +117,7 @@ export class MiniPlayer {
 
             const modeBtn = this.container?.querySelector('#st_mini_mode') as HTMLElement;
             if (modeBtn) {
-                modeBtn.setAttribute('title', `Mode: ${nextMode}`);
+                modeBtn.setAttribute('title', '模式');
                 const icon = modeBtn.querySelector('i');
                 if (icon) icon.className = `fa-solid ${this.getModeIcon(nextMode)}`;
             }

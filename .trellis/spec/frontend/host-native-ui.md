@@ -290,8 +290,8 @@ a pass-through assertion succeed for the wrong reason.
 ### 9.2 `#Backgrounds` 原位夺舍与无损还原 (`TopbarBackgroundDrawer`)
 
 1. **原位接管**：点击顶栏背景按钮时，展开的是酒馆原生抽屉 `#Backgrounds`，但在其内部挂载由插件接管的视听双选项卡容器：
-   - **Tab 1「背景媒体库」**：同源 `/api/backgrounds/` 后端文件存储管理、搜索筛选、文件上传、URL 导入与卡片激活管理；
-   - **Tab 2「详细设置」**：视听滤镜与调色、环境天气、音频频谱、视差、BGM与环境白噪音、全景视听预设、转场、毛玻璃与缓存管理等。
+   - **Tab 1「媒体」**：同源 `/api/backgrounds/` 后端文件存储管理、搜索筛选、文件上传、URL 导入与卡片激活管理；
+   - **Tab 2「设置」**：滤镜调色、环境天气、音频频谱、视差、BGM与环境音、视听预设、转场、毛玻璃与缓存管理等。
 2. **原生子节点隐藏**：通过向原生抽屉的原生子元素追加 `.st-bg-native-hidden` 类名（CSS 中显式 `display: none !important;`）进行视觉隐藏。严禁直接 `remove()` 原生 DOM，确保关闭总开关时能瞬间、零损耗还原酒馆原生背景网格。
 3. **抽屉动画与滑动契约**：遵循 §1 与 §2 铁律，严禁在抽屉外层或 `.inline-drawer-toggle` 拦截滑动事件或写入内联 `display` 样式，完全借用酒馆原生抽屉的折叠滑动与手势支持。
 
@@ -305,9 +305,37 @@ a pass-through assertion succeed for the wrong reason.
 2. **单一开关原则**：在 `#extensions_settings` 扩展设置列表面板中，不再塞入冗长的全套参数表单，仅提供：
    - 主总开关复选框（`st_bgloader_master_enable`）
    - 当前激活背景状态提示
-   - 「打开背景与详细设置」便捷直达按钮（点击直接调用 `HostBridge.openBackgroundDrawer()` 呼出顶栏抽屉）
+   - 「打开设置」快捷直达按钮（点击直接调用 `HostBridge.openBackgroundDrawer()` 呼出顶栏抽屉）
 3. **视觉继承**：必须严格继承 `--SmartTheme*` 颜色变量，且禁止任何 `box-shadow` 溢光按钮特效，保持与酒馆原生扩展设置卡片 100% 视觉一致。
 4. **稳健的双重折叠支持**：
    - 优先交由宿主 jQuery 委托监听器（`$(document).on('click', '.inline-drawer-toggle')`）执行平滑 `slideToggle()`；
    - 本身监听宿主触发的 `inline-drawer-toggle` 事件，若在无 jQuery 宿主环境或宿主委托未响应时，50ms 安全定时器回退为原生 class/display 切换，确保互斥不冲突且 100% 可展开。
+
+---
+
+## 10. UI 极致解耦与文案紧凑规范 (UI Decoupling & Copy Compaction Specification)
+
+### 10.1 统一原子组件工厂 (`UIComponents.ts`)
+- 所有的表单行、滑动条、选择框、复选框、按钮、分组容器必须统一由 `UIComponents` 工厂方法生成 (`renderSection`, `renderSlider`, `renderSelect`, `renderCheckbox`, `renderButton`)。
+- 严禁在视图代码中手写重复的 HTML 结构，杜绝冗余样式与不一致。
+- 所有 range 滑动条必须使用 `UIComponents.bindRafSlider` 统一进行 `requestAnimationFrame` 60fps 节流，禁止未经节流的高频频繁重绘。
+
+### 10.2 极简文案与短语纪律
+- **严禁长句与冗长说明**：杜绝长句、段落说明、副标题、`<small>` 注解块；
+- **严禁并列连词**：严禁出现“与”，如“背景与音效”必须拆分或精简；
+- **严禁括号注解**：严禁使用任何半角/全角括号说明，如 `(...)` 或 `（...）`；
+- **严禁分隔符**：禁止在文案中使用 `/` 斜杠分隔符，计数采用紧凑并列文本；
+- **按钮与标题极简化**：所有分组标题与按钮文案控制在 1–4 个汉字（如“场景”、“滤镜”、“动效”、“天气”、“音效”、“毛玻璃”、“转场”、“音乐”、“触发器”、“存储”、“云端”；“应用”、“保存”、“删除”、“导入”、“清空”、“导出”）。
+
+### 10.3 布局紧凑与零大空白
+- 容器内间距与外边距严格控制在 4px–6px；
+- 消除任何过大的垂直空隙与无意义的线条；
+- 侧边栏设置卡片展开高度严格收敛（≤ 130px），杜绝占据整屏可视区域。
+
+### 10.4 渲染能耗与能效优化
+- **页面失焦与后台休眠**：监听全局 `visibilitychange` 事件，当 `document.hidden === true` 或用户切换后台标签页时，`AtmosphereFX` 与 `AudioVisualizer` 立即中止 `requestAnimationFrame` 循环，降为 0% GPU/CPU 占用；
+- **背景隐藏状态联动**：当用户点击眼睛图标隐藏背景（`backgroundVisible === false`）或禁用扩展（`enabled === false`）时，粒子天气与音频动效画布即刻隐藏并停止循环；
+- **动效静音休眠**：音频静音或无音频信号输出时，`AudioVisualizer` 自动进入静默休眠，跳过渐变重绘；
+- **扫描线离屏着色**：扫描线静态条纹使用 1x4 离屏离散 Pattern 单次填充，取代每帧 300 次 `fillRect` 密集循环。
+
 

@@ -27,32 +27,32 @@ export interface FilterPreset {
 export const BUILTIN_PRESETS: Record<string, FilterPreset> = {
     default: {
         id: 'default',
-        name: 'Default (原色)',
+        name: '默认',
         filters: { blur: 0, brightness: 100, opacity: 100, saturate: 100 },
     },
     cinema_dark: {
         id: 'cinema_dark',
-        name: 'Cinema Dark (影院暗调)',
+        name: '影院',
         filters: { blur: 3, brightness: 75, opacity: 90, saturate: 95 },
     },
     cyberpunk: {
         id: 'cyberpunk',
-        name: 'Cyberpunk (赛博霓虹)',
+        name: '赛博',
         filters: { blur: 0, brightness: 110, opacity: 100, saturate: 160 },
     },
     vintage_sepia: {
         id: 'vintage_sepia',
-        name: 'Vintage (复古胶片)',
+        name: '复古',
         filters: { blur: 1, brightness: 90, opacity: 90, saturate: 70 },
     },
     dreamy_bloom: {
         id: 'dreamy_bloom',
-        name: 'Dreamy (梦幻光晕)',
+        name: '梦幻',
         filters: { blur: 6, brightness: 125, opacity: 95, saturate: 115 },
     },
     monochrome: {
         id: 'monochrome',
-        name: 'Monochrome (黑白极简)',
+        name: '黑白',
         filters: { blur: 0, brightness: 100, opacity: 100, saturate: 0 },
     },
 };
@@ -100,12 +100,12 @@ export type WeatherType = (typeof WEATHER_TYPES)[number];
  * a fourth, hand-maintained copy of the list and would silently drift.
  */
 export const WEATHER_LABELS: Record<WeatherType, string> = {
-    off: 'Off (关闭天气)',
-    rain: 'Rain (细雨微涟)',
-    snow: 'Snow (冬日飘雪)',
-    sakura: 'Sakura (落樱缤纷)',
-    cyber_motes: 'Cyber Motes (赛博霓虹微粒)',
-    scanlines: 'Scanlines (复古CRT扫描线)',
+    off: '关闭',
+    rain: '雨水',
+    snow: '飘雪',
+    sakura: '落樱',
+    cyber_motes: '微粒',
+    scanlines: '扫描线',
 };
 export type VisualizerMode = 'off' | 'pulse' | 'spectrum';
 export type TransitionType = 'fade' | 'zoom_fade' | 'blur_fade' | 'slide_left' | 'slide_right';
@@ -270,7 +270,7 @@ export function mergeSettings(stored: unknown): BgLoaderSettings {
 export const BUILTIN_SCENES: Record<string, SceneSnapshot> = {
     cyber_rain: {
         id: 'cyber_rain',
-        name: 'Cyberpunk Rain (赛博雨夜)',
+        name: '雨夜',
         presetId: 'cyberpunk',
         weather: { type: 'rain', density: 'high', speed: 1.3, opacity: 0.85, wind: 0.8 },
         visualizer: { mode: 'pulse', color: '#00f0ff', sensitivity: 1.2 },
@@ -281,7 +281,7 @@ export const BUILTIN_SCENES: Record<string, SceneSnapshot> = {
     },
     cozy_fireplace: {
         id: 'cozy_fireplace',
-        name: 'Cozy Fireplace (壁炉夜话)',
+        name: '壁炉',
         presetId: 'vintage_sepia',
         weather: { type: 'cyber_motes', density: 'low', speed: 0.8, opacity: 0.6, wind: 0.2 },
         visualizer: { mode: 'off', color: '#ffaa44', sensitivity: 1.0 },
@@ -292,7 +292,7 @@ export const BUILTIN_SCENES: Record<string, SceneSnapshot> = {
     },
     sakura_shrine: {
         id: 'sakura_shrine',
-        name: 'Sakura Shrine (落樱古刹)',
+        name: '落樱',
         presetId: 'dreamy_bloom',
         weather: { type: 'sakura', density: 'high', speed: 1.0, opacity: 0.8, wind: 0.6 },
         visualizer: { mode: 'off', color: '#ffb7c5', sensitivity: 1.0 },
@@ -303,7 +303,7 @@ export const BUILTIN_SCENES: Record<string, SceneSnapshot> = {
     },
     winter_cabin: {
         id: 'winter_cabin',
-        name: 'Winter Cabin (雪山木屋)',
+        name: '木屋',
         presetId: 'cinema_dark',
         weather: { type: 'snow', density: 'high', speed: 1.1, opacity: 0.85, wind: 0.4 },
         visualizer: { mode: 'off', color: '#ffffff', sensitivity: 1.0 },

@@ -8,7 +8,7 @@ const CHROME_PATH = process.env.PUPPETEER_EXECUTABLE_PATH
 
 const TARGET_URL = process.env.TEST_TARGET_URL
     || process.env.TARGET_URL
-    || 'http://localhost:8000';
+    || 'https://localhost:8003';
 
 async function runE2ETests() {
     console.log('🚀 Starting Automated E2E Test on', TARGET_URL);

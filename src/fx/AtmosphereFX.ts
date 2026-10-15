@@ -30,6 +30,11 @@ export class AtmosphereFX {
         wind: 0.5,
     };
 
+    private isTabHidden = false;
+    private isBgHidden = false;
+    private scanlinePattern: CanvasPattern | null = null;
+    private lastPatternOpacity = -1;
+
     private particles: Particle[] = [];
     private ripples: Particle[] = [];
     private scanlineOffset = 0;
@@ -84,7 +89,7 @@ export class AtmosphereFX {
         this.canvas.height = Math.floor(this.height * this.dpr);
 
         if (this.ctx) {
-            this.ctx.scale(this.dpr, this.dpr);
+            this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
         }
 
         if (this.currentOptions.type !== 'off') {
@@ -92,10 +97,31 @@ export class AtmosphereFX {
         }
     }
 
+    public handleVisibilityChange(hidden: boolean): void {
+        this.isTabHidden = hidden;
+        if (hidden) {
+            this.stop();
+        } else if (!this.isBgHidden && this.currentOptions.type !== 'off') {
+            this.start();
+        }
+    }
+
+    public handleBackgroundVisibilityChange(visible: boolean): void {
+        this.isBgHidden = !visible;
+        if (!visible) {
+            this.stop();
+            this.canvas.style.display = 'none';
+        } else if (!this.isTabHidden && this.currentOptions.type !== 'off') {
+            this.canvas.style.display = 'block';
+            this.start();
+        }
+    }
+
     public setWeather(options: WeatherOptions): void {
         this.currentOptions = { ...options };
+        this.scanlinePattern = null;
 
-        if (this.currentOptions.type === 'off') {
+        if (this.currentOptions.type === 'off' || this.isBgHidden || this.isTabHidden) {
             this.stop();
             this.canvas.style.display = 'none';
             this.particles = [];
@@ -193,11 +219,13 @@ export class AtmosphereFX {
     }
 
     private start(): void {
-        if (this.animFrameId !== null) return;
+        if (this.animFrameId !== null || this.isTabHidden || this.isBgHidden) return;
         const tick = () => {
             this.render();
-            if (this.currentOptions.type !== 'off') {
+            if (this.currentOptions.type !== 'off' && !this.isTabHidden && !this.isBgHidden) {
                 this.animFrameId = requestAnimationFrame(tick);
+            } else {
+                this.animFrameId = null;
             }
         };
         this.animFrameId = requestAnimationFrame(tick);
@@ -328,12 +356,23 @@ export class AtmosphereFX {
     }
 
     private renderScanlines(ctx: CanvasRenderingContext2D): void {
-        const step = 4;
         const alpha = 0.12 * this.currentOptions.opacity;
-        ctx.fillStyle = `rgba(0, 0, 0, ${alpha})`;
+        if (!this.scanlinePattern || this.lastPatternOpacity !== this.currentOptions.opacity) {
+            this.lastPatternOpacity = this.currentOptions.opacity;
+            const tile = document.createElement('canvas');
+            tile.width = 1;
+            tile.height = 4;
+            const tCtx = tile.getContext('2d');
+            if (tCtx) {
+                tCtx.fillStyle = `rgba(0, 0, 0, ${alpha})`;
+                tCtx.fillRect(0, 0, 1, 1.5);
+                this.scanlinePattern = ctx.createPattern(tile, 'repeat');
+            }
+        }
 
-        for (let y = 0; y < this.height; y += step) {
-            ctx.fillRect(0, y, this.width, 1.5);
+        if (this.scanlinePattern) {
+            ctx.fillStyle = this.scanlinePattern;
+            ctx.fillRect(0, 0, this.width, this.height);
         }
 
         // Rolling beam scanline
@@ -365,5 +404,6 @@ export class AtmosphereFX {
         }
         this.particles = [];
         this.ripples = [];
+        this.scanlinePattern = null;
     }
 }
