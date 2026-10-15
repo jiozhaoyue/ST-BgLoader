@@ -545,6 +545,34 @@
     display: flex;
     align-items: center;
     gap: 6px;
+    padding: 3px 6px;
+    background: rgba(0, 0, 0, 0.15);
+    border-radius: 4px;
+    margin-bottom: 4px;
+}
+
+.st-trigger-badge {
+    font-size: 0.75em;
+    padding: 1px 5px;
+    border-radius: 3px;
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--SmartThemeQuoteColor, #4fa3d1);
+    font-weight: 600;
+}
+
+.st-trigger-name {
+    font-size: 0.85em;
+    font-weight: 500;
+}
+
+.st-trigger-pattern {
+    font-size: 0.8em;
+    opacity: 0.7;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: monospace;
 }
 
 /* -------------------------------------------------------------------------
@@ -639,7 +667,8 @@
 }
 
 .st-bgloader-search-wrap {
-    flex: 1;
+    flex: 1 1 auto;
+    min-width: 120px;
 }
 
 .st-bgloader-search-wrap input {
@@ -647,6 +676,17 @@
     box-sizing: border-box;
     padding: 4px 8px;
     font-size: 0.9em;
+}
+
+.st-bgloader-toolbar-row select {
+    flex: 0 0 76px;
+    width: 76px;
+    padding: 4px 4px;
+    font-size: 0.9em;
+    border-radius: 4px;
+    border: 1px solid var(--SmartThemeBorderColor, rgba(255, 255, 255, 0.15));
+    background: rgba(0, 0, 0, 0.25);
+    color: var(--SmartThemeBodyColor, inherit);
 }
 
 .st-bgloader-upload-box {

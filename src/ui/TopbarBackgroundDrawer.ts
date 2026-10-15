@@ -67,6 +67,7 @@ export class TopbarBackgroundDrawer {
     private activeTab: 'library' | 'settings' = 'library';
     private searchQuery: string = '';
     private typeFilter: string = 'all';
+    private sortOrder: 'name' | 'time' | 'size' = 'name';
 
     constructor(
         settings: BgLoaderSettings,
@@ -195,6 +196,11 @@ export class TopbarBackgroundDrawer {
                             <option value="video" ${this.typeFilter === 'video' ? 'selected' : ''}>视频</option>
                             <option value="audio" ${this.typeFilter === 'audio' ? 'selected' : ''}>音频</option>
                             <option value="html" ${this.typeFilter === 'html' ? 'selected' : ''}>网页</option>
+                        </select>
+                        <select id="st_topbar_sort" class="text_pole">
+                            <option value="name" ${this.sortOrder === 'name' ? 'selected' : ''}>名称</option>
+                            <option value="time" ${this.sortOrder === 'time' ? 'selected' : ''}>时间</option>
+                            <option value="size" ${this.sortOrder === 'size' ? 'selected' : ''}>大小</option>
                         </select>
                         <button type="button" id="st_topbar_upload_toggle_btn" class="menu_button" title="导入">
                             <i class="fa-solid fa-cloud-arrow-up"></i> 导入
@@ -498,6 +504,12 @@ export class TopbarBackgroundDrawer {
         const typeFilter = this.panel.querySelector('#st_topbar_type_filter') as HTMLSelectElement | null;
         typeFilter?.addEventListener('change', () => {
             this.typeFilter = typeFilter.value;
+            void this.refreshMediaGrid();
+        });
+
+        const sortSelect = this.panel.querySelector('#st_topbar_sort') as HTMLSelectElement | null;
+        sortSelect?.addEventListener('change', () => {
+            this.sortOrder = (sortSelect.value as 'name' | 'time' | 'size') || 'name';
             void this.refreshMediaGrid();
         });
 
@@ -823,6 +835,15 @@ export class TopbarBackgroundDrawer {
             items = items.filter((i) => i.name.toLowerCase().includes(this.searchQuery));
         }
 
+        // Sort items
+        if (this.sortOrder === 'time') {
+            items.sort((a, b) => (b.addedTimestamp || 0) - (a.addedTimestamp || 0));
+        } else if (this.sortOrder === 'size') {
+            items.sort((a, b) => (b.size || 0) - (a.size || 0));
+        } else {
+            items.sort((a, b) => a.name.localeCompare(b.name));
+        }
+
         if (items.length === 0) {
             grid.innerHTML = `
                 <div class="st-bgloader-empty-state">
@@ -1081,7 +1102,7 @@ export class TopbarBackgroundDrawer {
                 row.className = 'st-bgloader-trigger-row';
                 row.innerHTML = `
                     <input type="checkbox" ${rule.enabled ? 'checked' : ''} class="st-trigger-check" />
-                    <span class="st-trigger-badge">${rule.type}</span>
+                    <span class="st-trigger-badge">${rule.type === 'character' ? '角色' : rule.type === 'chat' ? '聊天' : '正则'}</span>
                     <span class="st-trigger-name">${escapeHtml(rule.name)}</span>
                     <span class="st-trigger-pattern">${escapeHtml(rule.pattern)}</span>
                     <button type="button" class="menu_button menu_button_icon menu_button_danger st-trigger-del"><i class="fa-solid fa-trash"></i></button>
