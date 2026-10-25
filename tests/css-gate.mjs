@@ -99,9 +99,33 @@ noComment.split('\n').forEach((l, idx) => {
     }
 });
 
+// 规则 3b：TS 注入面（模板字符串里的动态 CSS）同样零容忍 box-shadow。
+// 门禁此前只扫 style.css，FrostedGlassController 注入的 box-shadow 因此漏网
+// （2026-10-26 夜间审计 P2-2）；这里对 src/**/*.ts 全量补扫，行内 `//` 注释豁免。
+import { readdirSync, statSync } from 'node:fs';
+const collectTs = (dir) => {
+    const out = [];
+    for (const name of readdirSync(dir)) {
+        const p = join(dir, name);
+        if (statSync(p).isDirectory()) out.push(...collectTs(p));
+        else if (name.endsWith('.ts')) out.push(p);
+    }
+    return out;
+};
+for (const tsPath of collectTs(join(root, 'src'))) {
+    const rel = tsPath.slice(root.length + 1);
+    const lines = readFileSync(tsPath, 'utf8').split('\n');
+    lines.forEach((raw, idx) => {
+        const code = raw.replace(/(^|[^:])\/\/.*$/, '$1'); // 剥行注释（不剥字符串里的 //，此处足够）
+        if (/box-shadow\s*:/.test(code)) {
+            violations.push(`${rel}:${idx + 1} TS 注入面禁止 box-shadow（用户裁定零溢光）: \`${raw.trim()}\``);
+        }
+    });
+}
+
 if (violations.length > 0) {
     console.error(`CSS 门禁未通过（${violations.length} 项）：`);
     for (const v of violations) console.error(`  - ${v}`);
     process.exit(1);
 }
-console.log('CSS 门禁通过：0 全局泄漏 / 0 缺前缀 / 0 box-shadow（src/ui/style.css）');
+console.log('CSS 门禁通过：0 全局泄漏 / 0 缺前缀 / 0 box-shadow（src/ui/style.css + src/**/*.ts 注入面）');
