@@ -390,7 +390,22 @@ try {
     });
     await settle(2500);
     const gridCards = await page.evaluate(() => document.querySelectorAll('#st_bgloader_grid .st-bgloader-media-card').length);
+    // 键盘可达性断言：焦点第一张卡 → ArrowRight 移动 → Enter 应用（以挂载管线调用为信号）
+    const kb = await page.evaluate(() => {
+        const cards = [...document.querySelectorAll('#st_bgloader_grid .st-bgloader-media-card')];
+        if (!cards.length) return { focusMoved: false, enterApplied: false };
+        const first = cards[0];
+        first.focus();
+        first.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+        const focusMoved = document.activeElement === cards[1];
+        const cm = window.STBgLoader.getCacheManager();
+        const orig = cm.getMediaBlobUrl.bind(cm);
+        cm.getMediaBlobUrl = async (item) => { window.__kbApplied = true; return orig(item); };
+        document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+        return { focusMoved, enterApplied: window.__kbApplied === true };
+    });
     await shot('c11-library-grid');
+    report({ id: 'c11-kb', title: '媒体网格键盘可达性（ArrowRight 移焦 / Enter 应用）', pass: kb.focusMoved && kb.enterApplied, note: `focusMoved=${kb.focusMoved} enterApplied=${kb.enterApplied}`, itemId: null });
 
     // ---------- 清理（探针零残留：以上传登记表为准）----------
     const allIds = await page.evaluate(() => window.__xmCreated.splice(0));

@@ -1006,6 +1006,31 @@ export class TopbarBackgroundDrawer {
                 this.reportMediaAction(this.callbacks.onMediaSelected(item), '应用媒体失败');
             });
 
+            // Keyboard reachability: Enter/Space applies, arrow keys move through the grid
+            // (column count read from the live CSS grid so a layout change stays correct).
+            card.tabIndex = 0;
+            card.setAttribute('role', 'button');
+            card.setAttribute('aria-label', `应用媒体 ${item.name}`);
+            card.addEventListener('keydown', (e) => {
+                const key = (e as KeyboardEvent).key;
+                if (key === 'Enter' || key === ' ') {
+                    e.preventDefault();
+                    this.reportMediaAction(this.callbacks.onMediaSelected(item), '应用媒体失败');
+                    return;
+                }
+                if (key !== 'ArrowRight' && key !== 'ArrowLeft' && key !== 'ArrowUp' && key !== 'ArrowDown') return;
+                e.preventDefault();
+                const cards = Array.from(grid.querySelectorAll<HTMLElement>('.st-bgloader-media-card'));
+                const idx = cards.indexOf(card);
+                const cols = getComputedStyle(grid).gridTemplateColumns.split(' ').filter(Boolean).length || 1;
+                let next = idx;
+                if (key === 'ArrowRight') next = idx + 1;
+                else if (key === 'ArrowLeft') next = idx - 1;
+                else if (key === 'ArrowUp') next = idx - cols;
+                else next = idx + cols;
+                if (next >= 0 && next < cards.length) cards[next].focus();
+            });
+
             fragment.appendChild(card);
         });
         grid.appendChild(fragment);

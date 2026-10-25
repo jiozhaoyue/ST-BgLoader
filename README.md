@@ -117,7 +117,8 @@ npm run check:css  # CSS 作用域门禁：裸选择器 / 扩展前缀 / box-sha
 - `npm run check:css`：CSS 作用域静态门禁（无需实例，随时可跑）；
 - `node tests/e2e.mjs`：端到端功能回归测试（24 项断言）；
 - `node tests/stress.mjs`：极限并发切换、大文件流、异常容错与显存泄漏压力测试；
-- `node tests/authority.mjs`：服务端存储与 Authority 扩展交互能力测试。
+- `node tests/authority.mjs`：服务端存储与 Authority 扩展交互能力测试；
+- `node tests/extreme-media.mjs`：极端媒体实测（超大图 / 真实视频 / 损坏与截断文件 / 伪装扩展名 / 超长文件名 / 超长音频 / 沙箱脚本 / 快速切换，逐项截图留证并自动清理）。
 
 > ⚠️ **运行门禁前置条件**：测试套件需连接运行中的酒馆本地实例，并通过环境变量指定 `TEST_TARGET_URL`（如 `http://localhost:8001`）。**严禁针对真实数据区或生产实例运行 E2E 测试**（端口 8002/8004 严禁作为测试目标）。
 

@@ -152,18 +152,18 @@ const P = {
   scenes: {},
   agentToolsEnabled: !1
 };
-function T(c, e = "") {
+function M(c, e = "") {
   const t = c.split(".").pop()?.toLowerCase().split("?")[0] || "";
   return ["mp4", "webm", "mov", "m4v", "ogv"].includes(t) || e.startsWith("video/") ? "video" : ["mp3", "wav", "ogg", "flac", "aac", "m4a"].includes(t) || e.startsWith("audio/") ? "audio" : t === "html" || t === "htm" ? "html" : t === "svg" ? "svg" : "image";
 }
-class S {
+class E {
   static instance = null;
   hostType;
   constructor() {
     this.hostType = this.detectHostType();
   }
   static getInstance() {
-    return S.instance || (S.instance = new S()), S.instance;
+    return E.instance || (E.instance = new E()), E.instance;
   }
   detectHostType() {
     return typeof window > "u" ? "generic" : window.__TAURI__ || window.__TAURI_METADATA__ || window.__TAURI_INVOKE__ || navigator.userAgent.toLowerCase().includes("tauri") ? "tauritavern" : window.PureTavern || document.title.toLowerCase().includes("puretavern") || document.querySelector('meta[name="puretavern"]') ? "puretavern" : window.Luker || document.title.toLowerCase().includes("luker") || document.querySelector('meta[name="luker"]') ? "luker" : window.SillyTavern ? "sillytavern" : "generic";
@@ -246,7 +246,7 @@ class S {
   }
 }
 const X = "st-bg-loader-manifest.json", L = 1;
-function E(c) {
+function T(c) {
   return `backgrounds/${encodeURIComponent(c)}`;
 }
 const de = /* @__PURE__ */ new Set(["favicon.ico"]);
@@ -254,11 +254,11 @@ function q(c) {
   return !!c && de.has(c.toLowerCase());
 }
 function x() {
-  return S.getInstance().getRequestHeaders({ omitContentType: !0 });
+  return E.getInstance().getRequestHeaders({ omitContentType: !0 });
 }
 async function ue(c) {
   try {
-    const e = await _(`${E(c)}?t=${Date.now()}`, { cache: "no-store" });
+    const e = await S(`${T(c)}?t=${Date.now()}`, { cache: "no-store" });
     return e.ok ? JSON.parse(await e.text()) : null;
   } catch (e) {
     return console.warn(`[ST-BgLoader] Server document "${c}" is missing or unreadable:`, e), null;
@@ -267,12 +267,12 @@ async function ue(c) {
 async function ge(c, e) {
   const t = new Blob([JSON.stringify(e, null, 2)], { type: "application/json" }), i = new FormData();
   i.append("avatar", new File([t], c, { type: "application/json" }));
-  const s = await _("/api/backgrounds/upload", { method: "POST", headers: x(), body: i });
+  const s = await S("/api/backgrounds/upload", { method: "POST", headers: x(), body: i });
   if (!s.ok)
     throw new Error(`Server upload failed for "${c}": HTTP ${s.status}`);
 }
 const pe = 6e4, me = 3e4;
-function _(c, e) {
+function S(c, e) {
   const t = e?.signal ?? AbortSignal.timeout(me);
   return fetch(c, { ...e, signal: t });
 }
@@ -290,7 +290,7 @@ class G {
   static CATALOG_TTL_MS = 2e3;
   async init() {
     try {
-      const e = await _(`${E(X)}?t=${Date.now()}`, { cache: "no-store" });
+      const e = await S(`${T(X)}?t=${Date.now()}`, { cache: "no-store" });
       if (e.ok) {
         const t = JSON.parse(await e.text());
         t && Array.isArray(t.items) && (this.manifest = { version: L, items: t.items });
@@ -314,7 +314,7 @@ class G {
   async fetchCatalog() {
     const e = /* @__PURE__ */ new Map();
     try {
-      const t = await _("/api/backgrounds/all", {
+      const t = await S("/api/backgrounds/all", {
         method: "POST",
         headers: { ...x(), "Content-Type": "application/json" },
         body: "{}"
@@ -323,14 +323,14 @@ class G {
         const i = await t.json();
         for (const s of i.images ?? []) {
           if (q(s.filename)) continue;
-          const a = T(s.filename);
+          const a = M(s.filename);
           e.set(s.filename, {
             id: "native_" + s.filename,
             name: s.filename,
             type: a,
             source: "server",
-            url: E(s.filename),
-            cacheKey: E(s.filename),
+            url: T(s.filename),
+            cacheKey: T(s.filename),
             size: 0,
             mimeType: H(s.filename, a),
             addedTimestamp: 0,
@@ -418,7 +418,7 @@ class G {
       this.manifest.items = this.manifest.items.filter((a) => a.id !== e), await this.saveManifest(), this.invalidateCatalog();
       return;
     }
-    const s = await _("/api/backgrounds/delete", {
+    const s = await S("/api/backgrounds/delete", {
       method: "POST",
       headers: { ...x(), "Content-Type": "application/json" },
       body: JSON.stringify({ bg: i })
@@ -429,11 +429,11 @@ class G {
   }
   async readMedia(e) {
     if (!e.url) return null;
-    const t = await _(e.url, { cache: "no-store" });
+    const t = await S(e.url, { cache: "no-store" });
     return t.ok ? t.blob() : null;
   }
   async findByUrl(e) {
-    const t = this.manifest.items.find((s) => s.remoteUrl === e || E(s.filename ?? "") === e);
+    const t = this.manifest.items.find((s) => s.remoteUrl === e || T(s.filename ?? "") === e);
     return t ? this.manifestToItem(t) : (await this.listCatalog()).find((s) => s.url === e || s.cacheKey === e) ?? null;
   }
   /** Fetches the raw bytes of a URL (direct first; used before storing server-side). */
@@ -443,7 +443,7 @@ class G {
       t = new URL(e, window.location.href);
     } catch {
     }
-    const i = !!t && t.origin !== window.location.origin, s = await _(e, i ? { signal: AbortSignal.timeout(pe) } : void 0);
+    const i = !!t && t.origin !== window.location.origin, s = await S(e, i ? { signal: AbortSignal.timeout(pe) } : void 0);
     if (!s.ok)
       throw new Error(`Failed to fetch media from ${e}: ${s.status} ${s.statusText}`);
     return s.blob();
@@ -456,7 +456,7 @@ class G {
     }
     const a = new FormData();
     a.append("avatar", new File([t], s, { type: i }));
-    const n = await _("/api/backgrounds/upload", { method: "POST", headers: x(), body: a });
+    const n = await S("/api/backgrounds/upload", { method: "POST", headers: x(), body: a });
     if (!n.ok)
       throw new Error(`Server upload failed: HTTP ${n.status}`);
     return (await n.text()).trim() || s;
@@ -464,7 +464,7 @@ class G {
   async filenameExists(e) {
     if (this.manifest.items.some((t) => t.filename === e)) return !0;
     try {
-      const t = await _("/api/backgrounds/all", {
+      const t = await S("/api/backgrounds/all", {
         method: "POST",
         headers: { ...x(), "Content-Type": "application/json" },
         body: "{}"
@@ -485,7 +485,7 @@ class G {
     try {
       const t = new FormData();
       t.append("avatar", new File([e], X, { type: "application/json" }));
-      const i = await _("/api/backgrounds/upload", { method: "POST", headers: x(), body: t });
+      const i = await S("/api/backgrounds/upload", { method: "POST", headers: x(), body: t });
       if (!i.ok)
         throw new Error(`HTTP ${i.status}`);
     } catch (t) {
@@ -493,14 +493,14 @@ class G {
     }
   }
   manifestToItem(e) {
-    const t = e.source === "url" && e.remoteUrl ? e.remoteUrl : e.filename ? E(e.filename) : e.remoteUrl ?? "";
+    const t = e.source === "url" && e.remoteUrl ? e.remoteUrl : e.filename ? T(e.filename) : e.remoteUrl ?? "";
     return {
       id: e.id,
       name: e.filename || e.remoteUrl || e.id,
       type: e.type,
       source: e.source === "url" ? "url" : "server",
       url: t,
-      cacheKey: e.filename ? E(e.filename) : e.id,
+      cacheKey: e.filename ? T(e.filename) : e.id,
       size: e.size,
       mimeType: e.mimeType,
       addedTimestamp: e.addedTimestamp,
@@ -693,7 +693,7 @@ function we(c) {
     return null;
   }
 }
-const N = "st-bg-cache-v1", _e = "st_bg_cache_index", w = "entries";
+const N = "st-bg-cache-v1", _e = "st_bg_cache_index", _ = "entries";
 class Se {
   origin;
   remoteImporter = null;
@@ -790,7 +790,7 @@ class Se {
     return await this.backfillCache(r, n), { item: r, isNew: !0 };
   }
   detectMediaType(e) {
-    return T(e);
+    return M(e);
   }
   getMimeType(e, t) {
     return H(e, t);
@@ -846,7 +846,7 @@ class Se {
       const i = indexedDB.open(_e, 1);
       i.onupgradeneeded = (s) => {
         const a = s.target.result;
-        a.objectStoreNames.contains(w) || a.createObjectStore(w, { keyPath: "cacheKey" });
+        a.objectStoreNames.contains(_) || a.createObjectStore(_, { keyPath: "cacheKey" });
       }, i.onsuccess = () => e(i.result), i.onerror = () => t(i.error);
     });
   }
@@ -861,25 +861,25 @@ class Se {
   }
   async indexReadAll() {
     return this.indexDb || await this.openIndex(), new Promise((e, t) => {
-      const s = this.indexDb.transaction(w, "readonly").objectStore(w).getAll();
+      const s = this.indexDb.transaction(_, "readonly").objectStore(_).getAll();
       s.onsuccess = () => e(s.result || []), s.onerror = () => t(s.error);
     });
   }
   async indexPut(e) {
     this.indexDb || await this.openIndex(), await new Promise((t, i) => {
-      const a = this.indexDb.transaction(w, "readwrite").objectStore(w).put(e);
+      const a = this.indexDb.transaction(_, "readwrite").objectStore(_).put(e);
       a.onsuccess = () => t(), a.onerror = () => i(a.error);
     }), this.indexMirror?.set(e.cacheKey, { ...e });
   }
   async indexDelete(e) {
     this.indexDb || await this.openIndex(), await new Promise((t, i) => {
-      const a = this.indexDb.transaction(w, "readwrite").objectStore(w).delete(e);
+      const a = this.indexDb.transaction(_, "readwrite").objectStore(_).delete(e);
       a.onsuccess = () => t(), a.onerror = () => i(a.error);
     }), this.indexMirror?.delete(e);
   }
   async indexClear() {
     this.indexDb || await this.openIndex(), await new Promise((e, t) => {
-      const s = this.indexDb.transaction(w, "readwrite").objectStore(w).clear();
+      const s = this.indexDb.transaction(_, "readwrite").objectStore(_).clear();
       s.onsuccess = () => e(), s.onerror = () => t(s.error);
     }), this.indexMirror = /* @__PURE__ */ new Map();
   }
@@ -1170,8 +1170,8 @@ class Y {
     const i = document.createElement("video");
     return i.className = "st-bg-video-element", i.src = e, i.loop = !0, i.playsInline = !0, i.autoplay = !0, this.applyFitting(i, t), i.style.position = "absolute", i.style.top = "0", i.style.left = "0", i.style.width = "100%", i.style.height = "100%", i.style.pointerEvents = "none", i.style.transform = "translateZ(0)", i.style.willChange = "transform", i.style.opacity = "0", i.style.transition = "opacity 400ms ease-in-out", this.container.appendChild(i), this.videoElement = i, this.audioEngine.attachVideo(i), new Promise((s) => {
       let a = !1;
-      const n = (h) => {
-        console.error("[ST-BgLoader] Error loading video:", h), this.onError?.(), r();
+      const n = (d) => {
+        console.error("[ST-BgLoader] Error loading video:", d), this.onError?.(), r();
       }, r = () => {
         a || (a = !0, window.clearTimeout(l), this.pendingSettle = null, i.removeEventListener("canplay", o), i.removeEventListener("error", n), s(i));
       }, l = window.setTimeout(r, Me);
@@ -1179,8 +1179,8 @@ class Y {
       const o = async () => {
         try {
           await i.play();
-        } catch (h) {
-          console.warn("[ST-BgLoader] Video autoplay failed, trying muted:", h), i.muted = !0, i.play().catch((m) => console.error("[ST-BgLoader] Video playback error:", m));
+        } catch (d) {
+          console.warn("[ST-BgLoader] Video autoplay failed, trying muted:", d), i.muted = !0, i.play().catch((f) => console.error("[ST-BgLoader] Video playback error:", f));
         }
         i.style.opacity = "1", r();
       };
@@ -1394,8 +1394,8 @@ class Ae {
     if (!this.containerEl || !this.layerA || !this.layerB) return;
     if (this.crossfadeTimer !== null) {
       clearTimeout(this.crossfadeTimer), this.crossfadeTimer = null;
-      const g = this.activeLayer === "A" ? this.videoRendererB : this.videoRendererA, u = this.activeLayer === "A" ? this.iframeRendererB : this.iframeRendererA, f = this.activeLayer === "A" ? this.imageRendererB : this.imageRendererA;
-      g.destroy(), u.destroy(), f.destroy();
+      const h = this.activeLayer === "A" ? this.videoRendererB : this.videoRendererA, u = this.activeLayer === "A" ? this.iframeRendererB : this.iframeRendererA, p = this.activeLayer === "A" ? this.imageRendererB : this.imageRendererA;
+      h.destroy(), u.destroy(), p.destroy();
       const y = this.activeLayer === "A" ? this.layerB : this.layerA;
       y && (y.style.opacity = "0", y.style.transform = "none", y.style.filter = "none");
     }
@@ -1417,14 +1417,14 @@ class Ae {
         await this.audioEngine.playMediaItem(e, t);
         break;
     }
-    const h = this.transitionDurationMs;
-    s.style.transition = `all ${h}ms cubic-bezier(0.4, 0, 0.2, 1)`, a.style.transition = `all ${h}ms cubic-bezier(0.4, 0, 0.2, 1)`;
-    const m = this.transitionType;
-    m === "zoom_fade" ? (s.style.transform = "scale(1.06)", s.style.opacity = "0", s.offsetHeight, s.style.transform = "scale(1)", s.style.opacity = "1", a.style.transform = "scale(0.96)", a.style.opacity = "0") : m === "blur_fade" ? (s.style.filter = "blur(10px)", s.style.opacity = "0", s.offsetHeight, s.style.filter = "blur(0px)", s.style.opacity = "1", a.style.filter = "blur(10px)", a.style.opacity = "0") : m === "slide_left" ? (s.style.transform = "translate3d(100%, 0, 0)", s.style.opacity = "1", s.offsetHeight, s.style.transform = "translate3d(0, 0, 0)", a.style.transform = "translate3d(-100%, 0, 0)", a.style.opacity = "0") : m === "slide_right" ? (s.style.transform = "translate3d(-100%, 0, 0)", s.style.opacity = "1", s.offsetHeight, s.style.transform = "translate3d(0, 0, 0)", a.style.transform = "translate3d(100%, 0, 0)", a.style.opacity = "0") : (s.style.transform = "none", s.style.filter = "none", s.style.opacity = "1", a.style.transform = "none", a.style.filter = "none", a.style.opacity = "0"), this.activeLayer = i, this.crossfadeTimer = window.setTimeout(() => {
+    const d = this.transitionDurationMs;
+    s.style.transition = `all ${d}ms cubic-bezier(0.4, 0, 0.2, 1)`, a.style.transition = `all ${d}ms cubic-bezier(0.4, 0, 0.2, 1)`;
+    const f = this.transitionType;
+    f === "zoom_fade" ? (s.style.transform = "scale(1.06)", s.style.opacity = "0", s.offsetHeight, s.style.transform = "scale(1)", s.style.opacity = "1", a.style.transform = "scale(0.96)", a.style.opacity = "0") : f === "blur_fade" ? (s.style.filter = "blur(10px)", s.style.opacity = "0", s.offsetHeight, s.style.filter = "blur(0px)", s.style.opacity = "1", a.style.filter = "blur(10px)", a.style.opacity = "0") : f === "slide_left" ? (s.style.transform = "translate3d(100%, 0, 0)", s.style.opacity = "1", s.offsetHeight, s.style.transform = "translate3d(0, 0, 0)", a.style.transform = "translate3d(-100%, 0, 0)", a.style.opacity = "0") : f === "slide_right" ? (s.style.transform = "translate3d(-100%, 0, 0)", s.style.opacity = "1", s.offsetHeight, s.style.transform = "translate3d(0, 0, 0)", a.style.transform = "translate3d(100%, 0, 0)", a.style.opacity = "0") : (s.style.transform = "none", s.style.filter = "none", s.style.opacity = "1", a.style.transform = "none", a.style.filter = "none", a.style.opacity = "0"), this.activeLayer = i, this.crossfadeTimer = window.setTimeout(() => {
       this.crossfadeTimer = null;
-      const g = this.activeLayer === "A" ? this.videoRendererB : this.videoRendererA, u = this.activeLayer === "A" ? this.iframeRendererB : this.iframeRendererA, f = this.activeLayer === "A" ? this.imageRendererB : this.imageRendererA;
-      g.destroy(), u.destroy(), f.destroy(), a.style.transform = "none", a.style.filter = "none";
-    }, h + 50);
+      const h = this.activeLayer === "A" ? this.videoRendererB : this.videoRendererA, u = this.activeLayer === "A" ? this.iframeRendererB : this.iframeRendererA, p = this.activeLayer === "A" ? this.imageRendererB : this.imageRendererA;
+      h.destroy(), u.destroy(), p.destroy(), a.style.transform = "none", a.style.filter = "none";
+    }, d + 50);
   }
   clear() {
     this.crossfadeTimer !== null && (clearTimeout(this.crossfadeTimer), this.crossfadeTimer = null), this.layerA && (this.layerA.style.opacity = "0", this.layerA.style.transform = "none", this.layerA.style.filter = "none"), this.layerB && (this.layerB.style.opacity = "0", this.layerB.style.transform = "none", this.layerB.style.filter = "none"), this.videoRendererA?.destroy(), this.videoRendererB?.destroy(), this.iframeRendererA?.destroy(), this.iframeRendererB?.destroy(), this.imageRendererA?.destroy(), this.imageRendererB?.destroy();
@@ -1440,7 +1440,7 @@ const Ie = {
 function b(c) {
   return String(c).replace(/[&<>"']/g, (e) => Ie[e]);
 }
-class d {
+class g {
   /**
    * Renders a compact, unified section card without redundant dividers.
    */
@@ -1513,8 +1513,8 @@ class d {
     if (!n) return;
     let l = null, o = null;
     n.addEventListener("input", () => {
-      const h = Number(n.value);
-      r && (r.textContent = `${h}${s}`), o = h, l === null && (l = window.requestAnimationFrame(() => {
+      const d = Number(n.value);
+      r && (r.textContent = `${d}${s}`), o = d, l === null && (l = window.requestAnimationFrame(() => {
         o !== null && a(o), l = null;
       }));
     });
@@ -1549,20 +1549,20 @@ class Be {
     this.settings = e, this.syncMasterToggle(e.enabled);
   }
   render() {
-    const e = S.getInstance(), t = e.getExtensionsSettingsContainer();
+    const e = E.getInstance(), t = e.getExtensionsSettingsContainer();
     if (!t) {
       const o = new MutationObserver(() => {
-        e.getExtensionsSettingsContainer() && (window.clearTimeout(h), o.disconnect(), this.render());
+        e.getExtensionsSettingsContainer() && (window.clearTimeout(d), o.disconnect(), this.render());
       });
       o.observe(document.body, { childList: !0, subtree: !0 });
-      const h = window.setTimeout(() => o.disconnect(), 3e4);
+      const d = window.setTimeout(() => o.disconnect(), 3e4);
       return;
     }
     const i = document.querySelector("#st_bgloader_container, #st_bgloader_settings");
     i && i.remove();
     const s = document.createElement("div");
     s.id = "st_bgloader_container", s.className = "extension_container", s.setAttribute("data-extension-name", "ST-BgLoader");
-    const n = (this.activeMediaName || "默认").replace(/[\(\（][^\)\）]*[\)\）]/g, "").trim() || "默认", r = this.settings.enabled ?? !0, l = d.renderButton({
+    const n = (this.activeMediaName || "默认").replace(/[\(\（][^\)\）]*[\)\）]/g, "").trim() || "默认", r = this.settings.enabled ?? !0, l = g.renderButton({
       id: "st_bgloader_open_topbar_btn",
       icon: "fa-arrow-up-right-from-square",
       label: "打开设置",
@@ -1603,7 +1603,7 @@ class Be {
       const r = e.checked;
       this.settings.enabled = r, this.syncMasterToggle(r), this.callbacks.onMasterToggle(r);
     }), this.container.querySelector("#st_bgloader_open_topbar_btn")?.addEventListener("click", () => {
-      this.settings.enabled && S.getInstance().openBackgroundDrawer();
+      this.settings.enabled && E.getInstance().openBackgroundDrawer();
     });
     const i = this.container.querySelector(".inline-drawer-toggle"), s = this.container.querySelector(".inline-drawer"), a = this.container.querySelector(".inline-drawer-content"), n = this.container.querySelector(".inline-drawer-icon");
     if (i && s && a && n) {
@@ -1661,7 +1661,7 @@ class Le {
   }
   /** Mounts the takeover panel into the host's #Backgrounds drawer */
   mount() {
-    const e = S.getInstance();
+    const e = E.getInstance();
     if (this.hostDrawer = e.getBackgroundDrawer(), !this.hostDrawer) {
       if (this.mountObserver) return;
       const i = new MutationObserver(() => {
@@ -1762,7 +1762,7 @@ class Le {
                 <!-- Tab 2: Settings -->
                 <div id="st_tab_settings" class="st-bgloader-tab-content ${this.activeTab === "settings" ? "active" : ""}">
                     <!-- Scene -->
-                    ${d.renderSection({
+                    ${g.renderSection({
       title: "场景",
       icon: "fa-earth-americas",
       contentHtml: `
@@ -1777,7 +1777,7 @@ class Le {
     })}
 
                     <!-- Filters -->
-                    ${d.renderSection({
+                    ${g.renderSection({
       title: "滤镜",
       icon: "fa-sliders",
       contentHtml: `
@@ -1787,18 +1787,18 @@ class Le {
                                 <button type="button" id="st_preset_save_btn" class="menu_button" title="保存"><i class="fa-solid fa-floppy-disk"></i></button>
                                 <button type="button" id="st_preset_del_btn" class="menu_button" title="删除"><i class="fa-solid fa-trash"></i></button>
                             </div>
-                            ${d.renderSlider({ id: "st_filter_blur", valId: "st_filter_blur_val", label: "模糊", min: 0, max: 20, step: 1, value: this.settings.filters.blur, unit: "px" })}
-                            ${d.renderSlider({ id: "st_filter_brightness", valId: "st_filter_brightness_val", label: "亮度", min: 0, max: 200, step: 5, value: this.settings.filters.brightness, unit: "%" })}
-                            ${d.renderSlider({ id: "st_filter_opacity", valId: "st_filter_opacity_val", label: "不透明", min: 0, max: 100, step: 5, value: this.settings.filters.opacity, unit: "%" })}
-                            ${d.renderSlider({ id: "st_filter_saturate", valId: "st_filter_saturate_val", label: "饱和度", min: 0, max: 200, step: 5, value: this.settings.filters.saturate, unit: "%" })}
+                            ${g.renderSlider({ id: "st_filter_blur", valId: "st_filter_blur_val", label: "模糊", min: 0, max: 20, step: 1, value: this.settings.filters.blur, unit: "px" })}
+                            ${g.renderSlider({ id: "st_filter_brightness", valId: "st_filter_brightness_val", label: "亮度", min: 0, max: 200, step: 5, value: this.settings.filters.brightness, unit: "%" })}
+                            ${g.renderSlider({ id: "st_filter_opacity", valId: "st_filter_opacity_val", label: "不透明", min: 0, max: 100, step: 5, value: this.settings.filters.opacity, unit: "%" })}
+                            ${g.renderSlider({ id: "st_filter_saturate", valId: "st_filter_saturate_val", label: "饱和度", min: 0, max: 200, step: 5, value: this.settings.filters.saturate, unit: "%" })}
                             <div class="st-bgloader-check-stack">
-                                ${d.renderCheckbox({ id: "st_bg_interactive", label: "背景交互", checked: this.settings.interactiveBackground })}
+                                ${g.renderCheckbox({ id: "st_bg_interactive", label: "背景交互", checked: this.settings.interactiveBackground })}
                             </div>
                         `
     })}
 
                     <!-- Weather -->
-                    ${d.renderSection({
+                    ${g.renderSection({
       title: "天气",
       icon: "fa-cloud-sun-rain",
       contentHtml: `
@@ -1816,13 +1816,13 @@ class Le {
                                     <option value="high" ${this.settings.weather.density === "high" ? "selected" : ""}>密集</option>
                                 </select>
                             </div>
-                            ${d.renderSlider({ id: "st_weather_speed", valId: "st_weather_speed_val", label: "速度", min: 5, max: 25, step: 1, value: Math.round(this.settings.weather.speed * 10), unit: "x" })}
-                            ${d.renderSlider({ id: "st_weather_opacity", valId: "st_weather_opacity_val", label: "不透明", min: 10, max: 100, step: 5, value: Math.round(this.settings.weather.opacity * 100), unit: "%" })}
+                            ${g.renderSlider({ id: "st_weather_speed", valId: "st_weather_speed_val", label: "速度", min: 5, max: 25, step: 1, value: Math.round(this.settings.weather.speed * 10), unit: "x" })}
+                            ${g.renderSlider({ id: "st_weather_opacity", valId: "st_weather_opacity_val", label: "不透明", min: 10, max: 100, step: 5, value: Math.round(this.settings.weather.opacity * 100), unit: "%" })}
                         `
     })}
 
                     <!-- Motion -->
-                    ${d.renderSection({
+                    ${g.renderSection({
       title: "动效",
       icon: "fa-chart-simple",
       contentHtml: `
@@ -1834,16 +1834,16 @@ class Le {
                                     <option value="spectrum" ${this.settings.visualizer.mode === "spectrum" ? "selected" : ""}>频谱</option>
                                 </select>
                             </div>
-                            ${d.renderSlider({ id: "st_visualizer_sens", valId: "st_visualizer_sens_val", label: "灵敏度", min: 5, max: 25, step: 1, value: Math.round(this.settings.visualizer.sensitivity * 10), unit: "x" })}
+                            ${g.renderSlider({ id: "st_visualizer_sens", valId: "st_visualizer_sens_val", label: "灵敏度", min: 5, max: 25, step: 1, value: Math.round(this.settings.visualizer.sensitivity * 10), unit: "x" })}
                             <div class="st-bgloader-check-stack">
-                                ${d.renderCheckbox({ id: "st_parallax_enabled", label: "景深视差", checked: this.settings.parallax.enabled })}
+                                ${g.renderCheckbox({ id: "st_parallax_enabled", label: "景深视差", checked: this.settings.parallax.enabled })}
                             </div>
-                            ${d.renderSlider({ id: "st_parallax_intensity", valId: "st_parallax_intensity_val", label: "深度", min: 1, max: 10, step: 1, value: Math.round(this.settings.parallax.intensity * 10), unit: "" })}
+                            ${g.renderSlider({ id: "st_parallax_intensity", valId: "st_parallax_intensity_val", label: "深度", min: 1, max: 10, step: 1, value: Math.round(this.settings.parallax.intensity * 10), unit: "" })}
                         `
     })}
 
                     <!-- Ambient Sound -->
-                    ${d.renderSection({
+                    ${g.renderSection({
       title: "音效",
       icon: "fa-fire",
       contentHtml: `
@@ -1856,25 +1856,25 @@ class Le {
                                     <option value="wind" ${this.settings.ambientSound.type === "wind" ? "selected" : ""}>风声</option>
                                 </select>
                             </div>
-                            ${d.renderSlider({ id: "st_ambient_vol", valId: "st_ambient_vol_val", label: "音量", min: 0, max: 100, step: 5, value: Math.round(this.settings.ambientSound.volume * 100), unit: "%" })}
+                            ${g.renderSlider({ id: "st_ambient_vol", valId: "st_ambient_vol_val", label: "音量", min: 0, max: 100, step: 5, value: Math.round(this.settings.ambientSound.volume * 100), unit: "%" })}
                         `
     })}
 
                     <!-- Frosted Chat -->
-                    ${d.renderSection({
+                    ${g.renderSection({
       title: "毛玻璃",
       icon: "fa-eye",
       contentHtml: `
                             <div class="st-bgloader-check-stack">
-                                ${d.renderCheckbox({ id: "st_frosted_enabled", label: "毛玻璃穿透", checked: this.settings.frostedChat.enabled })}
+                                ${g.renderCheckbox({ id: "st_frosted_enabled", label: "毛玻璃穿透", checked: this.settings.frostedChat.enabled })}
                             </div>
-                            ${d.renderSlider({ id: "st_frosted_blur", valId: "st_frosted_blur_val", label: "模糊", min: 0, max: 25, step: 1, value: this.settings.frostedChat.blur, unit: "px" })}
-                            ${d.renderSlider({ id: "st_frosted_opacity", valId: "st_frosted_opacity_val", label: "不透明", min: 20, max: 100, step: 5, value: this.settings.frostedChat.opacity, unit: "%" })}
+                            ${g.renderSlider({ id: "st_frosted_blur", valId: "st_frosted_blur_val", label: "模糊", min: 0, max: 25, step: 1, value: this.settings.frostedChat.blur, unit: "px" })}
+                            ${g.renderSlider({ id: "st_frosted_opacity", valId: "st_frosted_opacity_val", label: "不透明", min: 20, max: 100, step: 5, value: this.settings.frostedChat.opacity, unit: "%" })}
                         `
     })}
 
                     <!-- Transition -->
-                    ${d.renderSection({
+                    ${g.renderSection({
       title: "转场",
       icon: "fa-wand-magic-sparkles",
       contentHtml: `
@@ -1888,16 +1888,16 @@ class Le {
                                     <option value="slide_right" ${this.settings.transitionEffect === "slide_right" ? "selected" : ""}>右移</option>
                                 </select>
                             </div>
-                            ${d.renderSlider({ id: "st_transition_dur", valId: "st_transition_dur_val", label: "时长", min: 200, max: 1500, step: 50, value: this.settings.transitionDurationMs, unit: "ms" })}
+                            ${g.renderSlider({ id: "st_transition_dur", valId: "st_transition_dur_val", label: "时长", min: 200, max: 1500, step: 50, value: this.settings.transitionDurationMs, unit: "ms" })}
                         `
     })}
 
                     <!-- Audio Engine -->
-                    ${d.renderSection({
+                    ${g.renderSection({
       title: "音乐",
       icon: "fa-volume-high",
       contentHtml: `
-                            ${d.renderSlider({ id: "st_audio_volume", valId: "st_audio_volume_val", label: "音量", min: 0, max: 100, step: 1, value: Math.round(this.settings.volume * 100), unit: "%" })}
+                            ${g.renderSlider({ id: "st_audio_volume", valId: "st_audio_volume_val", label: "音量", min: 0, max: 100, step: 1, value: Math.round(this.settings.volume * 100), unit: "%" })}
                             <div class="st-bgloader-preset-row">
                                 <label>模式:</label>
                                 <select id="st_playback_mode" class="text_pole">
@@ -1907,17 +1907,17 @@ class Le {
                                 </select>
                             </div>
                             <div class="st-bgloader-check-stack">
-                                ${d.renderCheckbox({ id: "st_audio_mute", label: "静音", checked: this.settings.muted })}
-                                ${d.renderCheckbox({ id: "st_audio_muffle", label: "沉浸低通", checked: this.settings.muffleBGM })}
-                                ${d.renderCheckbox({ id: "st_audio_blur", label: "后台暂停", checked: this.settings.pauseOnBlur })}
-                                ${d.renderCheckbox({ id: "st_mini_player_toggle", label: "悬浮胶囊", checked: this.settings.showMiniPlayer })}
-                                ${d.renderCheckbox({ id: "st_capsule_on_play", label: "播放时显示", checked: this.settings.capsuleOnPlayOnly, sub: !0 })}
+                                ${g.renderCheckbox({ id: "st_audio_mute", label: "静音", checked: this.settings.muted })}
+                                ${g.renderCheckbox({ id: "st_audio_muffle", label: "沉浸低通", checked: this.settings.muffleBGM })}
+                                ${g.renderCheckbox({ id: "st_audio_blur", label: "后台暂停", checked: this.settings.pauseOnBlur })}
+                                ${g.renderCheckbox({ id: "st_mini_player_toggle", label: "悬浮胶囊", checked: this.settings.showMiniPlayer })}
+                                ${g.renderCheckbox({ id: "st_capsule_on_play", label: "播放时显示", checked: this.settings.capsuleOnPlayOnly, sub: !0 })}
                             </div>
                         `
     })}
 
                     <!-- Triggers -->
-                    ${d.renderSection({
+                    ${g.renderSection({
       title: "触发器",
       icon: "fa-bolt",
       contentHtml: `
@@ -1951,7 +1951,7 @@ class Le {
     })}
 
                     <!-- Storage -->
-                    ${d.renderSection({
+                    ${g.renderSection({
       title: "存储",
       icon: "fa-file-export",
       contentHtml: `
@@ -1959,9 +1959,9 @@ class Le {
                                 <div>已用: <strong id="st_cache_used">0 MB</strong> <span id="st_cache_count">0</span>项</div>
                                 <button type="button" id="st_cache_clear_btn" class="menu_button menu_button_danger">清空</button>
                             </div>
-                            ${d.renderSlider({ id: "st_cache_quota", valId: "st_cache_quota_val", label: "配额", min: 128, max: 8192, step: 128, value: this.settings.cacheQuotaMB, unit: " MB" })}
+                            ${g.renderSlider({ id: "st_cache_quota", valId: "st_cache_quota_val", label: "配额", min: 128, max: 8192, step: 128, value: this.settings.cacheQuotaMB, unit: " MB" })}
                             <div class="st-bgloader-check-stack">
-                                ${d.renderCheckbox({ id: "st_cache_autoclean", label: "自动清理", checked: this.settings.lruAutoClean })}
+                                ${g.renderCheckbox({ id: "st_cache_autoclean", label: "自动清理", checked: this.settings.lruAutoClean })}
                             </div>
                             <div class="st-bgloader-btn-row">
                                 <button type="button" id="st_backup_export_btn" class="menu_button"><i class="fa-solid fa-download"></i> 导出</button>
@@ -1974,14 +1974,14 @@ class Le {
     })}
 
                     <!-- Cloud -->
-                    ${d.renderSection({
+                    ${g.renderSection({
       id: "st_authority_section",
       title: "云端",
       icon: "fa-cloud",
       contentHtml: `
                             <div id="st_cloud_status_text" class="st-bgloader-cloud-note"></div>
                             <div class="st-bgloader-check-stack">
-                                ${d.renderCheckbox({ id: "st_agent_tools_enable", label: "Agent导演", checked: this.settings.agentToolsEnabled })}
+                                ${g.renderCheckbox({ id: "st_agent_tools_enable", label: "Agent导演", checked: this.settings.agentToolsEnabled })}
                             </div>
                         `
     })}
@@ -1993,19 +1993,19 @@ class Le {
     if (!this.panel) return;
     this.panel.querySelectorAll(".st-bgloader-tab-btn").forEach((u) => {
       u.addEventListener("click", () => {
-        const f = u.dataset.tab;
-        if (!f) return;
-        this.activeTab = f, this.panel?.querySelectorAll(".st-bgloader-tab-btn").forEach((M) => M.classList.remove("active")), u.classList.add("active"), this.panel?.querySelectorAll(".st-bgloader-tab-content").forEach((M) => M.classList.remove("active"));
-        const y = this.panel?.querySelector(`#st_tab_${f}`);
+        const p = u.dataset.tab;
+        if (!p) return;
+        this.activeTab = p, this.panel?.querySelectorAll(".st-bgloader-tab-btn").forEach((v) => v.classList.remove("active")), u.classList.add("active"), this.panel?.querySelectorAll(".st-bgloader-tab-content").forEach((v) => v.classList.remove("active"));
+        const y = this.panel?.querySelector(`#st_tab_${p}`);
         y && y.classList.add("active");
       });
     }), this.panel.querySelector("#st_topbar_bg_vis_btn")?.addEventListener("click", () => {
-      const f = !(this.callbacks.getBackgroundVisible?.() ?? this.settings.backgroundVisible ?? !0);
-      this.callbacks.onBackgroundVisibilityChanged?.(f), this.syncBackgroundVisible(f);
+      const p = !(this.callbacks.getBackgroundVisible?.() ?? this.settings.backgroundVisible ?? !0);
+      this.callbacks.onBackgroundVisibilityChanged?.(p), this.syncBackgroundVisible(p);
     }), this.panel.querySelector("#st_topbar_bg_clear_btn")?.addEventListener("click", () => {
       this.callbacks.onClearActiveBackground?.();
     }), this.panel.querySelector("#st_topbar_drawer_close")?.addEventListener("click", () => {
-      S.getInstance().closeBackgroundDrawer();
+      E.getInstance().closeBackgroundDrawer();
     });
     const s = this.panel.querySelector("#st_topbar_search");
     s?.addEventListener("input", () => {
@@ -2027,35 +2027,35 @@ class Le {
       const u = l.style.display === "none";
       l.style.display = u ? "block" : "none", r.classList.toggle("active", u);
     });
-    const o = this.panel.querySelector("#st_bgloader_dropzone"), h = this.panel.querySelector("#st_bgloader_file_input");
-    o?.addEventListener("click", () => h?.click()), o?.addEventListener("dragover", (u) => {
+    const o = this.panel.querySelector("#st_bgloader_dropzone"), d = this.panel.querySelector("#st_bgloader_file_input");
+    o?.addEventListener("click", () => d?.click()), o?.addEventListener("dragover", (u) => {
       u.preventDefault(), o.classList.add("dragover");
     }), o?.addEventListener("dragleave", () => o.classList.remove("dragover")), o?.addEventListener("drop", (u) => {
       u.preventDefault(), o.classList.remove("dragover");
-      const f = u.dataTransfer?.files;
-      f && f.length > 0 && this.handleFileUpload(f[0]);
-    }), h?.addEventListener("change", () => {
-      h.files && h.files.length > 0 && this.handleFileUpload(h.files[0]);
+      const p = u.dataTransfer?.files;
+      p && p.length > 0 && this.handleFileUpload(p[0]);
+    }), d?.addEventListener("change", () => {
+      d.files && d.files.length > 0 && this.handleFileUpload(d.files[0]);
     });
-    const m = this.panel.querySelector("#st_bgloader_url_btn"), g = this.panel.querySelector("#st_bgloader_url_input");
-    m?.addEventListener("click", () => {
-      const u = g?.value.trim();
-      u && (this.handleUrlImport(u), g && (g.value = ""));
+    const f = this.panel.querySelector("#st_bgloader_url_btn"), h = this.panel.querySelector("#st_bgloader_url_input");
+    f?.addEventListener("click", () => {
+      const u = h?.value.trim();
+      u && (this.handleUrlImport(u), h && (h.value = ""));
     }), this.bindSettingsFormEvents();
   }
   bindSettingsFormEvents() {
     if (!this.panel) return;
-    const e = (p, v, B, F) => {
-      this.panel && d.bindRafSlider(this.panel, p, v, B, F);
+    const e = (m, w, B, F) => {
+      this.panel && g.bindRafSlider(this.panel, m, w, B, F);
     };
-    e("st_filter_blur", "st_filter_blur_val", "px", (p) => {
-      this.settings.filters.blur = p, this.callbacks.onPresetChanged({ id: "custom", name: "Custom", filters: this.settings.filters }), this.save();
-    }), e("st_filter_brightness", "st_filter_brightness_val", "%", (p) => {
-      this.settings.filters.brightness = p, this.callbacks.onPresetChanged({ id: "custom", name: "Custom", filters: this.settings.filters }), this.save();
-    }), e("st_filter_opacity", "st_filter_opacity_val", "%", (p) => {
-      this.settings.filters.opacity = p, this.callbacks.onPresetChanged({ id: "custom", name: "Custom", filters: this.settings.filters }), this.save();
-    }), e("st_filter_saturate", "st_filter_saturate_val", "%", (p) => {
-      this.settings.filters.saturate = p, this.callbacks.onPresetChanged({ id: "custom", name: "Custom", filters: this.settings.filters }), this.save();
+    e("st_filter_blur", "st_filter_blur_val", "px", (m) => {
+      this.settings.filters.blur = m, this.callbacks.onPresetChanged({ id: "custom", name: "Custom", filters: this.settings.filters }), this.save();
+    }), e("st_filter_brightness", "st_filter_brightness_val", "%", (m) => {
+      this.settings.filters.brightness = m, this.callbacks.onPresetChanged({ id: "custom", name: "Custom", filters: this.settings.filters }), this.save();
+    }), e("st_filter_opacity", "st_filter_opacity_val", "%", (m) => {
+      this.settings.filters.opacity = m, this.callbacks.onPresetChanged({ id: "custom", name: "Custom", filters: this.settings.filters }), this.save();
+    }), e("st_filter_saturate", "st_filter_saturate_val", "%", (m) => {
+      this.settings.filters.saturate = m, this.callbacks.onPresetChanged({ id: "custom", name: "Custom", filters: this.settings.filters }), this.save();
     });
     const t = this.panel.querySelector("#st_bg_interactive");
     t?.addEventListener("change", () => {
@@ -2064,70 +2064,70 @@ class Le {
     const i = this.panel.querySelector("#st_weather_type"), s = this.panel.querySelector("#st_weather_density"), a = () => {
       i && (this.settings.weather.type = i.value), s && (this.settings.weather.density = s.value), this.callbacks.onWeatherChanged?.(this.settings.weather), this.save();
     };
-    i?.addEventListener("change", a), s?.addEventListener("change", a), e("st_weather_speed", "st_weather_speed_val", "x", (p) => {
-      this.settings.weather.speed = p / 10, this.callbacks.onWeatherChanged?.(this.settings.weather), this.save();
-    }), e("st_weather_opacity", "st_weather_opacity_val", "%", (p) => {
-      this.settings.weather.opacity = p / 100, this.callbacks.onWeatherChanged?.(this.settings.weather), this.save();
+    i?.addEventListener("change", a), s?.addEventListener("change", a), e("st_weather_speed", "st_weather_speed_val", "x", (m) => {
+      this.settings.weather.speed = m / 10, this.callbacks.onWeatherChanged?.(this.settings.weather), this.save();
+    }), e("st_weather_opacity", "st_weather_opacity_val", "%", (m) => {
+      this.settings.weather.opacity = m / 100, this.callbacks.onWeatherChanged?.(this.settings.weather), this.save();
     });
     const n = this.panel.querySelector("#st_visualizer_mode");
     n?.addEventListener("change", () => {
       this.settings.visualizer.mode = n.value, this.callbacks.onVisualizerChanged?.(this.settings.visualizer), this.save();
-    }), e("st_visualizer_sens", "st_visualizer_sens_val", "x", (p) => {
-      this.settings.visualizer.sensitivity = p / 10, this.callbacks.onVisualizerChanged?.(this.settings.visualizer), this.save();
+    }), e("st_visualizer_sens", "st_visualizer_sens_val", "x", (m) => {
+      this.settings.visualizer.sensitivity = m / 10, this.callbacks.onVisualizerChanged?.(this.settings.visualizer), this.save();
     });
     const r = this.panel.querySelector("#st_parallax_enabled");
     r?.addEventListener("change", () => {
       this.settings.parallax.enabled = r.checked, this.callbacks.onParallaxChanged?.(this.settings.parallax), this.save();
-    }), e("st_parallax_intensity", "st_parallax_intensity_val", "", (p) => {
-      this.settings.parallax.intensity = p / 10, this.callbacks.onParallaxChanged?.(this.settings.parallax), this.save();
+    }), e("st_parallax_intensity", "st_parallax_intensity_val", "", (m) => {
+      this.settings.parallax.intensity = m / 10, this.callbacks.onParallaxChanged?.(this.settings.parallax), this.save();
     });
     const l = this.panel.querySelector("#st_ambient_type");
     l?.addEventListener("change", () => {
       this.settings.ambientSound.type = l.value, this.callbacks.onAmbientSoundChanged?.(this.settings.ambientSound), this.save();
-    }), e("st_ambient_vol", "st_ambient_vol_val", "%", (p) => {
-      this.settings.ambientSound.volume = p / 100, this.callbacks.onAmbientSoundChanged?.(this.settings.ambientSound), this.save();
+    }), e("st_ambient_vol", "st_ambient_vol_val", "%", (m) => {
+      this.settings.ambientSound.volume = m / 100, this.callbacks.onAmbientSoundChanged?.(this.settings.ambientSound), this.save();
     });
     const o = this.panel.querySelector("#st_frosted_enabled");
     o?.addEventListener("change", () => {
       this.settings.frostedChat.enabled = o.checked, this.callbacks.onFrostedChatChanged?.(this.settings.frostedChat), this.save();
-    }), e("st_frosted_blur", "st_frosted_blur_val", "px", (p) => {
-      this.settings.frostedChat.blur = p, this.callbacks.onFrostedChatChanged?.(this.settings.frostedChat), this.save();
-    }), e("st_frosted_opacity", "st_frosted_opacity_val", "%", (p) => {
-      this.settings.frostedChat.opacity = p, this.callbacks.onFrostedChatChanged?.(this.settings.frostedChat), this.save();
+    }), e("st_frosted_blur", "st_frosted_blur_val", "px", (m) => {
+      this.settings.frostedChat.blur = m, this.callbacks.onFrostedChatChanged?.(this.settings.frostedChat), this.save();
+    }), e("st_frosted_opacity", "st_frosted_opacity_val", "%", (m) => {
+      this.settings.frostedChat.opacity = m, this.callbacks.onFrostedChatChanged?.(this.settings.frostedChat), this.save();
     });
-    const h = this.panel.querySelector("#st_transition_effect");
+    const d = this.panel.querySelector("#st_transition_effect");
+    d?.addEventListener("change", () => {
+      this.settings.transitionEffect = d.value, this.callbacks.onTransitionChanged?.(this.settings.transitionEffect, this.settings.transitionDurationMs), this.save();
+    }), e("st_transition_dur", "st_transition_dur_val", "ms", (m) => {
+      this.settings.transitionDurationMs = m, this.callbacks.onTransitionChanged?.(this.settings.transitionEffect, this.settings.transitionDurationMs), this.save();
+    }), e("st_audio_volume", "st_audio_volume_val", "%", (m) => {
+      this.settings.volume = m / 100, this.save();
+    });
+    const f = this.panel.querySelector("#st_playback_mode");
+    f?.addEventListener("change", () => {
+      this.settings.playbackMode = f.value, this.callbacks.onPlaybackModeChanged(this.settings.playbackMode), this.save();
+    });
+    const h = this.panel.querySelector("#st_audio_mute");
     h?.addEventListener("change", () => {
-      this.settings.transitionEffect = h.value, this.callbacks.onTransitionChanged?.(this.settings.transitionEffect, this.settings.transitionDurationMs), this.save();
-    }), e("st_transition_dur", "st_transition_dur_val", "ms", (p) => {
-      this.settings.transitionDurationMs = p, this.callbacks.onTransitionChanged?.(this.settings.transitionEffect, this.settings.transitionDurationMs), this.save();
-    }), e("st_audio_volume", "st_audio_volume_val", "%", (p) => {
-      this.settings.volume = p / 100, this.save();
-    });
-    const m = this.panel.querySelector("#st_playback_mode");
-    m?.addEventListener("change", () => {
-      this.settings.playbackMode = m.value, this.callbacks.onPlaybackModeChanged(this.settings.playbackMode), this.save();
-    });
-    const g = this.panel.querySelector("#st_audio_mute");
-    g?.addEventListener("change", () => {
-      this.settings.muted = g.checked, this.save();
+      this.settings.muted = h.checked, this.save();
     });
     const u = this.panel.querySelector("#st_audio_muffle");
     u?.addEventListener("change", () => {
       this.settings.muffleBGM = u.checked, this.callbacks.onMuffleChanged?.(u.checked), this.save();
     });
-    const f = this.panel.querySelector("#st_audio_blur");
-    f?.addEventListener("change", () => {
-      this.settings.pauseOnBlur = f.checked, this.save();
+    const p = this.panel.querySelector("#st_audio_blur");
+    p?.addEventListener("change", () => {
+      this.settings.pauseOnBlur = p.checked, this.save();
     });
     const y = this.panel.querySelector("#st_mini_player_toggle");
     y?.addEventListener("change", () => {
       this.settings.showMiniPlayer = y.checked, this.callbacks.onMiniPlayerToggle(y.checked), this.save();
     });
-    const M = this.panel.querySelector("#st_capsule_on_play");
-    M?.addEventListener("change", () => {
-      this.settings.capsuleOnPlayOnly = M.checked, this.callbacks.onCapsuleOnPlayToggle?.(M.checked), this.save();
-    }), e("st_cache_quota", "st_cache_quota_val", " MB", (p) => {
-      this.settings.cacheQuotaMB = p, this.save();
+    const v = this.panel.querySelector("#st_capsule_on_play");
+    v?.addEventListener("change", () => {
+      this.settings.capsuleOnPlayOnly = v.checked, this.callbacks.onCapsuleOnPlayToggle?.(v.checked), this.save();
+    }), e("st_cache_quota", "st_cache_quota_val", " MB", (m) => {
+      this.settings.cacheQuotaMB = m, this.save();
     });
     const j = this.panel.querySelector("#st_cache_autoclean");
     j?.addEventListener("change", () => {
@@ -2135,11 +2135,11 @@ class Le {
     }), this.panel.querySelector("#st_cache_clear_btn")?.addEventListener("click", async () => {
       await this.cacheManager.clearAll(), this.updateCacheStats(), this.refreshMediaGrid();
     }), this.panel.querySelector("#st_backup_export_btn")?.addEventListener("click", () => {
-      const p = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(this.settings, null, 2)), v = document.createElement("a");
-      v.setAttribute("href", p), v.setAttribute("download", `st-bgloader-backup-${Date.now()}.json`), document.body.appendChild(v), v.click(), v.remove();
-    }), this.panel.querySelector("#st_backup_import_file")?.addEventListener("change", (p) => {
-      const v = p.target.files?.[0];
-      if (!v) return;
+      const m = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(this.settings, null, 2)), w = document.createElement("a");
+      w.setAttribute("href", m), w.setAttribute("download", `st-bgloader-backup-${Date.now()}.json`), document.body.appendChild(w), w.click(), w.remove();
+    }), this.panel.querySelector("#st_backup_import_file")?.addEventListener("change", (m) => {
+      const w = m.target.files?.[0];
+      if (!w) return;
       const B = new FileReader();
       B.onload = (F) => {
         try {
@@ -2148,7 +2148,7 @@ class Le {
         } catch {
           alert("导入失败：不是有效的 JSON 配置文件");
         }
-      }, B.readAsText(v);
+      }, B.readAsText(w);
     }), this.updatePresetSelect(), this.updateSceneSelect(), this.updateTriggersUI();
   }
   save() {
@@ -2207,11 +2207,11 @@ class Le {
       n.className = `st-bgloader-media-card ${r ? "active" : ""}`, n.title = a.name;
       let l = "fa-file-image";
       a.type === "video" && (l = "fa-file-video"), a.type === "audio" && (l = "fa-file-audio"), (a.type === "html" || a.type === "svg") && (l = "fa-file-code");
-      const o = a.type === "image" ? `<div class="st-bgloader-card-img" style="background-image: url('${b(a.url)}')"></div>` : `<div class="st-bgloader-card-icon"><i class="fa-solid ${l} fa-2x"></i></div>`, h = a.name.replace(/[\(\（][^\)\）]*[\)\）]/g, "").trim() || a.name;
+      const o = a.type === "image" ? `<div class="st-bgloader-card-img" style="background-image: url('${b(a.url)}')"></div>` : `<div class="st-bgloader-card-icon"><i class="fa-solid ${l} fa-2x"></i></div>`, d = a.name.replace(/[\(\（][^\)\）]*[\)\）]/g, "").trim() || a.name;
       n.innerHTML = `
                 ${o}
                 <div class="st-bgloader-card-info">
-                    <div class="st-bgloader-card-name">${b(h)}</div>
+                    <div class="st-bgloader-card-name">${b(d)}</div>
                     <div class="st-bgloader-card-meta">
                         <span class="st-bg-native-badge ${a.type}">${a.type.toUpperCase()}</span>
                         ${r ? '<span class="st-bgloader-active-tag"><i class="fa-solid fa-check"></i> 当前</span>' : ""}
@@ -2221,25 +2221,36 @@ class Le {
                     <button type="button" class="menu_button menu_button_icon st-card-apply" title="应用"><i class="fa-solid fa-play"></i></button>
                     <button type="button" class="menu_button menu_button_icon menu_button_danger st-card-delete" title="删除"><i class="fa-solid fa-trash"></i></button>
                 </div>
-            `, n.querySelector(".st-card-apply")?.addEventListener("click", (m) => {
-        m.stopPropagation(), this.reportMediaAction(this.callbacks.onMediaSelected(a), "应用媒体失败");
-      }), n.querySelector(".st-card-delete")?.addEventListener("click", async (m) => {
-        if (m.stopPropagation(), confirm("确认删除？")) {
+            `, n.querySelector(".st-card-apply")?.addEventListener("click", (f) => {
+        f.stopPropagation(), this.reportMediaAction(this.callbacks.onMediaSelected(a), "应用媒体失败");
+      }), n.querySelector(".st-card-delete")?.addEventListener("click", async (f) => {
+        if (f.stopPropagation(), confirm("确认删除？")) {
           try {
             await this.cacheManager.deleteMedia(a.id), await this.callbacks.onMediaDeleted(a.id);
-          } catch (g) {
-            console.error("[ST-BgLoader] 删除媒体失败:", g);
+          } catch (h) {
+            console.error("[ST-BgLoader] 删除媒体失败:", h);
           }
           this.refreshMediaGrid(), this.updateCacheStats();
         }
       }), n.addEventListener("click", () => {
         this.reportMediaAction(this.callbacks.onMediaSelected(a), "应用媒体失败");
+      }), n.tabIndex = 0, n.setAttribute("role", "button"), n.setAttribute("aria-label", `应用媒体 ${a.name}`), n.addEventListener("keydown", (f) => {
+        const h = f.key;
+        if (h === "Enter" || h === " ") {
+          f.preventDefault(), this.reportMediaAction(this.callbacks.onMediaSelected(a), "应用媒体失败");
+          return;
+        }
+        if (h !== "ArrowRight" && h !== "ArrowLeft" && h !== "ArrowUp" && h !== "ArrowDown") return;
+        f.preventDefault();
+        const u = Array.from(e.querySelectorAll(".st-bgloader-media-card")), p = u.indexOf(n), y = getComputedStyle(e).gridTemplateColumns.split(" ").filter(Boolean).length || 1;
+        let v = p;
+        h === "ArrowRight" ? v = p + 1 : h === "ArrowLeft" ? v = p - 1 : h === "ArrowUp" ? v = p - y : v = p + y, v >= 0 && v < u.length && u[v].focus();
       }), s.appendChild(n);
     }), e.appendChild(s);
   }
   async handleFileUpload(e) {
     try {
-      const t = T(e.name), i = await this.cacheManager.saveMedia(
+      const t = M(e.name), i = await this.cacheManager.saveMedia(
         e,
         e.name,
         t,
@@ -2252,7 +2263,7 @@ class Le {
   }
   async handleUrlImport(e) {
     try {
-      const t = e.substring(e.lastIndexOf("/") + 1).split("?")[0] || "remote_media", i = T(t), s = await this.cacheManager.saveMedia(
+      const t = e.substring(e.lastIndexOf("/") + 1).split("?")[0] || "remote_media", i = M(t), s = await this.cacheManager.saveMedia(
         new Blob([]),
         t,
         i,
@@ -2349,8 +2360,8 @@ class Le {
                     <span class="st-bgloader-trigger-name">${b(r.name)}</span>
                     <span class="st-bgloader-trigger-pattern">${b(r.pattern)}</span>
                     <button type="button" class="menu_button menu_button_icon menu_button_danger st-bgloader-trigger-del"><i class="fa-solid fa-trash"></i></button>
-                `, o.querySelector(".st-bgloader-trigger-check")?.addEventListener("change", (h) => {
-        r.enabled = h.target.checked, this.save();
+                `, o.querySelector(".st-bgloader-trigger-check")?.addEventListener("change", (d) => {
+        r.enabled = d.target.checked, this.save();
       }), o.querySelector(".st-bgloader-trigger-del")?.addEventListener("click", () => {
         this.settings.triggerRules.splice(l, 1), this.save(), this.updateTriggersUI();
       }), e.appendChild(o);
@@ -2366,7 +2377,7 @@ class Le {
         alert("请填写规则名称和匹配文本");
         return;
       }
-      const h = {
+      const d = {
         id: "trig_" + Date.now(),
         name: l,
         enabled: !0,
@@ -2377,7 +2388,7 @@ class Le {
           weather: this.settings.weather.type
         }
       };
-      this.settings.triggerRules || (this.settings.triggerRules = []), this.settings.triggerRules.push(h), this.save(), this.updateTriggersUI(), i.style.display = "none", s.style.display = "block";
+      this.settings.triggerRules || (this.settings.triggerRules = []), this.settings.triggerRules.push(d), this.save(), this.updateTriggersUI(), i.style.display = "none", s.style.display = "block";
     });
   }
   async updateCacheStats() {
@@ -2504,7 +2515,7 @@ class Oe {
     }), this.refreshSelection(this.activeFileName));
   }
   addBadge(e) {
-    const t = T(e.getAttribute("bgfile") || "");
+    const t = M(e.getAttribute("bgfile") || "");
     if (t === "image") return;
     const i = document.createElement("span");
     i.className = `st-bg-native-badge ${t}`, i.setAttribute(te, "true"), i.textContent = t.toUpperCase(), e.appendChild(i);
@@ -2564,7 +2575,7 @@ class Oe {
     const i = t.closest(".bg_example");
     if (!i || !this.shouldTakeOver(i, t)) return;
     const s = i.getAttribute("bgfile");
-    s && (e.preventDefault(), e.stopPropagation(), Promise.resolve(this.onSelect(s, T(s))).catch((a) => {
+    s && (e.preventDefault(), e.stopPropagation(), Promise.resolve(this.onSelect(s, M(s))).catch((a) => {
       console.error(`[ST-BgLoader] Failed to apply native background "${s}":`, a);
     }));
   };
@@ -2576,7 +2587,7 @@ class Oe {
    * line numbers are for the host version recorded in `research/st-native-evidence.md`.
    */
   shouldTakeOver(e, t) {
-    return !(document.querySelector("#Backgrounds.bg-selection-mode") || this.isChatBackgroundLocked() || t.closest(".jg-button, .bg_folder_tile, .mobile-only-menu-toggle") || e.getAttribute("custom") === "true" || this.level === "non-image" && T(e.getAttribute("bgfile") || "") === "image");
+    return !(document.querySelector("#Backgrounds.bg-selection-mode") || this.isChatBackgroundLocked() || t.closest(".jg-button, .bg_folder_tile, .mobile-only-menu-toggle") || e.getAttribute("custom") === "true" || this.level === "non-image" && M(e.getAttribute("bgfile") || "") === "image");
   }
   /**
    * Whether the current chat has a locked background.
@@ -2669,8 +2680,8 @@ class $e {
     i && i.remove();
     const s = document.createElement("div");
     s.id = "st_bg_mini_player", s.className = "st-bg-mini-player";
-    const a = this.audioEngine.getCurrentTrack(), r = (a ? a.name : "无音频").replace(/[\(\（][^\)\）]*[\)\）]/g, "").trim(), l = this.audioEngine.isPlaying(), o = this.audioEngine.getPlaybackMode(), h = this.isVisible && (!this.capsuleOnPlayOnly || l);
-    s.classList.add(h ? "visible" : "hidden"), s.innerHTML = `
+    const a = this.audioEngine.getCurrentTrack(), r = (a ? a.name : "无音频").replace(/[\(\（][^\)\）]*[\)\）]/g, "").trim(), l = this.audioEngine.isPlaying(), o = this.audioEngine.getPlaybackMode(), d = this.isVisible && (!this.capsuleOnPlayOnly || l);
+    s.classList.add(d ? "visible" : "hidden"), s.innerHTML = `
             <div class="st-bg-mini-capsule">
                 <button class="st-bg-mini-btn" id="st_mini_prev" title="上一曲">
                     <i class="fa-solid fa-backward-step"></i>
@@ -2686,15 +2697,15 @@ class $e {
                     <i class="fa-solid ${this.getModeIcon(o)}"></i>
                 </button>
             </div>
-        `, document.body.appendChild(s), this.container = s, this.bindEvents(), this.unsubscribeTrack?.(), this.unsubscribePlayState?.(), this.unsubscribeTrack = this.audioEngine.addTrackListener((m) => {
-      const g = this.container?.querySelector("#st_mini_title");
-      if (g) {
-        const f = (m ? m.name : "无音频").replace(/[\(\（][^\)\）]*[\)\）]/g, "").trim();
-        g.textContent = f, g.setAttribute("title", f);
+        `, document.body.appendChild(s), this.container = s, this.bindEvents(), this.unsubscribeTrack?.(), this.unsubscribePlayState?.(), this.unsubscribeTrack = this.audioEngine.addTrackListener((f) => {
+      const h = this.container?.querySelector("#st_mini_title");
+      if (h) {
+        const p = (f ? f.name : "无音频").replace(/[\(\（][^\)\）]*[\)\）]/g, "").trim();
+        h.textContent = p, h.setAttribute("title", p);
       }
-    }), this.unsubscribePlayState = this.audioEngine.addPlayStateListener((m) => {
-      const g = this.container?.querySelector("#st_mini_play i");
-      g && (g.className = `fa-solid ${m ? "fa-pause" : "fa-play"}`), this.capsuleOnPlayOnly && this.isVisible && (m ? (this.hideTimer !== null && (clearTimeout(this.hideTimer), this.hideTimer = null), this.show()) : (this.hideTimer !== null && clearTimeout(this.hideTimer), this.hideTimer = window.setTimeout(() => {
+    }), this.unsubscribePlayState = this.audioEngine.addPlayStateListener((f) => {
+      const h = this.container?.querySelector("#st_mini_play i");
+      h && (h.className = `fa-solid ${f ? "fa-pause" : "fa-play"}`), this.capsuleOnPlayOnly && this.isVisible && (f ? (this.hideTimer !== null && (clearTimeout(this.hideTimer), this.hideTimer = null), this.show()) : (this.hideTimer !== null && clearTimeout(this.hideTimer), this.hideTimer = window.setTimeout(() => {
         this.hide();
       }, 1200)));
     });
@@ -2762,7 +2773,7 @@ class Fe {
   async setBackground(e, t) {
     let s = (await this.ext.getCacheManager().listMedia()).find((n) => n.id === e || n.name === e || n.url === e || n.cacheKey === e), a = !1;
     if (!s) {
-      const n = t?.name || e.split("/").pop()?.split("?")[0] || "remote_background", r = t?.type || T(e);
+      const n = t?.name || e.split("/").pop()?.split("?")[0] || "remote_background", r = t?.type || M(e);
       t?.saveToLibrary ? s = await this.ext.getCacheManager().saveMedia(new Blob([]), n, r, "url", e) : (a = !0, s = {
         id: "custom_" + Date.now(),
         name: n,
@@ -3022,20 +3033,20 @@ class Fe {
       for (; r.length > 0; ) {
         const o = r.shift();
         try {
-          const { item: h, isNew: m } = await this.ext.getCacheManager().preloadUrl(o), g = {
+          const { item: d, isNew: f } = await this.ext.getCacheManager().preloadUrl(o), h = {
             url: o,
             success: !0,
-            cached: !m,
-            size: h.size || 0
+            cached: !f,
+            size: d.size || 0
           };
-          s.push(g);
-        } catch (h) {
+          s.push(h);
+        } catch (d) {
           s.push({
             url: o,
             success: !1,
             cached: !1,
             size: 0,
-            error: h?.message || String(h)
+            error: d?.message || String(d)
           });
         }
         n++, t?.onProgress?.(n, i.length, o), this.emit("preload-progress", n, i.length, o);
@@ -3345,15 +3356,15 @@ class qe {
       const n = this.dataArray.length, r = Math.max(3, this.width / n * 1.6);
       let l = 0;
       const o = this.currentOptions.color || "#4fa3d1";
-      for (let h = 0; h < n; h++) {
-        const m = this.dataArray[h] / 255 * s, g = Math.min(this.height, m * (this.height - 10));
-        if (g > 1) {
-          const u = a.createLinearGradient(0, this.height, 0, this.height - g);
+      for (let d = 0; d < n; d++) {
+        const f = this.dataArray[d] / 255 * s, h = Math.min(this.height, f * (this.height - 10));
+        if (h > 1) {
+          const u = a.createLinearGradient(0, this.height, 0, this.height - h);
           u.addColorStop(0, `${o}22`), u.addColorStop(0.7, `${o}aa`), u.addColorStop(1, `${o}ff`), a.fillStyle = u;
-          const f = this.height - g;
+          const p = this.height - h;
           a.beginPath();
           const y = Math.min(r / 2, 3);
-          typeof a.roundRect == "function" ? a.roundRect(l, f, r - 1.5, g, [y, y, 0, 0]) : a.rect(l, f, r - 1.5, g), a.fill();
+          typeof a.roundRect == "function" ? a.roundRect(l, p, r - 1.5, h, [y, y, 0, 0]) : a.rect(l, p, r - 1.5, h), a.fill();
         }
         if (l += r, l > this.width) break;
       }
@@ -3591,15 +3602,15 @@ class Ve {
    */
   startRain(e) {
     const t = 2 * e.sampleRate, i = e.createBuffer(1, t, e.sampleRate), s = i.getChannelData(0);
-    let a = 0, n = 0, r = 0, l = 0, o = 0, h = 0, m = 0;
-    for (let f = 0; f < t; f++) {
+    let a = 0, n = 0, r = 0, l = 0, o = 0, d = 0, f = 0;
+    for (let p = 0; p < t; p++) {
       const y = Math.random() * 2 - 1;
-      a = 0.99886 * a + y * 0.0555179, n = 0.99332 * n + y * 0.0750759, r = 0.969 * r + y * 0.153852, l = 0.8665 * l + y * 0.3104856, o = 0.55 * o + y * 0.5329522, h = -0.7616 * h - y * 0.016898, s[f] = (a + n + r + l + o + h + m + y * 0.5362) * 0.11, m = y * 0.115926;
+      a = 0.99886 * a + y * 0.0555179, n = 0.99332 * n + y * 0.0750759, r = 0.969 * r + y * 0.153852, l = 0.8665 * l + y * 0.3104856, o = 0.55 * o + y * 0.5329522, d = -0.7616 * d - y * 0.016898, s[p] = (a + n + r + l + o + d + f + y * 0.5362) * 0.11, f = y * 0.115926;
     }
-    const g = e.createBufferSource();
-    g.buffer = i, g.loop = !0;
+    const h = e.createBufferSource();
+    h.buffer = i, h.loop = !0;
     const u = e.createBiquadFilter();
-    u.type = "lowpass", u.frequency.value = 1200, g.connect(u), u.connect(this.gainNode), g.start(0), this.activeSource = g;
+    u.type = "lowpass", u.frequency.value = 1200, h.connect(u), u.connect(this.gainNode), h.start(0), this.activeSource = h;
   }
   /**
    * Synthesize Fire: Low rumble pink noise + stochastic crackle bursts
@@ -4297,7 +4308,7 @@ class at {
         this.settings = i, this.saveSettings();
       }
     }), this.settingsDrawer.render(), this.nativeController = new Oe(async (i, s) => {
-      const a = E(i), n = {
+      const a = T(i), n = {
         id: "native_" + i,
         name: i,
         type: s,

@@ -300,11 +300,12 @@ window.stBgLoader.on('play-state-change', (isPlaying) => {
 unsub();
 ```
 
-### 全量 22 个事件对照表
+### 全量 23 个事件对照表
 
 | 事件名 (`Event Name`) | 回调参数 | 触发时机 |
 | --- | --- | --- |
 | `media-change` | `(item: MediaItem \| null)` | 背景媒体发生切换或被清空时 |
+| `media-error` | `(info: { type: 'image' \| 'video' })` | 已挂载的图片/视频解码失败时（损坏字节、404、不支持的编码） |
 | `background-visibility-change` | `(visible: boolean)` | 背景图层显隐状态切换时 |
 | `track-change` | `(item: MediaItem \| null)` | 当前播放的 BGM 音轨发生切换时 |
 | `play-state-change` | `(isPlaying: boolean)` | 音频开始播放或暂停时 |
