@@ -139,8 +139,9 @@ export class SettingsDrawer {
             const enabled = masterCb.checked;
             this.settings.enabled = enabled;
             this.syncMasterToggle(enabled);
+            // onMasterToggle alone owns persistence (setMasterEnabled → saveSettings); also
+            // firing onSettingsChanged would save a second time and double-bump the revision.
             this.callbacks.onMasterToggle(enabled);
-            this.callbacks.onSettingsChanged(this.settings);
         });
 
         const openBtn = this.container.querySelector('#st_bgloader_open_topbar_btn') as HTMLButtonElement | null;

@@ -291,7 +291,11 @@ export class NativeBackgroundController {
 
         e.preventDefault();
         e.stopPropagation();
-        this.onSelect(bgFile, detectMediaType(bgFile));
+        // onSelect is async (media resolution + mount); a failure must surface as a tagged
+        // log, not an unhandled rejection — the click handler itself stays synchronous.
+        Promise.resolve(this.onSelect(bgFile, detectMediaType(bgFile))).catch((err) => {
+            console.error(`[ST-BgLoader] Failed to apply native background "${bgFile}":`, err);
+        });
     };
 
     /**

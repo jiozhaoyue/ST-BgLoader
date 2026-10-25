@@ -68,6 +68,9 @@ export class TopbarBackgroundDrawer {
     private searchQuery: string = '';
     private typeFilter: string = 'all';
     private sortOrder: 'name' | 'time' | 'size' = 'name';
+    /** Pending DOM-wait observer between mount() and the host drawer appearing. */
+    private mountObserver: MutationObserver | null = null;
+    private searchDebounceTimer: number | null = null;
 
     constructor(
         settings: BgLoaderSettings,
@@ -104,17 +107,20 @@ export class TopbarBackgroundDrawer {
         this.hostDrawer = hostBridge.getBackgroundDrawer();
 
         if (!this.hostDrawer) {
-            // Wait for DOM if not ready yet
+            // Wait for DOM if not ready yet. One pending observer at a time: repeated mount()
+            // calls (init + master re-enable) must not stack observers on document.body.
+            if (this.mountObserver) return;
             const observer = new MutationObserver(() => {
                 const drawer = hostBridge.getBackgroundDrawer();
                 if (drawer) {
-                    observer.disconnect();
+                    this.dropMountObserver();
                     this.hostDrawer = drawer;
                     this.mount();
                 }
             });
+            this.mountObserver = observer;
             observer.observe(document.body, { childList: true, subtree: true });
-            setTimeout(() => observer.disconnect(), 15000);
+            setTimeout(() => this.dropMountObserver(), 15000);
             return;
         }
 
@@ -144,6 +150,9 @@ export class TopbarBackgroundDrawer {
 
     /** Restores the host drawer to its native state */
     public unmount(): void {
+        // Also cancel the pending DOM-wait: after a master disable, a later observer tick
+        // would otherwise re-run mount() and bring the panel back from the dead.
+        this.dropMountObserver();
         if (this.panel) {
             this.panel.remove();
             this.panel = null;
@@ -153,6 +162,16 @@ export class TopbarBackgroundDrawer {
                 child.classList.remove(NATIVE_HIDDEN_CLASS);
             });
         }
+    }
+
+    private dropMountObserver(): void {
+        this.mountObserver?.disconnect();
+        this.mountObserver = null;
+    }
+
+    /** Fire-and-forget async callback with a tagged rejection log (never an unhandled rejection). */
+    private reportMediaAction(action: Promise<void> | void, label: string): void {
+        Promise.resolve(action).catch((err) => console.error(`[ST-BgLoader] ${label}:`, err));
     }
 
     private renderPanel(): void {
@@ -498,7 +517,15 @@ export class TopbarBackgroundDrawer {
         const searchInput = this.panel.querySelector('#st_topbar_search') as HTMLInputElement | null;
         searchInput?.addEventListener('input', () => {
             this.searchQuery = searchInput.value.trim().toLowerCase();
-            void this.refreshMediaGrid();
+            // Debounced: once the catalog TTL expires, every keystroke would otherwise fire a
+            // full POST /api/backgrounds/all. 250ms trailing is imperceptible for a grid filter.
+            if (this.searchDebounceTimer !== null) {
+                window.clearTimeout(this.searchDebounceTimer);
+            }
+            this.searchDebounceTimer = window.setTimeout(() => {
+                this.searchDebounceTimer = null;
+                void this.refreshMediaGrid();
+            }, 250);
         });
 
         const typeFilter = this.panel.querySelector('#st_topbar_type_filter') as HTMLSelectElement | null;
@@ -798,6 +825,7 @@ export class TopbarBackgroundDrawer {
     private syncFormControls(): void {
         if (!this.panel) return;
         this.updateFilterSliders();
+        this.updateSettingsControls();
         this.updatePresetSelect();
         this.updateSceneSelect();
         this.updateTriggersUI();
@@ -817,6 +845,62 @@ export class TopbarBackgroundDrawer {
         setVal('st_filter_brightness', 'st_filter_brightness_val', this.settings.filters.brightness, '%');
         setVal('st_filter_opacity', 'st_filter_opacity_val', this.settings.filters.opacity, '%');
         setVal('st_filter_saturate', 'st_filter_saturate_val', this.settings.filters.saturate, '%');
+    }
+
+    /**
+     * Backfills every settings-tab control from the (possibly remotely updated) settings
+     * object: weather, visualizer, parallax, ambient, frosted glass, transition, audio,
+     * cache quota and agent tools. Without this, a remote convergence left those form
+     * controls showing stale values even though the subsystems had already applied them.
+     */
+    private updateSettingsControls(): void {
+        if (!this.panel) return;
+        const setSelect = (id: string, v: string) => {
+            const el = this.panel?.querySelector(`#${id}`) as HTMLSelectElement | null;
+            if (el) el.value = v;
+        };
+        const setVal = (id: string, valId: string, v: number, suffix: string) => {
+            const el = this.panel?.querySelector(`#${id}`) as HTMLInputElement | null;
+            const lbl = this.panel?.querySelector(`#${valId}`);
+            if (el) el.value = String(v);
+            if (lbl) lbl.textContent = `${v}${suffix}`;
+        };
+        const setChecked = (id: string, v: boolean) => {
+            const el = this.panel?.querySelector(`#${id}`) as HTMLInputElement | null;
+            if (el) el.checked = v;
+        };
+
+        setSelect('st_weather_type', this.settings.weather.type);
+        setSelect('st_weather_density', this.settings.weather.density);
+        setVal('st_weather_speed', 'st_weather_speed_val', Math.round(this.settings.weather.speed * 10), 'x');
+        setVal('st_weather_opacity', 'st_weather_opacity_val', Math.round(this.settings.weather.opacity * 100), '%');
+
+        setSelect('st_visualizer_mode', this.settings.visualizer.mode);
+        setVal('st_visualizer_sens', 'st_visualizer_sens_val', Math.round(this.settings.visualizer.sensitivity * 10), 'x');
+        setChecked('st_parallax_enabled', this.settings.parallax.enabled);
+        setVal('st_parallax_intensity', 'st_parallax_intensity_val', Math.round(this.settings.parallax.intensity * 10), '');
+
+        setSelect('st_ambient_type', this.settings.ambientSound.type);
+        setVal('st_ambient_vol', 'st_ambient_vol_val', Math.round(this.settings.ambientSound.volume * 100), '%');
+
+        setChecked('st_frosted_enabled', this.settings.frostedChat.enabled);
+        setVal('st_frosted_blur', 'st_frosted_blur_val', this.settings.frostedChat.blur, 'px');
+        setVal('st_frosted_opacity', 'st_frosted_opacity_val', this.settings.frostedChat.opacity, '%');
+
+        setSelect('st_transition_effect', this.settings.transitionEffect);
+        setVal('st_transition_dur', 'st_transition_dur_val', this.settings.transitionDurationMs, 'ms');
+
+        setVal('st_audio_volume', 'st_audio_volume_val', Math.round(this.settings.volume * 100), '%');
+        setSelect('st_playback_mode', this.settings.playbackMode);
+        setChecked('st_audio_mute', this.settings.muted);
+        setChecked('st_audio_muffle', this.settings.muffleBGM);
+        setChecked('st_audio_blur', this.settings.pauseOnBlur);
+        setChecked('st_mini_player_toggle', this.settings.showMiniPlayer);
+        setChecked('st_capsule_on_play', this.settings.capsuleOnPlayOnly);
+
+        setVal('st_cache_quota', 'st_cache_quota_val', this.settings.cacheQuotaMB, ' MB');
+        setChecked('st_cache_autoclean', this.settings.lruAutoClean);
+        setChecked('st_agent_tools_enable', this.settings.agentToolsEnabled);
     }
 
     public async refreshMediaGrid(): Promise<void> {
@@ -890,21 +974,25 @@ export class TopbarBackgroundDrawer {
 
             card.querySelector('.st-card-apply')?.addEventListener('click', (e) => {
                 e.stopPropagation();
-                this.callbacks.onMediaSelected(item);
+                this.reportMediaAction(this.callbacks.onMediaSelected(item), '应用媒体失败');
             });
 
             card.querySelector('.st-card-delete')?.addEventListener('click', async (e) => {
                 e.stopPropagation();
                 if (confirm('确认删除？')) {
-                    await this.cacheManager.deleteMedia(item.id);
-                    this.callbacks.onMediaDeleted(item.id);
+                    try {
+                        await this.cacheManager.deleteMedia(item.id);
+                        await this.callbacks.onMediaDeleted(item.id);
+                    } catch (err) {
+                        console.error('[ST-BgLoader] 删除媒体失败:', err);
+                    }
                     void this.refreshMediaGrid();
                     void this.updateCacheStats();
                 }
             });
 
             card.addEventListener('click', () => {
-                this.callbacks.onMediaSelected(item);
+                this.reportMediaAction(this.callbacks.onMediaSelected(item), '应用媒体失败');
             });
 
             fragment.appendChild(card);
