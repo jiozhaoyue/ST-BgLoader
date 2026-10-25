@@ -470,6 +470,46 @@ try {
         return items.filter(i => i.name.startsWith('xm_')).length;
     });
 
+    // ---------- c14 视图状态持久化（跨整页刷新）----------
+    {
+        await page.evaluate(() => {
+            const t = document.querySelector('#st_topbar_type_filter');
+            t.value = 'video';
+            t.dispatchEvent(new Event('change', { bubbles: true }));
+            const s = document.querySelector('#st_topbar_sort');
+            s.value = 'time';
+            s.dispatchEvent(new Event('change', { bubbles: true }));
+        });
+        await settle(1500);
+        // 用新页面代替 reload：同 browser context（同 cookie/localStorage，等效新会话），
+        // 且避开实例长任务导致的导航挂起。
+        const page2 = await browser.newPage();
+        await page2.setViewport({ width: 1280, height: 800 });
+        await page2.goto(TARGET_URL, { waitUntil: 'domcontentloaded', timeout: 40000 });
+        await ensureExtensionLoaded(page2);
+        await page2.waitForFunction(() => window.STBgLoader?.isInitialized, { timeout: 35000 });
+        await page2.evaluate(() => window.STBgLoader.getTopbarDrawer()?.mount());
+        await settle(2000);
+        const restored = await page2.evaluate(() => ({
+            typeFilter: document.querySelector('#st_topbar_type_filter')?.value,
+            sort: document.querySelector('#st_topbar_sort')?.value,
+            view: window.STBgLoader.getSettings().libraryView,
+        }));
+        await page2.screenshot({ path: join(outDir, 'c14-view-persist.png') });
+        // 复原视图状态，不给实例留测试痕迹
+        await page2.evaluate(() => {
+            const t = document.querySelector('#st_topbar_type_filter');
+            t.value = 'all';
+            t.dispatchEvent(new Event('change', { bubbles: true }));
+            const s = document.querySelector('#st_topbar_sort');
+            s.value = 'name';
+            s.dispatchEvent(new Event('change', { bubbles: true }));
+        });
+        await settle(1000);
+        await page2.close();
+        report({ id: 'c14', title: '媒体库视图状态跨刷新持久化（video/time）', pass: restored.typeFilter === 'video' && restored.sort === 'time' && restored.view?.typeFilter === 'video' && restored.view?.sortOrder === 'time', note: JSON.stringify(restored), itemId: null });
+    }
+
     const passCount = results.filter(r => r.pass).length;
     console.log(`\n===== 极端媒体套件：${passCount}/${results.length} 通过；清理 ${cleaned}/${allIds.length} 条测试条目；残留 xm_=${remaining}；媒体库卡片=${gridCards} =====`);
     writeFileSync(join(outDir, 'extreme-media-report.json'), JSON.stringify({ results, gridCards, remainingXmItems: remaining, consoleErrors: consoleErrors.slice(-40) }, null, 2));

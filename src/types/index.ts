@@ -213,6 +213,16 @@ export interface BgLoaderSettings {
 
     // Authority backend (opt-in): register ambient tools into the Agent Runtime
     agentToolsEnabled: boolean;
+
+    /**
+     * Media library view state (topbar drawer grid): persists sort order and type filter
+     * across sessions so the library opens the way the user left it. Search text is
+     * deliberately session-only (a stale query restored on reload reads as "empty library").
+     */
+    libraryView: {
+        sortOrder: 'name' | 'time' | 'size';
+        typeFilter: string;
+    };
 }
 
 export type AmbientSoundType = 'off' | 'rain' | 'fire' | 'wind';
@@ -370,4 +380,8 @@ export const DEFAULT_SETTINGS: BgLoaderSettings = {
     },
     scenes: {},
     agentToolsEnabled: false,
+    libraryView: {
+        sortOrder: 'name',
+        typeFilter: 'all',
+    },
 };

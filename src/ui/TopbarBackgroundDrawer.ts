@@ -67,8 +67,8 @@ export class TopbarBackgroundDrawer {
     private authority: AuthorityBridge | null;
     private activeTab: 'library' | 'settings' = 'library';
     private searchQuery: string = '';
-    private typeFilter: string = 'all';
-    private sortOrder: 'name' | 'time' | 'size' = 'name';
+    private typeFilter: string;
+    private sortOrder: 'name' | 'time' | 'size';
     /** Pending DOM-wait observer between mount() and the host drawer appearing. */
     private mountObserver: MutationObserver | null = null;
     private searchDebounceTimer: number | null = null;
@@ -88,10 +88,16 @@ export class TopbarBackgroundDrawer {
         this.cacheManager = cacheManager;
         this.callbacks = callbacks;
         this.authority = authority ?? null;
+        // View state persists in settings (libraryView); defensive fallbacks for callers that
+        // hand us an unmerged object (older builds, tests).
+        this.sortOrder = this.settings.libraryView?.sortOrder ?? 'name';
+        this.typeFilter = this.settings.libraryView?.typeFilter ?? 'all';
     }
 
     public applyRemoteSettings(next: BgLoaderSettings): void {
         this.settings = next;
+        this.sortOrder = next.libraryView?.sortOrder ?? this.sortOrder;
+        this.typeFilter = next.libraryView?.typeFilter ?? this.typeFilter;
         if (this.panel) {
             this.syncFormControls();
         }
@@ -537,12 +543,19 @@ export class TopbarBackgroundDrawer {
         const typeFilter = this.panel.querySelector('#st_topbar_type_filter') as HTMLSelectElement | null;
         typeFilter?.addEventListener('change', () => {
             this.typeFilter = typeFilter.value;
+            // Persisted view state: the library opens with the same filter next session.
+            if (!this.settings.libraryView) this.settings.libraryView = { sortOrder: this.sortOrder, typeFilter: 'all' };
+            this.settings.libraryView.typeFilter = this.typeFilter;
+            this.save();
             void this.refreshMediaGrid();
         });
 
         const sortSelect = this.panel.querySelector('#st_topbar_sort') as HTMLSelectElement | null;
         sortSelect?.addEventListener('change', () => {
             this.sortOrder = (sortSelect.value as 'name' | 'time' | 'size') || 'name';
+            if (!this.settings.libraryView) this.settings.libraryView = { sortOrder: 'name', typeFilter: this.typeFilter };
+            this.settings.libraryView.sortOrder = this.sortOrder;
+            this.save();
             void this.refreshMediaGrid();
         });
 
@@ -910,6 +923,12 @@ export class TopbarBackgroundDrawer {
         setVal('st_cache_quota', 'st_cache_quota_val', this.settings.cacheQuotaMB, ' MB');
         setChecked('st_cache_autoclean', this.settings.lruAutoClean);
         setChecked('st_agent_tools_enable', this.settings.agentToolsEnabled);
+
+        // Library view state (remote convergence must repaint the two toolbar selects too).
+        const typeEl = this.panel?.querySelector('#st_topbar_type_filter') as HTMLSelectElement | null;
+        if (typeEl) typeEl.value = this.typeFilter;
+        const sortEl = this.panel?.querySelector('#st_topbar_sort') as HTMLSelectElement | null;
+        if (sortEl) sortEl.value = this.sortOrder;
     }
 
     public async refreshMediaGrid(): Promise<void> {

@@ -448,6 +448,11 @@ export class STBgLoaderExtension {
             if (persist) {
                 this.settings.activeMediaId = previousActiveId ?? null;
                 this.saveSettings();
+                // Drawer surfaces must un-announce the failed pick too: the active-name label
+                // and the grid's "current" badge otherwise keep pointing at the broken item.
+                const previous = previousActiveId ? await this.cacheManager.getMedia(previousActiveId).catch(() => null) : null;
+                this.settingsDrawer?.updateActiveMedia(previous?.name ?? null);
+                void this.topbarDrawer?.refreshMediaGrid();
             }
             this.notifyMediaMountErrorOnce();
             console.error(`[ST-BgLoader] Failed to mount media "${item.name}":`, err);
