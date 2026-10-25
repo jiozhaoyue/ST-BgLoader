@@ -39,10 +39,10 @@
 
 ## Phase E：收尾（08:50 前）
 
-- [ ] E1 spec 判定与更新
-- [ ] E2 journal 记录 session
-- [ ] E3 分批提交（工作 → 任务工件 → journal）+ 推送 origin master
-- [ ] E4 工作区干净核查（git status --short 仅剩 gitignore 区）
+- [x] E1 spec 判定与更新（quality-guidelines.md 新增三节：测试引导与实例禁用态 / CSS 门禁 TS 注入面 / 媒体失败反馈契约）
+- [x] E2 journal 记录 session（add_session.py，含 13 笔工作提交清单）
+- [x] E3 分批提交（工作 1a56896→4328c83 → 任务工件 a2d4cbb → 归档+journal）+ 推送 origin master
+- [x] E4 工作区干净核查（git status --short 仅剩 gitignore 区）
 
 ## 回滚点
 
