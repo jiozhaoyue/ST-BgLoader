@@ -16,3 +16,6 @@ settings-backup-*.json
 *settings*backup*.json
 instance-backup/
 *.pre-enable-backup.json
+
+# Local test artifacts (screenshots etc.)
+test-artifacts/

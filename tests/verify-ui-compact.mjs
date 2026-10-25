@@ -9,7 +9,7 @@ const CHROME_PATH = process.env.PUPPETEER_EXECUTABLE_PATH
         : '/usr/bin/google-chrome');
 
 const TARGET_URL = process.env.TEST_TARGET_URL || 'https://localhost:8003';
-const ARTIFACT_DIR = process.env.ARTIFACT_DIR || 'C:/Users/caocaobi/.gemini/antigravity/brain/bd46b693-9bba-42af-a95b-d5867698b1f7';
+const ARTIFACT_DIR = process.env.ARTIFACT_DIR || path.join('test-artifacts', 'ui-compact');
 
 if (!fs.existsSync(ARTIFACT_DIR)) {
     fs.mkdirSync(ARTIFACT_DIR, { recursive: true });
