@@ -1,0 +1,6 @@
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "E2E 门槛、UI 代码标准与探针卫生（Probe hygiene）章节，修复与极端媒体测试都受其约束"}
+{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "子系统类、双缓冲层与 destroy 契约——审计与修复的核心契约面"}
+{"file": ".trellis/spec/frontend/host-native-ui.md", "reason": "夺舍顶栏抽屉与宿主接缝规范，UI 改动不得破坏与宿主不可区分原则"}
+{"file": ".trellis/spec/frontend/state-management.md", "reason": "settings 对象、云镜像与媒体库指针的真源约定，涉及设置/持久化修复必读"}
+{"file": ".trellis/spec/frontend/type-safety.md", "reason": "strict 配置与类型边界约定，新增代码须遵守"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "跨层思考指南，审计跨模块契约缺陷时使用"}

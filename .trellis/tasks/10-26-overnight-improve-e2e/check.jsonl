@@ -1,0 +1,3 @@
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "质量检查依据：E2E 门槛 + 探针卫生 + UI 代码标准"}
+{"file": ".trellis/spec/frontend/index.md", "reason": "frontend 层入口与 Pre-Development Checklist / Quality Check 清单"}
+{"file": ".trellis/spec/guides/repo-integrity-discipline.md", "reason": "仓完整性纪律，收尾提交与产物一致性检查依据"}

@@ -113,3 +113,48 @@ holds real (Dev) settings, so they carry production obligations:
   bare message cannot be attributed (`Identifier 'SPresetSettings' has already been declared` is
   plainly someone else's). Assert "no error originating from `dist/index.js`" and print the foreign
   ones as context — requiring a page-wide zero-error run is not achievable on a real tavern.
+
+---
+
+## Test bootstrap & instance-disabled extensions (added 2026-10-26 night batch)
+
+- **Test pages must not rely on the instance's extension enable state.** Luker exposes no
+  `ctx.enableExtension` and Dev instances keep `third-party/ST-BgLoader` in
+  `disabledExtensions`; e2e.mjs's manual `import('/scripts/extensions/third-party/ST-BgLoader/dist/index.js')`
+  fallback is the only thing that made it pass there. `tests/lib/ensure-extension.mjs`
+  carries the same semantics (enable API first, module-import fallback) and MUST be awaited
+  before any `waitForFunction(STBgLoader.isInitialized)` in new suites. This loads the
+  extension for the page session only — the instance's disabled list stays untouched
+  (zero residue).
+- **The CSS scope gate also covers TS-injected styles.** Injected CSS lives in template
+  strings inside `src/**/*.ts` (FrostedGlassController), which the style.css-only gate
+  never saw — a hardcoded `box-shadow` shipped there. `tests/css-gate.mjs` rule 3b scans
+  every `src/**/*.ts` line (inline `//` comments exempted) for `box-shadow:`; keep it that
+  way when adding new injected-style surfaces.
+- **Never wait for `networkidle2` after the first navigation on a live tavern.** Hosts keep
+  long-lived connections (SSE/poll); `page.reload(..., networkidle2)` hangs, and even
+  `domcontentloaded` reloads can stall behind long media tasks. For a "fresh session"
+  assertion, open a NEW page in the same browser context instead (`browser.newPage()` —
+  same cookies/localStorage, no navigation wait games). Used by `extreme-media.mjs` c14.
+
+---
+
+## Media-failure feedback contract (added 2026-10-26 night batch)
+
+- **Decode failure ≠ mount failure.** `MediaMount.mountMedia` resolves even when the image
+  never decodes (bounded-settle renderers); mount-chain failures throw. Feedback follows the
+  split: decode failures emit `media-error` (+ one-shot toastr) via
+  `MediaMount.setRenderErrorHandler`; mount failures roll back `activeMediaId`, toast via
+  `notifyMediaMountErrorOnce`, and rethrow for the call site's own catch. Any new renderer
+  must surface its error event through the same handler chain.
+- **A failed `play()` leaves `paused === false` (spec behavior).** `isPlaying()` is
+  `!element.paused`, so after a load error the engine reports phantom playback forever
+  unless the error path calls `pause()` explicitly (AudioEngine error listener). Anything
+  that abandons a pending play() must normalize element state the same way.
+- **Bounded auto-skip budgets refill only on real playback** (the `playing` event), never in
+  `playTrack()` — every auto-skip goes through `playTrack`, so a refill there makes an
+  all-corrupt playlist loop skips forever. `tests/extreme-media.mjs` c13 guards this with a
+  zero-byte-audio playlist. Note: random-bytes "corrupt" mp3 often DECODES as noise — use
+  zero-byte files for reliable decode failures.
+- **Extreme-media corpus uploads are tracked in an in-page registry** (`window.__xmCreated`)
+  and cleaned through it — per-case result fields miss multi-upload cases and leave residue.
