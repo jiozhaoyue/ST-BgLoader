@@ -29,7 +29,7 @@ const I = {
     name: "黑白",
     filters: { blur: 0, brightness: 100, opacity: 100, saturate: 0 }
   }
-}, M = ["off", "rain", "snow", "sakura", "cyber_motes", "scanlines"], he = {
+}, k = ["off", "rain", "snow", "sakura", "cyber_motes", "scanlines"], he = {
   off: "关闭",
   rain: "雨水",
   snow: "飘雪",
@@ -1153,7 +1153,7 @@ class Te {
     }), this.audioContext = null), this.attachedVideo = null, this.playlist = [];
   }
 }
-const ke = 15e3;
+const Me = 15e3;
 class Y {
   videoElement = null;
   container;
@@ -1174,7 +1174,7 @@ class Y {
         console.error("[ST-BgLoader] Error loading video:", h), this.onError?.(), r();
       }, r = () => {
         a || (a = !0, window.clearTimeout(l), this.pendingSettle = null, i.removeEventListener("canplay", o), i.removeEventListener("error", n), s(i));
-      }, l = window.setTimeout(r, ke);
+      }, l = window.setTimeout(r, Me);
       this.pendingSettle = r;
       const o = async () => {
         try {
@@ -1211,7 +1211,7 @@ class Y {
     }
   }
 }
-const Me = 8e3;
+const ke = 8e3;
 class J {
   iframeElement = null;
   container;
@@ -1226,7 +1226,7 @@ class J {
       let a = !1;
       const n = () => {
         a || (a = !0, window.clearTimeout(r), this.pendingSettle = null, s(i));
-      }, r = window.setTimeout(n, Me);
+      }, r = window.setTimeout(n, ke);
       this.pendingSettle = n, i.onload = () => {
         i.style.opacity = "1", n();
       }, t ? i.src = e : i.srcdoc = e;
@@ -1805,7 +1805,7 @@ class Le {
                             <div class="st-bgloader-preset-row">
                                 <label class="st-bgloader-label-md">天气:</label>
                                 <select id="st_weather_type" class="text_pole">
-                                    ${M.map((t) => `<option value="${t}" ${this.settings.weather.type === t ? "selected" : ""}>${he[t]}</option>`).join("")}
+                                    ${k.map((t) => `<option value="${t}" ${this.settings.weather.type === t ? "selected" : ""}>${he[t]}</option>`).join("")}
                                 </select>
                             </div>
                             <div class="st-bgloader-preset-row">
@@ -1995,7 +1995,7 @@ class Le {
       u.addEventListener("click", () => {
         const f = u.dataset.tab;
         if (!f) return;
-        this.activeTab = f, this.panel?.querySelectorAll(".st-bgloader-tab-btn").forEach((k) => k.classList.remove("active")), u.classList.add("active"), this.panel?.querySelectorAll(".st-bgloader-tab-content").forEach((k) => k.classList.remove("active"));
+        this.activeTab = f, this.panel?.querySelectorAll(".st-bgloader-tab-btn").forEach((M) => M.classList.remove("active")), u.classList.add("active"), this.panel?.querySelectorAll(".st-bgloader-tab-content").forEach((M) => M.classList.remove("active"));
         const y = this.panel?.querySelector(`#st_tab_${f}`);
         y && y.classList.add("active");
       });
@@ -2123,9 +2123,9 @@ class Le {
     y?.addEventListener("change", () => {
       this.settings.showMiniPlayer = y.checked, this.callbacks.onMiniPlayerToggle(y.checked), this.save();
     });
-    const k = this.panel.querySelector("#st_capsule_on_play");
-    k?.addEventListener("change", () => {
-      this.settings.capsuleOnPlayOnly = k.checked, this.callbacks.onCapsuleOnPlayToggle?.(k.checked), this.save();
+    const M = this.panel.querySelector("#st_capsule_on_play");
+    M?.addEventListener("change", () => {
+      this.settings.capsuleOnPlayOnly = M.checked, this.callbacks.onCapsuleOnPlayToggle?.(M.checked), this.save();
     }), e("st_cache_quota", "st_cache_quota_val", " MB", (p) => {
       this.settings.cacheQuotaMB = p, this.save();
     });
@@ -2874,7 +2874,7 @@ class Fe {
       ...this.ext.getSettings().weather,
       type: e,
       ...t || {}
-    } : i = { ...e }, !M.includes(i.type)) {
+    } : i = { ...e }, !k.includes(i.type)) {
       console.warn(`[ST-BgLoader PublicAPI] Ignored invalid weather type "${String(i.type)}".`);
       return;
     }
@@ -2990,7 +2990,7 @@ class Fe {
    * Quick cycle through weather types
    */
   cycleWeather() {
-    const e = this.ext.getSettings().weather.type, t = (M.indexOf(e) + 1) % M.length, i = M[t];
+    const e = this.ext.getSettings().weather.type, t = (k.indexOf(e) + 1) % k.length, i = k[t];
     return this.setWeather(i), i;
   }
   getPlaybackState() {
@@ -3899,11 +3899,11 @@ const it = [
     // Fourth copy of the weather vocabulary used to live here as a literal, which silently
     // drifted whenever a weather type was added. Referencing the shared constant keeps the
     // AI-facing tool schema in step with the runtime validator in PublicAPI.
-    description: `Set the atmospheric weather FX (${M.join(", ")}).`,
+    description: `Set the atmospheric weather FX (${k.join(", ")}).`,
     inputSchema: {
       type: "object",
       properties: {
-        type: { type: "string", enum: M },
+        type: { type: "string", enum: k },
         density: { type: "string", enum: ["low", "medium", "high"] }
       },
       required: ["type"]
@@ -4178,7 +4178,16 @@ class at {
     return this.topbarDrawer;
   }
   setMasterEnabled(e) {
-    this.settings.enabled = e, this.saveSettings(), e ? (this.topbarDrawer?.mount(), this.nativeController?.start(this.settings.nativeTakeover), this.mediaMount.setVisible(this.settings.backgroundVisible), this.atmosphereFX.handleBackgroundVisibilityChange(this.settings.backgroundVisible), this.audioVisualizer.handleBackgroundVisibilityChange(this.settings.backgroundVisible)) : (this.topbarDrawer?.unmount(), this.nativeController?.stop(), this.mediaMount.clear(), this.atmosphereFX.handleBackgroundVisibilityChange(!1), this.audioVisualizer.handleBackgroundVisibilityChange(!1), this.nativeController?.releaseNativeBackground());
+    this.settings.enabled = e, this.saveSettings(), this.applyMasterEnabled(e);
+  }
+  /**
+   * Master-switch side effects WITHOUT persistence: the local toggle path persists via
+   * setMasterEnabled; the remote-convergence path (applySettingsToSubsystems) must apply
+   * the converged `enabled` without writing settings back (that would re-bump the revision
+   * and push the pre-convergence state over the remote one).
+   */
+  applyMasterEnabled(e) {
+    e ? (this.topbarDrawer?.mount(), this.nativeController?.start(this.settings.nativeTakeover), this.mediaMount.setVisible(this.settings.backgroundVisible), this.atmosphereFX.handleBackgroundVisibilityChange(this.settings.backgroundVisible), this.audioVisualizer.handleBackgroundVisibilityChange(this.settings.backgroundVisible)) : (this.topbarDrawer?.unmount(), this.nativeController?.stop(), this.mediaMount.clear(), this.atmosphereFX.handleBackgroundVisibilityChange(!1), this.audioVisualizer.handleBackgroundVisibilityChange(!1), this.nativeController?.releaseNativeBackground());
   }
   clearActiveBackground() {
     this.settings.activeMediaId = null, this.mediaMount.clear(), this.nativeController?.releaseNativeBackground(), this.saveSettings(), this.settingsDrawer?.updateActiveMedia(null), this.topbarDrawer && this.topbarDrawer.refreshMediaGrid();
@@ -4308,7 +4317,7 @@ class at {
       const i = await this.cacheManager.getMedia(this.settings.activeMediaId);
       i ? await this.applyMedia(i) : (console.warn(`[ST-BgLoader] Active background "${this.settings.activeMediaId}" no longer exists; clearing the reference.`), this.settings.activeMediaId = null, this.saveSettings());
     }
-    this.isInitialized = !0, console.log("[ST-BgLoader] All Modular Subsystems fully initialized.");
+    this.appliedEnabled = this.settings.enabled, this.isInitialized = !0, console.log("[ST-BgLoader] All Modular Subsystems fully initialized.");
   }
   async applyMedia(e, t = !0) {
     const i = this.settings.activeMediaId;
@@ -4317,7 +4326,7 @@ class at {
       const s = await this.cacheManager.getMediaBlobUrl(e);
       await this.mediaMount.mountMedia(e, s);
     } catch (s) {
-      throw t && (this.settings.activeMediaId = i ?? null, this.saveSettings()), console.error(`[ST-BgLoader] Failed to mount media "${e.name}":`, s), s;
+      throw t && (this.settings.activeMediaId = i ?? null, this.saveSettings()), this.notifyMediaMountErrorOnce(), console.error(`[ST-BgLoader] Failed to mount media "${e.name}":`, s), s;
     }
     this.nativeController?.refreshSelection(e.name), this.nativeController?.clearNativeBackgroundImage(), this.settingsDrawer?.updateActiveMedia(e.name), this.topbarDrawer && (this.topbarDrawer.refreshMediaGrid(), this.topbarDrawer.updateCacheStats());
   }
@@ -4333,7 +4342,7 @@ class at {
     t && (this.atmosphereFX.mount(t), this.audioVisualizer.mount(t, this.mediaMount.getPumpWrapperElement() ?? e)), this.parallaxController.attach(e);
   }
   applySettingsToSubsystems() {
-    this.mediaMount.applyFilters(this.settings.filters), this.mediaMount.setInteractive(this.settings.interactiveBackground), this.mediaMount.setVisible(this.settings.backgroundVisible), this.mediaMount.setTransition(this.settings.transitionEffect, this.settings.transitionDurationMs), this.audioEngine.setVolume(this.settings.volume), this.audioEngine.setMuted(this.settings.muted), this.audioEngine.setMuffled(this.settings.muffleBGM), this.audioEngine.setPlaybackMode(this.settings.playbackMode), this.atmosphereFX.setWeather(this.settings.weather), this.audioVisualizer.setOptions(this.settings.visualizer), this.parallaxController.setOptions(this.settings.parallax), this.ambientSoundGenerator.setSound(this.settings.ambientSound), this.frostedGlassController.setOptions(this.settings.frostedChat), this.triggerManager.setRules(this.settings.triggerRules || []), this.sceneManager?.setUserScenes(this.settings.scenes || {}), this.nativeController?.setLevel(this.settings.nativeTakeover), this.syncAgentTools();
+    this.settings.enabled !== this.appliedEnabled && (this.appliedEnabled = this.settings.enabled, this.applyMasterEnabled(this.settings.enabled)), this.mediaMount.applyFilters(this.settings.filters), this.mediaMount.setInteractive(this.settings.interactiveBackground), this.mediaMount.setVisible(this.settings.backgroundVisible), this.mediaMount.setTransition(this.settings.transitionEffect, this.settings.transitionDurationMs), this.audioEngine.setVolume(this.settings.volume), this.audioEngine.setMuted(this.settings.muted), this.audioEngine.setMuffled(this.settings.muffleBGM), this.audioEngine.setPlaybackMode(this.settings.playbackMode), this.atmosphereFX.setWeather(this.settings.weather), this.audioVisualizer.setOptions(this.settings.visualizer), this.parallaxController.setOptions(this.settings.parallax), this.ambientSoundGenerator.setSound(this.settings.ambientSound), this.frostedGlassController.setOptions(this.settings.frostedChat), this.triggerManager.setRules(this.settings.triggerRules || []), this.sceneManager?.setUserScenes(this.settings.scenes || {}), this.nativeController?.setLevel(this.settings.nativeTakeover), this.syncAgentTools();
   }
   /**
    * Shows/hides the background layer. MediaMount owns the applied state (finding A1) while
@@ -4359,11 +4368,25 @@ class at {
   lastEnforcedQuotaBytes = null;
   /** One-shot toastr for a broken mounted medium; repeats still emit `media-error` events. */
   notifiedMediaRenderError = !1;
+  /** One-shot toastr for a mount that never completed (resolution/mount failure, not decode). */
+  notifiedMediaMountError = !1;
+  /** Tracks the enabled state actually applied to subsystems (remote convergence compares against this). */
+  appliedEnabled = null;
   notifyMediaRenderErrorOnce() {
     if (!this.notifiedMediaRenderError) {
       this.notifiedMediaRenderError = !0;
       try {
         window.toastr?.warn("背景媒体加载失败（文件可能损坏或格式不受支持），详见控制台", "ST-BgLoader");
+      } catch {
+      }
+    }
+  }
+  /** One-shot toastr for a mount that never completed (resolution/mount failure, not decode). */
+  notifyMediaMountErrorOnce() {
+    if (!this.notifiedMediaMountError) {
+      this.notifiedMediaMountError = !0;
+      try {
+        window.toastr?.error("背景媒体挂载失败，详见控制台", "ST-BgLoader");
       } catch {
       }
     }

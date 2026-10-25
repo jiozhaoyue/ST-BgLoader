@@ -87,6 +87,16 @@ export class STBgLoaderExtension {
     public setMasterEnabled(enabled: boolean): void {
         this.settings.enabled = enabled;
         this.saveSettings();
+        this.applyMasterEnabled(enabled);
+    }
+
+    /**
+     * Master-switch side effects WITHOUT persistence: the local toggle path persists via
+     * setMasterEnabled; the remote-convergence path (applySettingsToSubsystems) must apply
+     * the converged `enabled` without writing settings back (that would re-bump the revision
+     * and push the pre-convergence state over the remote one).
+     */
+    private applyMasterEnabled(enabled: boolean): void {
         if (enabled) {
             this.topbarDrawer?.mount();
             this.nativeController?.start(this.settings.nativeTakeover);
@@ -413,6 +423,10 @@ export class STBgLoaderExtension {
             }
         }
 
+        // init itself already mounted per settings.enabled (step 8) — record it so the first
+        // remote convergence compares against reality instead of null.
+        this.appliedEnabled = this.settings.enabled;
+
         this.isInitialized = true;
         console.log('[ST-BgLoader] All Modular Subsystems fully initialized.');
     }
@@ -435,6 +449,7 @@ export class STBgLoaderExtension {
                 this.settings.activeMediaId = previousActiveId ?? null;
                 this.saveSettings();
             }
+            this.notifyMediaMountErrorOnce();
             console.error(`[ST-BgLoader] Failed to mount media "${item.name}":`, err);
             throw err;
         }
@@ -475,6 +490,12 @@ export class STBgLoaderExtension {
     }
 
     private applySettingsToSubsystems(): void {
+        // The master switch is part of the converged object too: a remote disable must
+        // actually stop the takeover/unmount the drawer here, not just repaint the toggle.
+        if (this.settings.enabled !== this.appliedEnabled) {
+            this.appliedEnabled = this.settings.enabled;
+            this.applyMasterEnabled(this.settings.enabled);
+        }
         this.mediaMount.applyFilters(this.settings.filters);
         this.mediaMount.setInteractive(this.settings.interactiveBackground);
         this.mediaMount.setVisible(this.settings.backgroundVisible);
@@ -530,6 +551,12 @@ export class STBgLoaderExtension {
     /** One-shot toastr for a broken mounted medium; repeats still emit `media-error` events. */
     private notifiedMediaRenderError = false;
 
+    /** One-shot toastr for a mount that never completed (resolution/mount failure, not decode). */
+    private notifiedMediaMountError = false;
+
+    /** Tracks the enabled state actually applied to subsystems (remote convergence compares against this). */
+    private appliedEnabled: boolean | null = null;
+
     private notifyMediaRenderErrorOnce(): void {
         if (this.notifiedMediaRenderError) return;
         this.notifiedMediaRenderError = true;
@@ -538,6 +565,18 @@ export class STBgLoaderExtension {
             toastr?.warn('背景媒体加载失败（文件可能损坏或格式不受支持），详见控制台', 'ST-BgLoader');
         } catch {
             // toastr unavailable — the media-error event and console log carry the signal.
+        }
+    }
+
+    /** One-shot toastr for a mount that never completed (resolution/mount failure, not decode). */
+    private notifyMediaMountErrorOnce(): void {
+        if (this.notifiedMediaMountError) return;
+        this.notifiedMediaMountError = true;
+        try {
+            const toastr = (window as unknown as { toastr?: { error(msg: string, title?: string): void } }).toastr;
+            toastr?.error('背景媒体挂载失败，详见控制台', 'ST-BgLoader');
+        } catch {
+            // toastr unavailable — the rethrown error is logged at every call site already.
         }
     }
 
