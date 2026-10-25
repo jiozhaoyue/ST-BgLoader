@@ -621,3 +621,25 @@ Added procedural WebAudio ambient soundscape synthesizer, frosted glass transpar
 
 [OK] **Completed**
 
+
+
+## Session 23: 夜间改进批：审计修复×8批次 + dev酒馆四套件×双实例全绿 + 极端媒体截图验证
+<!-- trellis-session: v=2 fp=cae639803d964960 -->
+
+**Date**: 2026-10-26
+**Task**: 夜间改进批：审计修复×8批次 + dev酒馆四套件×双实例全绿 + 极端媒体截图验证
+**Branch**: `master`
+
+### Summary
+
+自主夜间批（Trellis 任务 10-26-overnight-improve-e2e）。子代理通道被服务端拦截改主会话内联精读全部 30 模块：0×P1/4×P2/4×P3，P2 全修（设置导入未走 mergeSettings 可被部分 JSON 污染、TS 注入面硬编码 box-shadow 逃过 style.css 门禁、音频坏轨无 error 监听歌单卡死、applyMedia 失败不回滚 activeMediaId），P3 修 3 记 1；实现与自查再追加修复 2 项真 bug（跳轨预算在 playTrack 补满致全坏歌单死循环、play() 失败后 paused 标志保持 false 致 isPlaying 幽灵 true）。功能增强 4 项：media-error 事件+toastr 失败反馈、媒体网格键盘可达性、卡片真实预览层+视频首帧缩略图（原 card-img 无样式预览从未显示过）、媒体库视图状态持久化。测试基建：stress/authority 接入扩展装载兜底（Luker 无 enableExtension API，实例禁用清单零改动）、新增极端媒体套件（14 用例：超大图/真实视频/零字节/损坏 JPEG/截断 webm/伪装扩展名/Unicode 超长名/1h WAV/SVG 脚本/HTML canvas/快速切换/键盘/缩略图/视图持久化，逐项截图并上传登记表清理零残留）、真实 UI 冒烟套件（11 步全复原）、probe-session/probe-drawer-tabs 截图基建、CSS 门禁扩展到 TS 注入面。验证矩阵：Dev Luker :8003 与 Dev ST :8001（旧克隆恢复并同步）双实例上 type-check/CSS 门禁/e2e 24/24/stress 4/4/authority 18/18/extreme 14/14/smoke 11/11 全绿；截图由主会话逐张核验（报告落 research/）。教训沉淀：c14 类跨页复原必须等服务端 800ms 去抖并开第三页核验落盘，否则 localStorage 复原被服务端旧文档覆盖回残留（实测两次）；套件对持久化视图过滤残留须免疫（S1b 自动复位）。看门狗 cron（静默巡检/断掉拉起）与 Dev Luker 后台实例随收尾注销/停止。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `4328c83` | test(harness): 视图状态残留免疫（S1b 自动复位/S10 全量复原/c14 服务端落盘核验/S3 动态选型） |
+
+### Status
+
+[OK] **Completed**
