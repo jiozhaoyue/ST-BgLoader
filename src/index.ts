@@ -126,6 +126,9 @@ export class STBgLoaderExtension {
     }
 
     public async init(): Promise<void> {
+        // Re-entry guard: a second call would re-register the visibilitychange listener,
+        // rebuild both drawers and start a second SettingsSync — none of that is idempotent.
+        if (this.isInitialized) return;
         console.log('[ST-BgLoader] Initializing Rich Media Background Plugin...');
 
         // 1. Load persisted settings, reconciled against the server copy (higher revision
@@ -372,6 +375,7 @@ export class STBgLoaderExtension {
             this.atmosphereFX.handleVisibilityChange(hidden);
             this.audioVisualizer.handleVisibilityChange(hidden);
         });
+        window.addEventListener('pagehide', () => this.flushPendingPersist());
 
         // 10.5 Cross-device settings sync (Authority cloud mirror; no-op in local mode)
         this.authorityBridge.onCapabilitiesChanged(() => this.topbarDrawer?.updateCloudPanel());
@@ -575,6 +579,10 @@ export class STBgLoaderExtension {
         try {
             await this.reconcileSettings();
             this.applySettingsToSubsystems();
+            // Both drawers must re-point at the converged object. If the topbar drawer keeps
+            // its stale reference, its next save() writes the pre-convergence snapshot back
+            // wholesale and silently reverts the remote state.
+            this.topbarDrawer?.applyRemoteSettings(this.settings);
             this.settingsDrawer?.applyRemoteSettings(this.settings);
             this.publicApi.emit('settings-sync', this.settings);
         } finally {
@@ -592,11 +600,15 @@ export class STBgLoaderExtension {
                     // (B4, 2026-09-26: the per-chat binding branch that used to run first here
                     // was removed with `settings.chatBindings` — it had no writer anywhere, so
                     // it was unreachable.)
-                    if (this.settings.activeMediaId) {
-                        const defaultItem = await this.cacheManager.getMedia(this.settings.activeMediaId);
-                        if (defaultItem) {
-                            await this.applyMedia(defaultItem);
+                    try {
+                        if (this.settings.activeMediaId) {
+                            const defaultItem = await this.cacheManager.getMedia(this.settings.activeMediaId);
+                            if (defaultItem) {
+                                await this.applyMedia(defaultItem);
+                            }
                         }
+                    } catch (err) {
+                        console.error('[ST-BgLoader] Failed to restore background on chat change:', err);
                     }
                 });
             }
@@ -638,7 +650,34 @@ export class STBgLoaderExtension {
         }
     }
 
+    private persistTimer: number | null = null;
+
+    /**
+     * Sliders drive saveSettings() once per rAF frame while dragging; the server/KV mirrors
+     * already debounce their own schedules, so the synchronous localStorage write was the
+     * only per-frame cost (60 full-JSON writes per second of dragging). Trailing-debounce
+     * it, with a pagehide flush so a tab close never loses the tail of a drag.
+     */
     private persistLocalSettings(): void {
+        if (this.persistTimer !== null) {
+            window.clearTimeout(this.persistTimer);
+        }
+        this.persistTimer = window.setTimeout(() => {
+            this.persistTimer = null;
+            this.persistLocalSettingsNow();
+        }, 250);
+    }
+
+    /** Last-chance synchronous flush of a pending debounced write (pagehide). */
+    private flushPendingPersist(): void {
+        if (this.persistTimer !== null) {
+            window.clearTimeout(this.persistTimer);
+            this.persistTimer = null;
+            this.persistLocalSettingsNow();
+        }
+    }
+
+    private persistLocalSettingsNow(): void {
         try {
             localStorage.setItem(SETTINGS_KEY, JSON.stringify(this.settings));
             localStorage.setItem(SETTINGS_REV_KEY, String(this.settingsRevision));

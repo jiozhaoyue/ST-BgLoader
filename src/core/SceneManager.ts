@@ -52,7 +52,11 @@ export class SceneManager {
         }
 
         console.log(`[ST-BgLoader SceneManager] Applying scene: "${scene.name}"`);
-        this.onApplySceneCallback?.(scene);
+        // onApply may be async (media fetch + mount); a failure must surface as a tagged
+        // log, not an unhandled rejection, while applyScene itself stays synchronous.
+        Promise.resolve(this.onApplySceneCallback?.(scene)).catch((err) => {
+            console.error(`[ST-BgLoader SceneManager] Failed to apply scene "${scene.name}":`, err);
+        });
         return true;
     }
 }

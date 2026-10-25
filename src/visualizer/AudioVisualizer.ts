@@ -98,8 +98,14 @@ export class AudioVisualizer {
             const bufferLength = this.analyser.frequencyBinCount;
             this.dataArray = new Uint8Array(new ArrayBuffer(bufferLength));
             this.isSilent = false;
+            // The render loop is not started without an analyser (it would idle-spin);
+            // kick it off now if the visualizer is meant to be running.
+            if (this.currentOptions.mode !== 'off' && !this.isBgHidden && !this.isTabHidden) {
+                this.start();
+            }
         } else {
             this.dataArray = null;
+            this.stop();
         }
     }
 
@@ -125,6 +131,11 @@ export class AudioVisualizer {
 
     private start(): void {
         if (this.animFrameId !== null || this.isTabHidden || this.isBgHidden) return;
+        if (!this.analyser) {
+            // Every frame would early-return in render() — an idle spin forever. The loop
+            // starts from setAnalyser() once real audio data is available.
+            return;
+        }
         const tick = () => {
             this.render();
             if (this.currentOptions.mode !== 'off' && !this.isTabHidden && !this.isBgHidden) {

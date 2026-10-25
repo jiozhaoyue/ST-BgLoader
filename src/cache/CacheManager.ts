@@ -98,6 +98,10 @@ export class CacheManager {
         return item;
     }
 
+    /** In-flight URL resolutions per media id: concurrent callers share one result instead of
+     *  each creating an objectURL only for all but the last to leak (map keeps one entry). */
+    private inflightBlobUrls = new Map<string, Promise<string>>();
+
     public async getMediaBlobUrl(item: MediaItem): Promise<string> {
         const existing = this.objectUrls.get(item.id);
         if (existing) {
@@ -105,6 +109,18 @@ export class CacheManager {
             return existing.url;
         }
 
+        const inflight = this.inflightBlobUrls.get(item.id);
+        if (inflight) {
+            return inflight;
+        }
+        const resolution = this.resolveMediaUrl(item).finally(() => {
+            this.inflightBlobUrls.delete(item.id);
+        });
+        this.inflightBlobUrls.set(item.id, resolution);
+        return resolution;
+    }
+
+    private async resolveMediaUrl(item: MediaItem): Promise<string> {
         // Hot cache hit: instant playback from local bytes.
         if (this.l1) {
             const hit = await this.l1.match(item.cacheKey);

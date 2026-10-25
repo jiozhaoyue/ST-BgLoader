@@ -101,7 +101,11 @@ export class TriggerManager {
         this.lastTriggerTime = now;
 
         console.log(`[ST-BgLoader TriggerManager] Fired rule: "${rule.name}" (${rule.type})`);
-        this.onTriggerCallback?.(rule.action, rule);
+        // The trigger callback is async (media/BGM/weather application); a failure must
+        // surface as a tagged log, not an unhandled rejection.
+        Promise.resolve(this.onTriggerCallback?.(rule.action, rule)).catch((err) => {
+            console.error(`[ST-BgLoader TriggerManager] Rule "${rule.name}" failed:`, err);
+        });
     }
 
     public bindSillyTavernEvents(eventSource: any, eventTypes?: any): void {
@@ -136,10 +140,15 @@ export class TriggerManager {
         const onEvent = (event: string, handler: (...args: any[]) => void) => {
             eventSource.on(event, handler);
             this.eventSourceUnlisteners.push(() => {
+                // ST's EventSource has migrated its teardown API across versions
+                // (removeListener → off → removeEventListener); try all three so the
+                // unbind can never silently no-op.
                 if (typeof eventSource.removeListener === 'function') {
                     eventSource.removeListener(event, handler);
                 } else if (typeof eventSource.off === 'function') {
                     eventSource.off(event, handler);
+                } else if (typeof eventSource.removeEventListener === 'function') {
+                    eventSource.removeEventListener(event, handler);
                 }
             });
         };

@@ -51,7 +51,7 @@ function serverCsrfHeaders(): Record<string, string> {
  */
 export async function readServerJson(filename: string): Promise<Record<string, unknown> | null> {
     try {
-        const response = await fetch(`${mediaUrl(filename)}?t=${Date.now()}`, { cache: 'no-store' });
+        const response = await fetchBounded(`${mediaUrl(filename)}?t=${Date.now()}`, { cache: 'no-store' });
         if (!response.ok) return null;
         return JSON.parse(await response.text()) as Record<string, unknown>;
     } catch (err) {
@@ -65,7 +65,7 @@ export async function writeServerJson(filename: string, data: unknown): Promise<
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const form = new FormData();
     form.append('avatar', new File([blob], filename, { type: 'application/json' }));
-    const response = await fetch('/api/backgrounds/upload', { method: 'POST', headers: serverCsrfHeaders(), body: form });
+    const response = await fetchBounded('/api/backgrounds/upload', { method: 'POST', headers: serverCsrfHeaders(), body: form });
     if (!response.ok) {
         throw new Error(`Server upload failed for "${filename}": HTTP ${response.status}`);
     }
@@ -82,6 +82,16 @@ export interface MediaPutInput {
 // Same-origin media (the backgrounds/ static route) is trusted and fast; external hosts can
 // stall indefinitely (blackholed DNS/connect), so their download is bounded.
 const EXTERNAL_DOWNLOAD_TIMEOUT_MS = 60000;
+
+// The local server can hang too (stalled proxy, dead socket): every same-origin await gets a
+// generous bound as well, so no code path can wait on the host forever (L1-MR-7).
+const SAME_ORIGIN_TIMEOUT_MS = 30000;
+
+/** Bounded fetch: applies the same-origin timeout unless the caller already supplied a signal. */
+function fetchBounded(url: string, init?: RequestInit): Promise<Response> {
+    const signal = init?.signal ?? AbortSignal.timeout(SAME_ORIGIN_TIMEOUT_MS);
+    return fetch(url, { ...init, signal });
+}
 
 /**
  * The only media source of truth: the SillyTavern server's own `backgrounds/` user directory,
@@ -107,7 +117,7 @@ export class ServerOrigin {
 
     public async init(): Promise<void> {
         try {
-            const response = await fetch(`${mediaUrl(MANIFEST_NAME)}?t=${Date.now()}`, { cache: 'no-store' });
+            const response = await fetchBounded(`${mediaUrl(MANIFEST_NAME)}?t=${Date.now()}`, { cache: 'no-store' });
             if (response.ok) {
                 const parsed = JSON.parse(await response.text()) as Manifest;
                 if (parsed && Array.isArray(parsed.items)) {
@@ -141,7 +151,7 @@ export class ServerOrigin {
 
         // Native listing: images uploaded through the stock ST picker (or by us).
         try {
-            const response = await fetch('/api/backgrounds/all', {
+            const response = await fetchBounded('/api/backgrounds/all', {
                 method: 'POST',
                 headers: { ...serverCsrfHeaders(), 'Content-Type': 'application/json' },
                 body: '{}',
@@ -261,7 +271,7 @@ export class ServerOrigin {
             return;
         }
 
-        const response = await fetch('/api/backgrounds/delete', {
+        const response = await fetchBounded('/api/backgrounds/delete', {
             method: 'POST',
             headers: { ...serverCsrfHeaders(), 'Content-Type': 'application/json' },
             body: JSON.stringify({ bg: filename }),
@@ -276,7 +286,7 @@ export class ServerOrigin {
 
     public async readMedia(item: MediaItem): Promise<Blob | null> {
         if (!item.url) return null;
-        const response = await fetch(item.url, { cache: 'no-store' });
+        const response = await fetchBounded(item.url, { cache: 'no-store' });
         return response.ok ? response.blob() : null;
     }
 
@@ -295,7 +305,7 @@ export class ServerOrigin {
         } catch { /* treated as relative */ }
         const isExternal = !!absoluteUrl && absoluteUrl.origin !== window.location.origin;
 
-        const response = await fetch(url, isExternal
+        const response = await fetchBounded(url, isExternal
             ? { signal: AbortSignal.timeout(EXTERNAL_DOWNLOAD_TIMEOUT_MS) }
             : undefined);
         if (!response.ok) {
@@ -316,7 +326,7 @@ export class ServerOrigin {
 
         const form = new FormData();
         form.append('avatar', new File([blob], filename, { type: mimeType }));
-        const response = await fetch('/api/backgrounds/upload', { method: 'POST', headers: serverCsrfHeaders(), body: form });
+        const response = await fetchBounded('/api/backgrounds/upload', { method: 'POST', headers: serverCsrfHeaders(), body: form });
         if (!response.ok) {
             throw new Error(`Server upload failed: HTTP ${response.status}`);
         }
@@ -326,7 +336,7 @@ export class ServerOrigin {
     private async filenameExists(filename: string): Promise<boolean> {
         if (this.manifest.items.some(i => i.filename === filename)) return true;
         try {
-            const response = await fetch('/api/backgrounds/all', {
+            const response = await fetchBounded('/api/backgrounds/all', {
                 method: 'POST',
                 headers: { ...serverCsrfHeaders(), 'Content-Type': 'application/json' },
                 body: '{}',
@@ -352,7 +362,7 @@ export class ServerOrigin {
         try {
             const form = new FormData();
             form.append('avatar', new File([blob], MANIFEST_NAME, { type: 'application/json' }));
-            const response = await fetch('/api/backgrounds/upload', { method: 'POST', headers: serverCsrfHeaders(), body: form });
+            const response = await fetchBounded('/api/backgrounds/upload', { method: 'POST', headers: serverCsrfHeaders(), body: form });
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}`);
             }
