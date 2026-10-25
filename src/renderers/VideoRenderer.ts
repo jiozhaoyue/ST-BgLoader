@@ -47,12 +47,17 @@ export class VideoRenderer {
 
         return new Promise<HTMLVideoElement>((resolve) => {
             let settled = false;
+            const onError = (e: Event) => {
+                console.error('[ST-BgLoader] Error loading video:', e);
+                settle();
+            };
             const settle = () => {
                 if (settled) return;
                 settled = true;
                 window.clearTimeout(fallback);
                 this.pendingSettle = null;
                 video.removeEventListener('canplay', onCanPlay);
+                video.removeEventListener('error', onError);
                 resolve(video);
             };
             const fallback = window.setTimeout(settle, RENDER_SETTLE_TIMEOUT_MS);
@@ -72,10 +77,7 @@ export class VideoRenderer {
             };
 
             video.addEventListener('canplay', onCanPlay);
-            video.addEventListener('error', (e) => {
-                console.error('[ST-BgLoader] Error loading video:', e);
-                settle();
-            });
+            video.addEventListener('error', onError);
         });
     }
 
@@ -99,12 +101,16 @@ export class VideoRenderer {
 
     public destroy(): void {
         if (this.videoElement) {
+            const el = this.videoElement;
             this.pendingSettle?.();
-            this.audioEngine.attachVideo(null);
-            this.videoElement.pause();
-            this.videoElement.removeAttribute('src');
-            this.videoElement.load();
-            this.videoElement.remove();
+            // Conditional detach: a newer video layer may already own the audio controls.
+            this.audioEngine.detachVideo(el);
+            el.pause();
+            // Listeners were removed by the settle above, so the empty-src reload of this
+            // detached element cannot log a phantom load error.
+            el.removeAttribute('src');
+            el.load();
+            el.remove();
             this.videoElement = null;
         }
     }

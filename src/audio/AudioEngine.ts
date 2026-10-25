@@ -319,6 +319,18 @@ export class AudioEngine {
         }
     }
 
+    /**
+     * Detaches a video only if it is the one currently attached. During a video→video
+     * crossfade the outgoing layer's destroy() runs AFTER the incoming layer attached
+     * its element; an unconditional clear here would drop volume/mute/visibility control
+     * from the video that is actually playing.
+     */
+    public detachVideo(video: HTMLVideoElement): void {
+        if (this.attachedVideo === video) {
+            this.attachedVideo = null;
+        }
+    }
+
     public async playTrack(url: string, loop: boolean = true): Promise<void> {
         if (!this.audioElement) return;
 
@@ -337,12 +349,18 @@ export class AudioEngine {
             this.initWebAudio();
             this.resumeAudioContext();
             // play() stays pending on a stalled host until the media stack times out; bound it.
+            let settleTimer: number | undefined;
             await Promise.race([
                 this.audioElement.play().catch((err) => {
                     console.warn('[ST-BgLoader AudioEngine] Autoplay was prevented by browser policy:', err);
                 }),
-                new Promise((resolve) => window.setTimeout(resolve, PLAY_SETTLE_TIMEOUT_MS)),
-            ]);
+                new Promise((resolve) => {
+                    settleTimer = window.setTimeout(resolve, PLAY_SETTLE_TIMEOUT_MS);
+                }),
+            ]).finally(() => {
+                // play() usually wins the race; without this the 10s bail-out timer would dangle.
+                window.clearTimeout(settleTimer);
+            });
         } catch (err) {
             console.warn('[ST-BgLoader AudioEngine] Autoplay was prevented by browser policy:', err);
         }
