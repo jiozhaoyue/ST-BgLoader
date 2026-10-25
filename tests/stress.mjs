@@ -1,4 +1,5 @@
 import puppeteer from 'puppeteer-core';
+import { ensureExtensionLoaded } from './lib/ensure-extension.mjs';
 
 const CHROME_PATH = process.env.PUPPETEER_EXECUTABLE_PATH
     || process.env.CHROME_PATH
@@ -40,6 +41,7 @@ async function runStressTests() {
     try {
         console.log('⏳ Navigating to SillyTavern...');
         await page.goto(TARGET_URL, { waitUntil: 'domcontentloaded', timeout: 35000 });
+        await ensureExtensionLoaded(page);
 
         console.log('⏳ Waiting for STBgLoader initialization...');
         await page.waitForFunction(() => {

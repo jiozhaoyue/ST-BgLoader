@@ -17,6 +17,7 @@
  * no-SDK degradation path a bare instance would take. Skips (exit 0) when the instance is unreachable.
  */
 import puppeteer from 'puppeteer-core';
+import { ensureExtensionLoaded } from './lib/ensure-extension.mjs';
 
 const CHROME_PATH = process.env.PUPPETEER_EXECUTABLE_PATH
     || process.env.CHROME_PATH
@@ -129,6 +130,7 @@ async function openPage(browser, { mock = false, lockMock = false, hideAuthority
     if (lockMock) await page.evaluateOnNewDocument(injectAuthorityMockInPage, true);
     else if (mock) await page.evaluateOnNewDocument(injectAuthorityMockInPage, false);
     await page.goto(TARGET_URL, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await ensureExtensionLoaded(page);
     await page.waitForFunction(() => window.STBgLoader && window.STBgLoader.isInitialized, { timeout: 35000 });
     return page;
 }
@@ -143,6 +145,7 @@ async function openPageWithSeededLocalSettings(browser, settingsJson, revision, 
         localStorage.setItem('st_bgloader_settings_rev', String(rev));
     }, settingsJson, revision, volumeOverride);
     await page.goto(TARGET_URL, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await ensureExtensionLoaded(page);
     await page.waitForFunction(() => window.STBgLoader && window.STBgLoader.isInitialized, { timeout: 35000 });
     return page;
 }
@@ -163,6 +166,7 @@ async function openPageWithClearedLocalSettings(browser) {
         }
     });
     await page.goto(TARGET_URL, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await ensureExtensionLoaded(page);
     await page.waitForFunction(() => window.STBgLoader && window.STBgLoader.isInitialized, { timeout: 35000 });
     return page;
 }
