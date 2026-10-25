@@ -585,3 +585,39 @@ Added procedural WebAudio ambient soundscape synthesizer, frosted glass transpar
 
 [OK] **Completed**
 
+
+## Session 22: 无任务巡检修复批（审计 15 项 + 门禁固化 + 隐私基线）
+<!-- trellis-session: v=2 fp=patrol-fixes-20261025 -->
+
+**Date**: 2026-10-25
+**Task**: 无 Trellis 任务（用户指令「完全继续改进修改修复」的巡检轮）
+**Branch**: `master`
+
+### Summary
+
+全任务归档后的自主巡检轮。派只读探子对 src 全部 30 模块做缺陷审计（1×P1 / 5×P2 / 10×P3），另自查出 CSS 前缀违规与开源隐私基线问题，全部修复。关键发现：① 视频→视频 crossfade 时旧层 destroy() 无条件 attachVideo(null)，摘掉新层正在播放视频的音量/静音/后台暂停控制（新增 detachVideo 按实例匹配）；② reconcileRemoteConflict 漏调 topbarDrawer.applyRemoteSettings，顶栏抽屉持旧对象时下一次 save() 会整体回写并静默撤销远端收敛；③ mount 兜底观察者可在主开关停用后面板复活且连续 mount 会叠加观察者；④ 滑杆拖动每帧同步写 localStorage（60 次/秒，改 250ms 尾沿去抖 + pagehide 冲刷）；⑤ 历史门禁跑在压缩 dist 上被行首 grep 骗过——固化 tests/css-gate.mjs（裸选择器/前缀/box-shadow 三合一，对 src 生效），并借此抓到 5 处 st-trigger-* 缺 st-bgloader 前缀。其余：五处 fire-and-forget 加 rejection 兜底、搜索 250ms 防抖、远端收敛补齐全量表单回填、并发 getMediaBlobUrl 在途去重防 objectURL 泄漏、AudioVisualizer 无 analyser 不再空转 rAF、TriggerManager 解绑加 removeEventListener 回退、ServerOrigin 全部同源 fetch 加 30s 有界超时、init 加重入守卫、verify 脚本移除硬编码本机个人路径（L1-MR-14）。P2-5（主开关关闭不停 BGM/环境音）属产品语义裁定，本轮保持现状未动。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `8e15d20` | fix(css): 触发规则类名补齐 st-bgloader 前缀 + 新增 check:css 门禁 |
+| `f913a74` | fix(test): 移除测试脚本中硬编码的本机个人路径 |
+| `ee10ea4` | docs(readme): 开发命令补充 check:css 门禁说明 |
+| `e029e86` | fix(audio): 视频切换后音量/静音控制脱落 + 播放兜底定时器与错误监听清理 |
+| `9f25099` | fix(ui): 顶栏抽屉停用复活/观察者叠加、异步回调兜底、搜索防抖与远端表单回填 |
+| `81ea2e0` | fix(core): 远端收敛回滚缺口、持久化去抖、并发 objectURL、空转 rAF 与同源 fetch 超时 |
+| `fd7459d` | chore(build): 重建 dist（本轮修复批） |
+
+### Verification
+
+- [OK] `npm run type-check` ✓
+- [OK] `npm run build` ✓（dist/index.js 205.23 kB / style.css 12.10 kB）
+- [OK] `npm run check:css` ✓（0 全局泄漏 / 0 缺前缀 / 0 box-shadow，且对 src 生效）
+- [OK] 提交全部显式 pathspec，暂存区逐一校验，均已推送 origin master
+- [SKIP] e2e / stress / authority 三套件：Dev 实例（:8001/:8003）本轮均不在线，未启动用户实例；待实例在线后补跑
+
+### Status
+
+[OK] **Completed**
+
