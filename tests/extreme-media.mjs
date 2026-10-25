@@ -496,7 +496,8 @@ try {
             view: window.STBgLoader.getSettings().libraryView,
         }));
         await page2.screenshot({ path: join(outDir, 'c14-view-persist.png') });
-        // 复原视图状态，不给实例留测试痕迹
+        // 复原视图状态，不给实例留测试痕迹。服务端文档写有 800ms 去抖——过早关页会让
+        // localStorage 的复原被服务端旧文档覆盖回残留（实测事故），必须等写落盘并回读验证。
         await page2.evaluate(() => {
             const t = document.querySelector('#st_topbar_type_filter');
             t.value = 'all';
@@ -505,9 +506,13 @@ try {
             s.value = 'name';
             s.dispatchEvent(new Event('change', { bubbles: true }));
         });
-        await settle(1000);
+        await settle(3000);
+        const restoredOk = await page2.evaluate(() => {
+            const v = window.STBgLoader.getSettings().libraryView || {};
+            return v.typeFilter === 'all' && v.sortOrder === 'name';
+        });
         await page2.close();
-        report({ id: 'c14', title: '媒体库视图状态跨刷新持久化（video/time）', pass: restored.typeFilter === 'video' && restored.sort === 'time' && restored.view?.typeFilter === 'video' && restored.view?.sortOrder === 'time', note: JSON.stringify(restored), itemId: null });
+        report({ id: 'c14', title: '媒体库视图状态跨刷新持久化（video/time）', pass: restored.typeFilter === 'video' && restored.sort === 'time' && restored.view?.typeFilter === 'video' && restored.view?.sortOrder === 'time', note: `${JSON.stringify(restored)} 复原落盘=${restoredOk}`, itemId: null });
     }
 
     const passCount = results.filter(r => r.pass).length;
