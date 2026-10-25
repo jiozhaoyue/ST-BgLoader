@@ -18,6 +18,11 @@ export class AudioEngine {
     private urlResolver?: (item: MediaItem) => Promise<string>;
     private userHasInteracted: boolean = false;
     private isWaitingForInteractionUnmute: boolean = false;
+    // A broken/deleted track fires 'error' with no listener today: playback fails silently and
+    // the playlist stalls on the bad entry forever. Auto-skip is bounded by how many tracks the
+    // playlist had when the first error hit, so a playlist that is entirely corrupt cannot spin
+    // an endless skip loop.
+    private errorSkipBudget: number = 0;
 
     // WebAudio Graph for Lo-Fi muffle and Visualizer
     private audioContext: AudioContext | null = null;
@@ -191,6 +196,12 @@ export class AudioEngine {
             this.emitPlayState(false);
         });
 
+        this.audioElement.addEventListener('error', () => {
+            const src = this.audioElement?.src || '(no src)';
+            console.error('[ST-BgLoader AudioEngine] Track failed to load:', src);
+            this.handleTrackError();
+        });
+
         this.setupInteractionListener();
     }
 
@@ -312,6 +323,28 @@ export class AudioEngine {
         }
     }
 
+    /**
+     * A track failed to load (corrupt file, deleted server-side, bad URL). Skip forward the
+     * same way 'ended' does, but only while a skip budget lasts: it is refilled whenever a
+     * track is successfully started and sized against the whole playlist, so an all-corrupt
+     * playlist stops after one pass instead of looping on errors forever. 'single' mode keeps
+     * the user's explicit choice: stop, don't silently play something else.
+     */
+    private handleTrackError(): void {
+        this.isWaitingForInteractionUnmute = false;
+        if (this.playbackMode === 'single' || this.playlist.length === 0) {
+            this.emitPlayState(false);
+            return;
+        }
+        if (this.errorSkipBudget <= 0) {
+            console.warn('[ST-BgLoader AudioEngine] Skip budget exhausted (every track failed?); stopping auto-skip.');
+            this.emitPlayState(false);
+            return;
+        }
+        this.errorSkipBudget -= 1;
+        this.playNext().catch(err => console.error('[ST-BgLoader AudioEngine] Auto-skip after error failed:', err));
+    }
+
     public attachVideo(video: HTMLVideoElement | null): void {
         this.attachedVideo = video;
         if (this.attachedVideo) {
@@ -337,6 +370,8 @@ export class AudioEngine {
         this.clearFade();
         this.audioElement.src = url;
         this.audioElement.loop = loop;
+        // A successful start refills the error auto-skip budget (setPlaylist sizes it first).
+        this.errorSkipBudget = Math.max(this.errorSkipBudget, this.playlist.length);
 
         if (!this.userHasInteracted && !this.muted) {
             this.isWaitingForInteractionUnmute = true;
@@ -403,6 +438,9 @@ export class AudioEngine {
     }
 
     public stopTrack(fadeOutMs: number = 300): void {
+        // Stopping cancels the pending unmute too: without this, the first user interaction
+        // after an explicit stop would fade in an idle element for no reason.
+        this.isWaitingForInteractionUnmute = false;
         if (!this.audioElement || this.audioElement.paused) return;
 
         if (fadeOutMs <= 0) {

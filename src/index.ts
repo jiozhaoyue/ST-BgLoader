@@ -143,6 +143,12 @@ export class STBgLoaderExtension {
         this.mediaMount.setInteractive(this.settings.interactiveBackground);
         this.mediaMount.setVisible(this.settings.backgroundVisible);
         this.mediaMount.setTransition(this.settings.transitionEffect, this.settings.transitionDurationMs);
+        // Broken-media feedback: decode failures are now observable (event + one-shot toastr)
+        // instead of a silent broken layer — also the assertion point of the extreme-media suite.
+        this.mediaMount.setRenderErrorHandler((type) => {
+            this.publicApi.emit('media-error', { type });
+            this.notifyMediaRenderErrorOnce();
+        });
 
         // 3. Mount FX & Controllers to host — happens via MediaMount's onHostReady callback
         //    (immediately when #bg1 exists at init, or when the DOM observer finds it later),
@@ -310,6 +316,10 @@ export class STBgLoaderExtension {
                     this.mediaMount.clear();
                     this.audioEngine.stopTrack();
                     this.saveSettings();
+                } else if (this.audioEngine.getCurrentTrack()?.id === id) {
+                    // Deleted the track that is currently playing (the background is something
+                    // else): refreshing the playlist alone would leave the deleted track playing.
+                    this.audioEngine.stopTrack();
                 }
                 const currentItems = await this.cacheManager.listMedia();
                 this.audioEngine.setPlaylist(currentItems.filter(i => i.type === 'audio'));
@@ -408,13 +418,26 @@ export class STBgLoaderExtension {
     }
 
     private async applyMedia(item: MediaItem, persist: boolean = true): Promise<void> {
+        const previousActiveId = this.settings.activeMediaId;
         if (persist) {
             this.settings.activeMediaId = item.id;
             this.saveSettings();
         }
 
-        const mediaUrl = await this.cacheManager.getMediaBlobUrl(item);
-        await this.mediaMount.mountMedia(item, mediaUrl);
+        try {
+            const mediaUrl = await this.cacheManager.getMediaBlobUrl(item);
+            await this.mediaMount.mountMedia(item, mediaUrl);
+        } catch (err) {
+            // The durable pointer must not keep targeting media that never mounted: roll it
+            // back so the next reload doesn't try to restore a broken background. The old
+            // layer may already be torn down at this point, hence no best-effort remount.
+            if (persist) {
+                this.settings.activeMediaId = previousActiveId ?? null;
+                this.saveSettings();
+            }
+            console.error(`[ST-BgLoader] Failed to mount media "${item.name}":`, err);
+            throw err;
+        }
 
         // Keep the host's picker in sync with what we just mounted: mark the matching native
         // thumbnail, and make sure the host's own layer is not showing underneath ours.
@@ -503,6 +526,20 @@ export class STBgLoaderExtension {
 
     /** null = nothing enforced yet, so the first change under auto-clean compares honestly. */
     private lastEnforcedQuotaBytes: number | null = null;
+
+    /** One-shot toastr for a broken mounted medium; repeats still emit `media-error` events. */
+    private notifiedMediaRenderError = false;
+
+    private notifyMediaRenderErrorOnce(): void {
+        if (this.notifiedMediaRenderError) return;
+        this.notifiedMediaRenderError = true;
+        try {
+            const toastr = (window as unknown as { toastr?: { warn(msg: string, title?: string): void } }).toastr;
+            toastr?.warn('背景媒体加载失败（文件可能损坏或格式不受支持），已保留上一背景，详见控制台', 'ST-BgLoader');
+        } catch {
+            // toastr unavailable — the media-error event and console log carry the signal.
+        }
+    }
 
     /** Opt-in Agent Runtime ambient tools (AI director mode); requires the cloud backend. */
     public syncAgentTools(): void {

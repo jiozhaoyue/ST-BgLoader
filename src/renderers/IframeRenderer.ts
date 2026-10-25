@@ -71,9 +71,11 @@ export class IframeRenderer {
     public destroy(): void {
         if (this.iframeElement) {
             this.pendingSettle?.();
+            // Remove first: clearing src/srcdoc on a still-attached element kicks off an
+            // about:blank navigation that is thrown away a line later anyway.
+            this.iframeElement.remove();
             this.iframeElement.srcdoc = '';
             this.iframeElement.src = 'about:blank';
-            this.iframeElement.remove();
             this.iframeElement = null;
         }
     }

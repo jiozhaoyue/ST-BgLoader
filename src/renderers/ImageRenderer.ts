@@ -5,9 +5,13 @@ export class ImageRenderer {
     private imageElement: HTMLImageElement | null = null;
     private container: HTMLElement;
     private pendingSettle: (() => void) | null = null;
+    // Surfaces broken images (corrupt bytes, 404) to the mount layer: render() still resolves
+    // (the mount chain must not hang), but the failure is no longer invisible.
+    private onError?: () => void;
 
-    constructor(container: HTMLElement) {
+    constructor(container: HTMLElement, onError?: () => void) {
         this.container = container;
+        this.onError = onError;
     }
 
     public async render(url: string, fitting: string = 'cover'): Promise<HTMLImageElement> {
@@ -49,6 +53,7 @@ export class ImageRenderer {
             };
             img.onerror = () => {
                 console.error('[ST-BgLoader] Failed to load background image:', url);
+                this.onError?.();
                 settle();
             };
         });

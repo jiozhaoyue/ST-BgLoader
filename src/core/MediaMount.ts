@@ -37,6 +37,8 @@ export class MediaMount {
     // Serializes concurrent mounts (rapid media double-click): interleaved mounts would
     // both write the same target layer and race activeLayer bookkeeping.
     private mountQueue: Promise<void> = Promise.resolve();
+    /** Notified when the mounted image/video fails to decode (corrupt bytes, 404, codec). */
+    private renderErrorHandler: ((type: 'image' | 'video') => void) | null = null;
 
     private transitionType: TransitionType = 'fade';
     private transitionDurationMs: number = 400;
@@ -49,6 +51,11 @@ export class MediaMount {
     public setTransition(type: TransitionType, durationMs: number = 400): void {
         this.transitionType = type;
         this.transitionDurationMs = Math.max(100, Math.min(2000, durationMs));
+    }
+
+    /** Registers the handler for broken-media notifications (image/video decode failures). */
+    public setRenderErrorHandler(handler: ((type: 'image' | 'video') => void) | null): void {
+        this.renderErrorHandler = handler;
     }
 
     public getContainerElement(): HTMLElement | null {
@@ -156,12 +163,12 @@ export class MediaMount {
         }
         this.containerEl = container;
 
-        this.videoRendererA = new VideoRenderer(this.layerA!, this.audioEngine);
-        this.videoRendererB = new VideoRenderer(this.layerB!, this.audioEngine);
+        this.videoRendererA = new VideoRenderer(this.layerA!, this.audioEngine, () => this.renderErrorHandler?.('video'));
+        this.videoRendererB = new VideoRenderer(this.layerB!, this.audioEngine, () => this.renderErrorHandler?.('video'));
         this.iframeRendererA = new IframeRenderer(this.layerA!);
         this.iframeRendererB = new IframeRenderer(this.layerB!);
-        this.imageRendererA = new ImageRenderer(this.layerA!);
-        this.imageRendererB = new ImageRenderer(this.layerB!);
+        this.imageRendererA = new ImageRenderer(this.layerA!, () => this.renderErrorHandler?.('image'));
+        this.imageRendererB = new ImageRenderer(this.layerB!, () => this.renderErrorHandler?.('image'));
 
         // Re-apply the controlled visibility: the container is created/reused once, so its
         // display must reflect MediaMount's state rather than whatever the DOM kept (A1).

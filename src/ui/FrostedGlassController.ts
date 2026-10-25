@@ -51,7 +51,6 @@ export class FrostedGlassController {
                 backdrop-filter: blur(var(--st-frosted-blur, 10px)) !important;
                 -webkit-backdrop-filter: blur(var(--st-frosted-blur, 10px)) !important;
                 border: 1px solid var(--SmartThemeBorderColor, rgba(255, 255, 255, 0.12)) !important;
-                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25) !important;
                 transition: background 0.3s ease, backdrop-filter 0.3s ease !important;
             }
         `;

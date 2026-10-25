@@ -9,10 +9,14 @@ export class VideoRenderer {
     private container: HTMLElement;
     private audioEngine: AudioEngine;
     private pendingSettle: (() => void) | null = null;
+    // Surfaces broken videos (corrupt bytes, unsupported codec, 404) to the mount layer:
+    // render() still settles (bounded wait), but the failure is no longer invisible.
+    private onError?: () => void;
 
-    constructor(container: HTMLElement, audioEngine: AudioEngine) {
+    constructor(container: HTMLElement, audioEngine: AudioEngine, onError?: () => void) {
         this.container = container;
         this.audioEngine = audioEngine;
+        this.onError = onError;
     }
 
     public async render(url: string, fitting: string = 'cover'): Promise<HTMLVideoElement> {
@@ -49,6 +53,7 @@ export class VideoRenderer {
             let settled = false;
             const onError = (e: Event) => {
                 console.error('[ST-BgLoader] Error loading video:', e);
+                this.onError?.();
                 settle();
             };
             const settle = () => {

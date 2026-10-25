@@ -5,6 +5,7 @@ import {
     FilterPreset,
     MediaItem,
     MediaType,
+    mergeSettings,
     PlaybackMode,
     SceneSnapshot,
     TransitionType,
@@ -71,6 +72,8 @@ export class TopbarBackgroundDrawer {
     /** Pending DOM-wait observer between mount() and the host drawer appearing. */
     private mountObserver: MutationObserver | null = null;
     private searchDebounceTimer: number | null = null;
+    /** Monotonic token for in-flight grid refreshes: only the newest run may write the grid. */
+    private refreshGeneration = 0;
 
     constructor(
         settings: BgLoaderSettings,
@@ -802,7 +805,10 @@ export class TopbarBackgroundDrawer {
             reader.onload = (event) => {
                 try {
                     const parsed = JSON.parse(event.target?.result as string);
-                    this.settings = { ...this.settings, ...parsed };
+                    // mergeSettings, not a shallow spread: a partial backup (e.g. filters without
+                    // `saturate`) would otherwise replace the nested object wholesale and later
+                    // render `saturate(undefined%)` into the container's CSS filter.
+                    this.settings = mergeSettings({ ...this.settings, ...parsed });
                     this.save();
                     this.syncFormControls();
                 } catch (err) {
@@ -907,7 +913,12 @@ export class TopbarBackgroundDrawer {
         const grid = this.panel?.querySelector('#st_bgloader_grid');
         if (!grid) return;
 
+        // Out-of-order completion guard: two overlapping refreshes (search debounce racing a
+        // sort change) used to let the stale result overwrite the newer one.
+        const generation = ++this.refreshGeneration;
+
         let items = await this.cacheManager.listMedia();
+        if (generation !== this.refreshGeneration) return;
 
         // Filter by type
         if (this.typeFilter !== 'all') {
