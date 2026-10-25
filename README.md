@@ -109,10 +109,12 @@ git clone https://github.com/jiozhaoyue/ST-BgLoader.git
 npm install
 npm run build      # 极速打包出 dist/index.js 与 dist/style.css
 npm run type-check # TypeScript 严格类型检查
+npm run check:css  # CSS 作用域门禁：裸选择器 / 扩展前缀 / box-shadow 三合一自查（对 src 生效）
 ```
 
 ### 自动化测试套件
 项目配备了完整的自动化质量门禁套件：
+- `npm run check:css`：CSS 作用域静态门禁（无需实例，随时可跑）；
 - `node tests/e2e.mjs`：端到端功能回归测试（24 项断言）；
 - `node tests/stress.mjs`：极限并发切换、大文件流、异常容错与显存泄漏压力测试；
 - `node tests/authority.mjs`：服务端存储与 Authority 扩展交互能力测试。
