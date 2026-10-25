@@ -77,7 +77,8 @@ try {
         document.querySelector('#Backgrounds').classList.contains('openDrawer')));
     await shot('01-drawer-open');
 
-    // 网格就绪等待（有界）：首次目录请求可能撞上实例瞬时抖动；若库真的为空则后续用例 SKIP
+    // 网格就绪等待（有界）：若持久化的视图过滤恰好筛空了库（如 video 且库中无视频），
+    // 先经 UI 复位为 all 再等；若库真的为空则后续用例 SKIP
     let libraryEmpty = false;
     {
         let cards = 0;
@@ -88,9 +89,24 @@ try {
             const listed = await page.evaluate(async () =>
                 (await window.STBgLoader.getAPI().getMediaList()).length);
             if (listed === 0) { libraryEmpty = true; break; }
+            // 库非空但网格空：多半是持久化的类型过滤筛空了当前库，经 UI 复位一次
+            if (i === 2) {
+                await page.evaluate(() => {
+                    const t = document.querySelector('#st_topbar_type_filter');
+                    if (t && t.value !== 'all') {
+                        t.value = 'all';
+                        t.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+                    const s2 = document.querySelector('#st_topbar_search');
+                    if (s2 && s2.value) {
+                        s2.value = '';
+                        s2.dispatchEvent(new Event('input', { bubbles: true }));
+                    }
+                });
+            }
             await settle(1000);
         }
-        step('S1b 媒体网格就绪', libraryEmpty || cards > 0, libraryEmpty ? '实例媒体库为空（SKIP S2/S4）' : `${cards} 卡片`);
+        step('S1b 媒体网格就绪', libraryEmpty || cards > 0, libraryEmpty ? '实例媒体库为空（SKIP S2/S3/S4）' : `${cards} 卡片`);
     }
 
     // S2 搜索过滤（用首卡名称前缀作搜索词，不依赖特定文件名）
@@ -112,31 +128,50 @@ try {
         step('S2 搜索过滤生效', true, 'SKIP（空库）');
     }
 
-    // S3 类型过滤 + 复原
-    await page.evaluate(() => {
-        const t = document.querySelector('#st_topbar_type_filter');
-        t.value = 'video';
-        t.dispatchEvent(new Event('change', { bubbles: true }));
-    });
-    await settle(900);
-    const allVideo = await page.evaluate(() =>
-        [...document.querySelectorAll('#st_bgloader_grid .st-bgloader-media-card')].every(c =>
-            c.querySelector('.st-bg-native-badge.video, .st-bgloader-media-badge.video')));
-    step('S3 类型过滤（video）生效', allVideo);
-    await shot('03-type-filter');
-    await page.evaluate((tf) => {
-        const t = document.querySelector('#st_topbar_type_filter');
-        t.value = tf || 'all';
-        t.dispatchEvent(new Event('change', { bubbles: true }));
-    }, initial.libraryView?.typeFilter || 'all');
-    await settle(600);
+    // S3 类型过滤 + 复原（动态选一个有匹配项的类型：清理后库内可能没有任何视频）
+    const gridCountBeforeS3 = await page.evaluate(() =>
+        document.querySelectorAll('#st_bgloader_grid .st-bgloader-media-card').length);
+    if (gridCountBeforeS3 > 0) {
+        const target = await page.evaluate(() => {
+            const types = {};
+            return window.STBgLoader.getAPI().getMediaList().then((items) => {
+                for (const i of items) types[i.type] = (types[i.type] || 0) + 1;
+                // 选一个 1 ≤ 数量 < 总数 的类型，过滤效果可双向断言
+                const hit = Object.keys(types).find(t => types[t] > 0 && types[t] < items.length);
+                return hit ? { type: hit, count: types[hit] } : null;
+            });
+        });
+        if (target) {
+            await page.evaluate((t) => {
+                const el = document.querySelector('#st_topbar_type_filter');
+                el.value = t;
+                el.dispatchEvent(new Event('change', { bubbles: true }));
+            }, target.type);
+            await settle(1200);
+            const filtered = await page.evaluate(() =>
+                document.querySelectorAll('#st_bgloader_grid .st-bgloader-media-card').length);
+            step('S3 类型过滤生效', filtered === target.count, `${target.type}: ${filtered}/${target.count}`);
+            await shot('03-type-filter');
+        } else {
+            step('S3 类型过滤生效', true, 'SKIP（所有条目同类型，过滤无区分度）');
+        }
+        await page.evaluate((tf) => {
+            const t = document.querySelector('#st_topbar_type_filter');
+            t.value = tf || 'all';
+            t.dispatchEvent(new Event('change', { bubbles: true }));
+        }, initial.libraryView?.typeFilter || 'all');
+        await settle(600);
+    } else {
+        step('S3 类型过滤生效', true, 'SKIP（网格为空）');
+    }
 
-    // S4 点击卡片应用（真实点击）
+    // S4 点击卡片应用（真实点击）。断言「激活 id === 被点卡的 id」：被点的卡可能恰好是
+    // 当前激活媒体（重应用同 id 合法，before === after 不是失败）。
     if (!libraryEmpty) {
         const before = await page.evaluate(() => window.STBgLoader.getSettings().activeMediaId);
         await page.evaluate(() => {
             // 分级探针：记录失败发生在挂载管线的哪一段（间歇性问题定位用）
-            window.__s4 = { stage: null, err: null };
+            window.__s4 = { stage: null, err: null, clickedId: null };
             const cm = window.STBgLoader.getCacheManager();
             const mm = window.STBgLoader.getMediaMount();
             const origUrl = cm.getMediaBlobUrl.bind(cm);
@@ -153,28 +188,32 @@ try {
                 });
             };
             const card = document.querySelector('#st_bgloader_grid .st-bgloader-media-card');
+            window.__s4.clickedId = card?.dataset.itemId || null;
             card?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
         });
         await settle(3500);
-        const s4 = await page.evaluate(() => ({ after: window.STBgLoader.getSettings().activeMediaId, probe: window.__s4 }));
+        const s4 = await page.evaluate(() => ({
+            after: window.STBgLoader.getSettings().activeMediaId,
+            probe: window.__s4,
+        }));
         const after = s4.after;
+        const clickedOk = !!after && after === s4.probe.clickedId;
         const mounted = await page.evaluate(() => {
             const c = document.querySelector('#bg1 .st-bg-media-container');
             return !!c && getComputedStyle(c).display !== 'none';
         });
-        const note = `${before} → ${after} 探针=${JSON.stringify(s4.probe)}`;
-        step('S4 点击卡片应用媒体', !!after && after !== before && mounted, note);
+        step('S4 点击卡片应用媒体', clickedOk && mounted, `${before} → ${after} 探针=${JSON.stringify(s4.probe)}`);
         await shot('04-applied');
     } else {
         step('S4 点击卡片应用媒体', true, 'SKIP（空库）');
     }
 
-    // S5 显示/隐藏切换 + 复原
-    await page.click('#st_topbar_bg_vis_btn');
+    // S5 显示/隐藏切换 + 复原（DOM 派发：实体鼠标在不同宿主布局下可能不可点）
+    await page.evaluate(() => document.querySelector('#st_topbar_bg_vis_btn')?.click());
     await settle(500);
     const hidden = await page.evaluate(() =>
         getComputedStyle(document.querySelector('#bg1 .st-bg-media-container')).display === 'none');
-    await page.click('#st_topbar_bg_vis_btn');
+    await page.evaluate(() => document.querySelector('#st_topbar_bg_vis_btn')?.click());
     await settle(500);
     const shown = await page.evaluate(() =>
         getComputedStyle(document.querySelector('#bg1 .st-bg-media-container')).display !== 'none');
@@ -235,7 +274,7 @@ try {
     step('S9 抽屉收起', drawerClosed);
     await shot('09-drawer-closed');
 
-    // 复原（探针零残留）
+    // 复原（探针零残留：含视图状态）
     await page.evaluate(async (init) => {
         const api = window.STBgLoader.getAPI();
         api.setWeather(init.weather);
@@ -247,8 +286,13 @@ try {
             api.clearBackground();
         }
         window.STBgLoader.setBackgroundVisible(init.backgroundVisible);
+        const s = window.STBgLoader.getSettings();
+        s.libraryView = init.libraryView && Object.keys(init.libraryView).length
+            ? init.libraryView
+            : { sortOrder: 'name', typeFilter: 'all' };
+        window.STBgLoader.saveSettings();
     }, initial);
-    await settle(2500);
+    await settle(3000);
     const restored = await page.evaluate((init) => {
         const s = window.STBgLoader.getSettings();
         return s.weather.type === init.weather.type

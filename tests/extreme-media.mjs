@@ -512,7 +512,29 @@ try {
             return v.typeFilter === 'all' && v.sortOrder === 'name';
         });
         await page2.close();
-        report({ id: 'c14', title: '媒体库视图状态跨刷新持久化（video/time）', pass: restored.typeFilter === 'video' && restored.sort === 'time' && restored.view?.typeFilter === 'video' && restored.view?.sortOrder === 'time', note: `${JSON.stringify(restored)} 复原落盘=${restoredOk}`, itemId: null });
+        // 服务端文档核验（内存值不等于落盘）：新开第三页读真实收敛结果，未落盘则补写一次
+        const page3 = await browser.newPage();
+        await page3.goto(TARGET_URL, { waitUntil: 'domcontentloaded', timeout: 40000 });
+        await ensureExtensionLoaded(page3);
+        await page3.waitForFunction(() => window.STBgLoader?.isInitialized, { timeout: 35000 });
+        let serverOk = await page3.evaluate(() => {
+            const v = window.STBgLoader.getSettings().libraryView || {};
+            return v.typeFilter === 'all' && v.sortOrder === 'name';
+        });
+        if (!serverOk) {
+            await page3.evaluate(() => {
+                const s = window.STBgLoader.getSettings();
+                s.libraryView = { sortOrder: 'name', typeFilter: 'all' };
+                window.STBgLoader.saveSettings();
+            });
+            await settle(4000);
+            serverOk = await page3.evaluate(() => {
+                const v = window.STBgLoader.getSettings().libraryView || {};
+                return v.typeFilter === 'all' && v.sortOrder === 'name';
+            });
+        }
+        await page3.close();
+        report({ id: 'c14', title: '媒体库视图状态跨刷新持久化（video/time）', pass: restored.typeFilter === 'video' && restored.sort === 'time' && restored.view?.typeFilter === 'video' && restored.view?.sortOrder === 'time', note: `${JSON.stringify(restored)} 复原内存=${restoredOk} 复原落盘=${serverOk}`, itemId: null });
     }
 
     const passCount = results.filter(r => r.pass).length;
