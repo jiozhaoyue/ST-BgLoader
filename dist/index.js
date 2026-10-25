@@ -2228,14 +2228,14 @@ class Ie {
     t.length === 0 ? e.innerHTML = '<div class="st-bgloader-dim-text">暂无规则</div>' : t.forEach((r, c) => {
       const o = document.createElement("div");
       o.className = "st-bgloader-trigger-row", o.innerHTML = `
-                    <input type="checkbox" ${r.enabled ? "checked" : ""} class="st-trigger-check" />
-                    <span class="st-trigger-badge">${r.type === "character" ? "角色" : r.type === "chat" ? "聊天" : "正则"}</span>
-                    <span class="st-trigger-name">${b(r.name)}</span>
-                    <span class="st-trigger-pattern">${b(r.pattern)}</span>
-                    <button type="button" class="menu_button menu_button_icon menu_button_danger st-trigger-del"><i class="fa-solid fa-trash"></i></button>
-                `, o.querySelector(".st-trigger-check")?.addEventListener("change", (h) => {
+                    <input type="checkbox" ${r.enabled ? "checked" : ""} class="st-bgloader-trigger-check" />
+                    <span class="st-bgloader-trigger-badge">${r.type === "character" ? "角色" : r.type === "chat" ? "聊天" : "正则"}</span>
+                    <span class="st-bgloader-trigger-name">${b(r.name)}</span>
+                    <span class="st-bgloader-trigger-pattern">${b(r.pattern)}</span>
+                    <button type="button" class="menu_button menu_button_icon menu_button_danger st-bgloader-trigger-del"><i class="fa-solid fa-trash"></i></button>
+                `, o.querySelector(".st-bgloader-trigger-check")?.addEventListener("change", (h) => {
         r.enabled = h.target.checked, this.save();
-      }), o.querySelector(".st-trigger-del")?.addEventListener("click", () => {
+      }), o.querySelector(".st-bgloader-trigger-del")?.addEventListener("click", () => {
         this.settings.triggerRules.splice(c, 1), this.save(), this.updateTriggersUI();
       }), e.appendChild(o);
     });

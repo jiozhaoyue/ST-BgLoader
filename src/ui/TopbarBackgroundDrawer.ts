@@ -1101,19 +1101,19 @@ export class TopbarBackgroundDrawer {
                 const row = document.createElement('div');
                 row.className = 'st-bgloader-trigger-row';
                 row.innerHTML = `
-                    <input type="checkbox" ${rule.enabled ? 'checked' : ''} class="st-trigger-check" />
-                    <span class="st-trigger-badge">${rule.type === 'character' ? '角色' : rule.type === 'chat' ? '聊天' : '正则'}</span>
-                    <span class="st-trigger-name">${escapeHtml(rule.name)}</span>
-                    <span class="st-trigger-pattern">${escapeHtml(rule.pattern)}</span>
-                    <button type="button" class="menu_button menu_button_icon menu_button_danger st-trigger-del"><i class="fa-solid fa-trash"></i></button>
+                    <input type="checkbox" ${rule.enabled ? 'checked' : ''} class="st-bgloader-trigger-check" />
+                    <span class="st-bgloader-trigger-badge">${rule.type === 'character' ? '角色' : rule.type === 'chat' ? '聊天' : '正则'}</span>
+                    <span class="st-bgloader-trigger-name">${escapeHtml(rule.name)}</span>
+                    <span class="st-bgloader-trigger-pattern">${escapeHtml(rule.pattern)}</span>
+                    <button type="button" class="menu_button menu_button_icon menu_button_danger st-bgloader-trigger-del"><i class="fa-solid fa-trash"></i></button>
                 `;
 
-                row.querySelector('.st-trigger-check')?.addEventListener('change', (e) => {
+                row.querySelector('.st-bgloader-trigger-check')?.addEventListener('change', (e) => {
                     rule.enabled = (e.target as HTMLInputElement).checked;
                     this.save();
                 });
 
-                row.querySelector('.st-trigger-del')?.addEventListener('click', () => {
+                row.querySelector('.st-bgloader-trigger-del')?.addEventListener('click', () => {
                     this.settings.triggerRules.splice(idx, 1);
                     this.save();
                     this.updateTriggersUI();

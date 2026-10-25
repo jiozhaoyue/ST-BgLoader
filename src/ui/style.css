@@ -551,7 +551,7 @@
     margin-bottom: 4px;
 }
 
-.st-trigger-badge {
+.st-bgloader-trigger-badge {
     font-size: 0.75em;
     padding: 1px 5px;
     border-radius: 3px;
@@ -560,12 +560,12 @@
     font-weight: 600;
 }
 
-.st-trigger-name {
+.st-bgloader-trigger-name {
     font-size: 0.85em;
     font-weight: 500;
 }
 
-.st-trigger-pattern {
+.st-bgloader-trigger-pattern {
     font-size: 0.8em;
     opacity: 0.7;
     flex: 1;
