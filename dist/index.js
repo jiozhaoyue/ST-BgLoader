@@ -1004,7 +1004,14 @@ class Te {
       this.emitPlayState(!1);
     }), this.audioElement.addEventListener("error", () => {
       const e = this.audioElement?.src || "(no src)";
-      console.error("[ST-BgLoader AudioEngine] Track failed to load:", e), this.handleTrackError();
+      console.error("[ST-BgLoader AudioEngine] Track failed to load:", e);
+      try {
+        this.audioElement?.pause();
+      } catch {
+      }
+      this.handleTrackError();
+    }), this.audioElement.addEventListener("playing", () => {
+      this.errorSkipBudget = Math.max(this.errorSkipBudget, this.playlist.length);
     }), this.setupInteractionListener();
   }
   setupInteractionListener() {
@@ -1035,7 +1042,7 @@ class Te {
     return this.playbackMode;
   }
   setPlaylist(e, t = !1) {
-    this.playlist = e, this.playlist.length > 0 && this.currentIndex === -1 && (this.currentIndex = 0, t && this.playCurrentTrack());
+    this.playlist = e, this.errorSkipBudget = Math.max(this.errorSkipBudget, this.playlist.length), this.playlist.length > 0 && this.currentIndex === -1 && (this.currentIndex = 0, t && this.playCurrentTrack());
   }
   getPlaylist() {
     return this.playlist;
@@ -1095,7 +1102,7 @@ class Te {
   }
   async playTrack(e, t = !0) {
     if (this.audioElement) {
-      this.clearFade(), this.audioElement.src = e, this.audioElement.loop = t, this.errorSkipBudget = Math.max(this.errorSkipBudget, this.playlist.length), !this.userHasInteracted && !this.muted ? (this.isWaitingForInteractionUnmute = !0, this.audioElement.muted = !0) : this.applyVolume();
+      this.clearFade(), this.audioElement.src = e, this.audioElement.loop = t, !this.userHasInteracted && !this.muted ? (this.isWaitingForInteractionUnmute = !0, this.audioElement.muted = !0) : this.applyVolume();
       try {
         this.initWebAudio(), this.resumeAudioContext();
         let i;

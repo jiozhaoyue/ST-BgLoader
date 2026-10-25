@@ -378,6 +378,37 @@ try {
         report({ id: 'c10', title: `快速切换 ×${seqIds.length}（300ms 间隔）`, pass: st.containerDisplay === 'block' && st.activeOpacity === 1, note: `终态 opacity=${st.activeOpacity} A/B children=${st.aChildren}/${st.bChildren}`, itemId: null });
     }
 
+    // ---------- c13 全坏音频歌单（跳轨预算有界性）----------
+    {
+        // 两条随机字节的 .mp3（损坏）+ 直接驱动 AudioEngine：断言 auto-skip 恰好烧完预算后停止，
+        // 不会无限循环（修复验证：预算只在 'playing' 事件补满，playTrack 不再补）。
+        const c13 = await page.evaluate(async () => {
+            const ext = window.STBgLoader;
+            const engine = ext.getAudioEngine();
+            // 零字节 mp3：浏览器解码必然失败（随机字节可能被当噪声成功解码，不可靠）
+            const makeCorrupt = (name) =>
+                ext.cacheManager.saveMedia(new Blob([], { type: 'audio/mpeg' }), name, 'audio', 'server');
+            const a = await makeCorrupt('xm_c13_bad_a.mp3');
+            const b = await makeCorrupt('xm_c13_bad_b.mp3');
+            window.__xmCreated.push(a.id, b.id);
+
+            const previousMode = engine.getPlaybackMode();
+            engine.setPlaybackMode('loop');
+            engine.setPlaylist([a, b], false);
+            const t0 = performance.now();
+            await engine.playTrack('backgrounds/' + encodeURIComponent(a.name), false).catch(() => {});
+            // 有界观察窗：若预算失效会无限 error→skip→error；15s 内必须归于停止
+            await new Promise(r => setTimeout(r, 12000));
+            const stillPlaying = engine.isPlaying();
+            const attempts = (performance.now() - t0) / 1000;
+            engine.stopTrack(0);
+            engine.setPlaybackMode(previousMode);
+            return { stillPlaying, attempts };
+        });
+        await shot('c13-all-corrupt-playlist');
+        report({ id: 'c13', title: '全坏歌单：跳轨预算有界（12s 观察窗后必须停止）', pass: c13.stillPlaying === false, note: `stillPlaying=${c13.stillPlaying}（预算失效时此值会为 true 且不收敛）`, itemId: null });
+    }
+
     // ---------- 汇总截图（最终状态 + 打开顶栏抽屉看媒体库）----------
     await dismissInstancePopups();
     await page.evaluate(() => window.STBgLoader.getTopbarDrawer()?.mount());

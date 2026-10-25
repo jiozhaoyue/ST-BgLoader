@@ -199,7 +199,19 @@ export class AudioEngine {
         this.audioElement.addEventListener('error', () => {
             const src = this.audioElement?.src || '(no src)';
             console.error('[ST-BgLoader AudioEngine] Track failed to load:', src);
+            // A failed play() leaves the paused flag FALSE (play() clears it before failing and
+            // nothing sets it back on a load error), so isPlaying() would report phantom
+            // playback forever. Normalize the element state before any skip decision.
+            try { this.audioElement?.pause(); } catch { /* already stopped */ }
             this.handleTrackError();
+        });
+
+        // A track that actually STARTS playing refills the error auto-skip budget. Refilling at
+        // playTrack() instead would defeat the bound: each auto-skip calls playTrack, which
+        // would restore the budget before the next error lands, and an all-corrupt playlist
+        // would loop skips forever.
+        this.audioElement.addEventListener('playing', () => {
+            this.errorSkipBudget = Math.max(this.errorSkipBudget, this.playlist.length);
         });
 
         this.setupInteractionListener();
@@ -253,6 +265,9 @@ export class AudioEngine {
 
     public setPlaylist(items: MediaItem[], autoPlay: boolean = false): void {
         this.playlist = items;
+        // A fresh playlist gets a full skip budget: an all-corrupt list may then burn through
+        // exactly one pass before auto-skip stops (refilled only by tracks that really play).
+        this.errorSkipBudget = Math.max(this.errorSkipBudget, this.playlist.length);
         if (this.playlist.length > 0 && this.currentIndex === -1) {
             this.currentIndex = 0;
             if (autoPlay) {
@@ -370,8 +385,6 @@ export class AudioEngine {
         this.clearFade();
         this.audioElement.src = url;
         this.audioElement.loop = loop;
-        // A successful start refills the error auto-skip budget (setPlaylist sizes it first).
-        this.errorSkipBudget = Math.max(this.errorSkipBudget, this.playlist.length);
 
         if (!this.userHasInteracted && !this.muted) {
             this.isWaitingForInteractionUnmute = true;
