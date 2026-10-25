@@ -29,7 +29,7 @@ const I = {
     name: "黑白",
     filters: { blur: 0, brightness: 100, opacity: 100, saturate: 0 }
   }
-}, k = ["off", "rain", "snow", "sakura", "cyber_motes", "scanlines"], he = {
+}, k = ["off", "rain", "snow", "sakura", "cyber_motes", "scanlines"], de = {
   off: "关闭",
   rain: "雨水",
   snow: "飘雪",
@@ -249,9 +249,9 @@ const X = "st-bg-loader-manifest.json", L = 1;
 function T(c) {
   return `backgrounds/${encodeURIComponent(c)}`;
 }
-const de = /* @__PURE__ */ new Set(["favicon.ico"]);
+const he = /* @__PURE__ */ new Set(["favicon.ico"]);
 function q(c) {
-  return !!c && de.has(c.toLowerCase());
+  return !!c && he.has(c.toLowerCase());
 }
 function x() {
   return E.getInstance().getRequestHeaders({ omitContentType: !0 });
@@ -451,8 +451,8 @@ class G {
   async uploadFile(e, t, i) {
     let s = fe(e || "media");
     if (await this.filenameExists(s)) {
-      const r = s.lastIndexOf("."), l = r > 0 ? s.slice(0, r) : s, o = r > 0 ? s.slice(r) : "";
-      s = `${l}_${Date.now()}${o}`;
+      const r = s.lastIndexOf("."), o = r > 0 ? s.slice(0, r) : s, l = r > 0 ? s.slice(r) : "";
+      s = `${o}_${Date.now()}${l}`;
     }
     const a = new FormData();
     a.append("avatar", new File([t], s, { type: i }));
@@ -1119,8 +1119,8 @@ class Te {
     const i = performance.now(), s = Math.max(0, Math.min(1, e));
     this.audioElement && (this.audioElement.muted = !1, this.audioElement.volume = 0), this.attachedVideo && (this.attachedVideo.muted = !1, this.attachedVideo.volume = 0);
     const a = () => {
-      const n = performance.now() - i, r = Math.min(1, n / t), l = s * r;
-      this.audioElement && (this.audioElement.volume = l), this.attachedVideo && (this.attachedVideo.volume = l), r < 1 ? this.fadeTimer = requestAnimationFrame(a) : this.applyVolume();
+      const n = performance.now() - i, r = Math.min(1, n / t), o = s * r;
+      this.audioElement && (this.audioElement.volume = o), this.attachedVideo && (this.attachedVideo.volume = o), r < 1 ? this.fadeTimer = requestAnimationFrame(a) : this.applyVolume();
     };
     this.fadeTimer = requestAnimationFrame(a);
   }
@@ -1173,10 +1173,10 @@ class Y {
       const n = (d) => {
         console.error("[ST-BgLoader] Error loading video:", d), this.onError?.(), r();
       }, r = () => {
-        a || (a = !0, window.clearTimeout(l), this.pendingSettle = null, i.removeEventListener("canplay", o), i.removeEventListener("error", n), s(i));
-      }, l = window.setTimeout(r, Me);
+        a || (a = !0, window.clearTimeout(o), this.pendingSettle = null, i.removeEventListener("canplay", l), i.removeEventListener("error", n), s(i));
+      }, o = window.setTimeout(r, Me);
       this.pendingSettle = r;
-      const o = async () => {
+      const l = async () => {
         try {
           await i.play();
         } catch (d) {
@@ -1184,7 +1184,7 @@ class Y {
         }
         i.style.opacity = "1", r();
       };
-      i.addEventListener("canplay", o), i.addEventListener("error", n);
+      i.addEventListener("canplay", l), i.addEventListener("error", n);
     });
   }
   applyFitting(e, t) {
@@ -1399,19 +1399,19 @@ class Ae {
       const y = this.activeLayer === "A" ? this.layerB : this.layerA;
       y && (y.style.opacity = "0", y.style.transform = "none", y.style.filter = "none");
     }
-    const i = this.activeLayer === "A" ? "B" : "A", s = i === "B" ? this.layerB : this.layerA, a = this.activeLayer === "A" ? this.layerA : this.layerB, n = i === "B" ? this.videoRendererB : this.videoRendererA, r = i === "B" ? this.iframeRendererB : this.iframeRendererA, l = i === "B" ? this.imageRendererB : this.imageRendererA;
-    n.destroy(), r.destroy(), l.destroy();
-    const o = this.getFitting();
+    const i = this.activeLayer === "A" ? "B" : "A", s = i === "B" ? this.layerB : this.layerA, a = this.activeLayer === "A" ? this.layerA : this.layerB, n = i === "B" ? this.videoRendererB : this.videoRendererA, r = i === "B" ? this.iframeRendererB : this.iframeRendererA, o = i === "B" ? this.imageRendererB : this.imageRendererA;
+    n.destroy(), r.destroy(), o.destroy();
+    const l = this.getFitting();
     switch (e.type) {
       case "video":
-        await n.render(t, o);
+        await n.render(t, l);
         break;
       case "html":
       case "svg":
         await r.render(t, !0);
         break;
       case "image":
-        await l.render(t, o);
+        await o.render(t, l);
         break;
       case "audio":
         await this.audioEngine.playMediaItem(e, t);
@@ -1511,11 +1511,11 @@ class g {
   static bindRafSlider(e, t, i, s, a) {
     const n = e.querySelector(`#${t}`), r = e.querySelector(`#${i}`);
     if (!n) return;
-    let l = null, o = null;
+    let o = null, l = null;
     n.addEventListener("input", () => {
       const d = Number(n.value);
-      r && (r.textContent = `${d}${s}`), o = d, l === null && (l = window.requestAnimationFrame(() => {
-        o !== null && a(o), l = null;
+      r && (r.textContent = `${d}${s}`), l = d, o === null && (o = window.requestAnimationFrame(() => {
+        l !== null && a(l), o = null;
       }));
     });
   }
@@ -1551,18 +1551,18 @@ class Be {
   render() {
     const e = E.getInstance(), t = e.getExtensionsSettingsContainer();
     if (!t) {
-      const o = new MutationObserver(() => {
-        e.getExtensionsSettingsContainer() && (window.clearTimeout(d), o.disconnect(), this.render());
+      const l = new MutationObserver(() => {
+        e.getExtensionsSettingsContainer() && (window.clearTimeout(d), l.disconnect(), this.render());
       });
-      o.observe(document.body, { childList: !0, subtree: !0 });
-      const d = window.setTimeout(() => o.disconnect(), 3e4);
+      l.observe(document.body, { childList: !0, subtree: !0 });
+      const d = window.setTimeout(() => l.disconnect(), 3e4);
       return;
     }
     const i = document.querySelector("#st_bgloader_container, #st_bgloader_settings");
     i && i.remove();
     const s = document.createElement("div");
     s.id = "st_bgloader_container", s.className = "extension_container", s.setAttribute("data-extension-name", "ST-BgLoader");
-    const n = (this.activeMediaName || "默认").replace(/[\(\（][^\)\）]*[\)\）]/g, "").trim() || "默认", r = this.settings.enabled ?? !0, l = g.renderButton({
+    const n = (this.activeMediaName || "默认").replace(/[\(\（][^\)\）]*[\)\）]/g, "").trim() || "默认", r = this.settings.enabled ?? !0, o = g.renderButton({
       id: "st_bgloader_open_topbar_btn",
       icon: "fa-arrow-up-right-from-square",
       label: "打开设置",
@@ -1589,7 +1589,7 @@ class Be {
                             </span>
                         </div>
                         <div class="st-bgloader-master-actions">
-                            ${l}
+                            ${o}
                         </div>
                     </div>
                 </div>
@@ -1611,10 +1611,10 @@ class Be {
       s.addEventListener("inline-drawer-toggle", () => {
         r = !0;
       });
-      const l = window.$ || window.jQuery;
-      if (typeof l == "function")
+      const o = window.$ || window.jQuery;
+      if (typeof o == "function")
         try {
-          l(s).on("inline-drawer-toggle", () => {
+          o(s).on("inline-drawer-toggle", () => {
             r = !0;
           });
         } catch {
@@ -1622,8 +1622,8 @@ class Be {
       i.addEventListener("click", () => {
         r = !1, window.setTimeout(() => {
           if (!r) {
-            const o = a.style.display === "none" || window.getComputedStyle(a).display === "none";
-            a.style.display = o ? "block" : "none", n.classList.toggle("down", !o), n.classList.toggle("up", o), n.classList.toggle("fa-circle-chevron-down", !o), n.classList.toggle("fa-circle-chevron-up", o);
+            const l = a.style.display === "none" || window.getComputedStyle(a).display === "none";
+            a.style.display = l ? "block" : "none", n.classList.toggle("down", !l), n.classList.toggle("up", l), n.classList.toggle("fa-circle-chevron-down", !l), n.classList.toggle("fa-circle-chevron-up", l);
           }
         }, 50);
       });
@@ -1647,6 +1647,9 @@ class Le {
   searchDebounceTimer = null;
   /** Monotonic token for in-flight grid refreshes: only the newest run may write the grid. */
   refreshGeneration = 0;
+  /** Video first-frame thumbnails (itemId → dataURL), generated lazily per grid render. */
+  thumbCache = /* @__PURE__ */ new Map();
+  thumbInflight = /* @__PURE__ */ new Map();
   constructor(e, t, i, s) {
     this.settings = e, this.cacheManager = t, this.callbacks = i, this.authority = s ?? null;
   }
@@ -1805,7 +1808,7 @@ class Le {
                             <div class="st-bgloader-preset-row">
                                 <label class="st-bgloader-label-md">天气:</label>
                                 <select id="st_weather_type" class="text_pole">
-                                    ${k.map((t) => `<option value="${t}" ${this.settings.weather.type === t ? "selected" : ""}>${he[t]}</option>`).join("")}
+                                    ${k.map((t) => `<option value="${t}" ${this.settings.weather.type === t ? "selected" : ""}>${de[t]}</option>`).join("")}
                                 </select>
                             </div>
                             <div class="st-bgloader-preset-row">
@@ -2021,17 +2024,17 @@ class Le {
     n?.addEventListener("change", () => {
       this.sortOrder = n.value || "name", this.refreshMediaGrid();
     });
-    const r = this.panel.querySelector("#st_topbar_upload_toggle_btn"), l = this.panel.querySelector("#st_topbar_upload_box");
+    const r = this.panel.querySelector("#st_topbar_upload_toggle_btn"), o = this.panel.querySelector("#st_topbar_upload_box");
     r?.addEventListener("click", () => {
-      if (!l) return;
-      const u = l.style.display === "none";
-      l.style.display = u ? "block" : "none", r.classList.toggle("active", u);
+      if (!o) return;
+      const u = o.style.display === "none";
+      o.style.display = u ? "block" : "none", r.classList.toggle("active", u);
     });
-    const o = this.panel.querySelector("#st_bgloader_dropzone"), d = this.panel.querySelector("#st_bgloader_file_input");
-    o?.addEventListener("click", () => d?.click()), o?.addEventListener("dragover", (u) => {
-      u.preventDefault(), o.classList.add("dragover");
-    }), o?.addEventListener("dragleave", () => o.classList.remove("dragover")), o?.addEventListener("drop", (u) => {
-      u.preventDefault(), o.classList.remove("dragover");
+    const l = this.panel.querySelector("#st_bgloader_dropzone"), d = this.panel.querySelector("#st_bgloader_file_input");
+    l?.addEventListener("click", () => d?.click()), l?.addEventListener("dragover", (u) => {
+      u.preventDefault(), l.classList.add("dragover");
+    }), l?.addEventListener("dragleave", () => l.classList.remove("dragover")), l?.addEventListener("drop", (u) => {
+      u.preventDefault(), l.classList.remove("dragover");
       const p = u.dataTransfer?.files;
       p && p.length > 0 && this.handleFileUpload(p[0]);
     }), d?.addEventListener("change", () => {
@@ -2081,15 +2084,15 @@ class Le {
     }), e("st_parallax_intensity", "st_parallax_intensity_val", "", (m) => {
       this.settings.parallax.intensity = m / 10, this.callbacks.onParallaxChanged?.(this.settings.parallax), this.save();
     });
-    const l = this.panel.querySelector("#st_ambient_type");
-    l?.addEventListener("change", () => {
-      this.settings.ambientSound.type = l.value, this.callbacks.onAmbientSoundChanged?.(this.settings.ambientSound), this.save();
+    const o = this.panel.querySelector("#st_ambient_type");
+    o?.addEventListener("change", () => {
+      this.settings.ambientSound.type = o.value, this.callbacks.onAmbientSoundChanged?.(this.settings.ambientSound), this.save();
     }), e("st_ambient_vol", "st_ambient_vol_val", "%", (m) => {
       this.settings.ambientSound.volume = m / 100, this.callbacks.onAmbientSoundChanged?.(this.settings.ambientSound), this.save();
     });
-    const o = this.panel.querySelector("#st_frosted_enabled");
-    o?.addEventListener("change", () => {
-      this.settings.frostedChat.enabled = o.checked, this.callbacks.onFrostedChatChanged?.(this.settings.frostedChat), this.save();
+    const l = this.panel.querySelector("#st_frosted_enabled");
+    l?.addEventListener("change", () => {
+      this.settings.frostedChat.enabled = l.checked, this.callbacks.onFrostedChatChanged?.(this.settings.frostedChat), this.save();
     }), e("st_frosted_blur", "st_frosted_blur_val", "px", (m) => {
       this.settings.frostedChat.blur = m, this.callbacks.onFrostedChatChanged?.(this.settings.frostedChat), this.save();
     }), e("st_frosted_opacity", "st_frosted_opacity_val", "%", (m) => {
@@ -2177,8 +2180,8 @@ class Le {
       const n = this.panel?.querySelector(`#${s}`);
       n && (n.value = a);
     }, t = (s, a, n, r) => {
-      const l = this.panel?.querySelector(`#${s}`), o = this.panel?.querySelector(`#${a}`);
-      l && (l.value = String(n)), o && (o.textContent = `${n}${r}`);
+      const o = this.panel?.querySelector(`#${s}`), l = this.panel?.querySelector(`#${a}`);
+      o && (o.value = String(n)), l && (l.textContent = `${n}${r}`);
     }, i = (s, a) => {
       const n = this.panel?.querySelector(`#${s}`);
       n && (n.checked = a);
@@ -2204,12 +2207,12 @@ class Le {
     const s = document.createDocumentFragment();
     i.forEach((a) => {
       const n = document.createElement("div"), r = this.settings.activeMediaId === a.id;
-      n.className = `st-bgloader-media-card ${r ? "active" : ""}`, n.title = a.name;
-      let l = "fa-file-image";
-      a.type === "video" && (l = "fa-file-video"), a.type === "audio" && (l = "fa-file-audio"), (a.type === "html" || a.type === "svg") && (l = "fa-file-code");
-      const o = a.type === "image" ? `<div class="st-bgloader-card-img" style="background-image: url('${b(a.url)}')"></div>` : `<div class="st-bgloader-card-icon"><i class="fa-solid ${l} fa-2x"></i></div>`, d = a.name.replace(/[\(\（][^\)\）]*[\)\）]/g, "").trim() || a.name;
+      n.className = `st-bgloader-media-card ${r ? "active" : ""}`, n.title = a.name, n.dataset.itemId = a.id;
+      let o = "fa-file-image";
+      a.type === "video" && (o = "fa-file-video"), a.type === "audio" && (o = "fa-file-audio"), (a.type === "html" || a.type === "svg") && (o = "fa-file-code");
+      const l = a.type === "image" ? `<div class="st-bgloader-card-img" style="background-image: url('${b(a.url)}')"></div>` : a.type === "video" ? '<div class="st-bgloader-card-img st-bgloader-card-img-pending"></div>' : `<div class="st-bgloader-card-icon"><i class="fa-solid ${o} fa-2x"></i></div>`, d = a.name.replace(/[\(\（][^\)\）]*[\)\）]/g, "").trim() || a.name;
       n.innerHTML = `
-                ${o}
+                ${l}
                 <div class="st-bgloader-card-info">
                     <div class="st-bgloader-card-name">${b(d)}</div>
                     <div class="st-bgloader-card-meta">
@@ -2246,7 +2249,61 @@ class Le {
         let v = p;
         h === "ArrowRight" ? v = p + 1 : h === "ArrowLeft" ? v = p - 1 : h === "ArrowUp" ? v = p - y : v = p + y, v >= 0 && v < u.length && u[v].focus();
       }), s.appendChild(n);
-    }), e.appendChild(s);
+    }), e.appendChild(s), this.populateVideoThumbnails(i, t);
+  }
+  /**
+   * Fills video cards with first-frame thumbnails after the grid renders. Lazily generated
+   * (2 at a time, seek ~1/3 into the stream), cached per item for the session; failures fall
+   * back to the empty placeholder tile silently. Generation-guarded so a newer grid refresh
+   * is never painted by a stale run.
+   */
+  async populateVideoThumbnails(e, t) {
+    const i = e.filter((n) => n.type === "video"), s = (n, r) => {
+      if (t !== this.refreshGeneration || !this.panel) return;
+      const o = this.panel.querySelector(
+        `#st_bgloader_grid .st-bgloader-media-card[data-item-id="${CSS.escape(n.id)}"] .st-bgloader-card-img`
+      );
+      o && (o.style.backgroundImage = `url('${r}')`, o.classList.remove("st-bgloader-card-img-pending"));
+    }, a = async () => {
+      for (; i.length > 0; ) {
+        const n = i.shift(), r = await this.getVideoThumbnail(n);
+        r && s(n, r);
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(2, i.length) }, a));
+  }
+  async getVideoThumbnail(e) {
+    const t = this.thumbCache.get(e.id);
+    if (t) return t;
+    const i = this.thumbInflight.get(e.id);
+    if (i) return i;
+    const s = this.makeVideoThumb(e).then((a) => (a && this.thumbCache.set(e.id, a), a)).finally(() => this.thumbInflight.delete(e.id));
+    return this.thumbInflight.set(e.id, s), s;
+  }
+  makeVideoThumb(e) {
+    return new Promise((t) => {
+      let i = null, s = !1;
+      const a = (d) => {
+        s || (s = !0, window.clearTimeout(n), i && (i.removeEventListener("loadeddata", r), i.removeEventListener("seeked", o), i.removeEventListener("error", l), i.removeAttribute("src"), i.load(), i.remove(), i = null), t(d));
+      }, n = window.setTimeout(() => a(null), 8e3), r = () => {
+        try {
+          const d = i && Number.isFinite(i.duration) ? Math.min(0.5, i.duration / 3) : 0.1;
+          i.currentTime = d;
+        } catch {
+          a(null);
+        }
+      }, o = () => {
+        try {
+          const d = document.createElement("canvas");
+          d.width = 240, d.height = 135, d.getContext("2d").drawImage(i, 0, 0, 240, 135), a(d.toDataURL("image/jpeg", 0.6));
+        } catch {
+          a(null);
+        }
+      }, l = () => a(null);
+      this.cacheManager.getMediaBlobUrl(e).then((d) => {
+        s || (i = document.createElement("video"), i.muted = !0, i.preload = "metadata", i.style.display = "none", i.addEventListener("loadeddata", r), i.addEventListener("seeked", o), i.addEventListener("error", l), document.body.appendChild(i), i.src = d);
+      }).catch(() => a(null));
+    });
   }
   async handleFileUpload(e) {
     try {
@@ -2352,19 +2409,19 @@ class Le {
     if (!e) return;
     e.innerHTML = "";
     const t = this.settings.triggerRules || [];
-    t.length === 0 ? e.innerHTML = '<div class="st-bgloader-dim-text">暂无规则</div>' : t.forEach((r, l) => {
-      const o = document.createElement("div");
-      o.className = "st-bgloader-trigger-row", o.innerHTML = `
+    t.length === 0 ? e.innerHTML = '<div class="st-bgloader-dim-text">暂无规则</div>' : t.forEach((r, o) => {
+      const l = document.createElement("div");
+      l.className = "st-bgloader-trigger-row", l.innerHTML = `
                     <input type="checkbox" ${r.enabled ? "checked" : ""} class="st-bgloader-trigger-check" />
                     <span class="st-bgloader-trigger-badge">${r.type === "character" ? "角色" : r.type === "chat" ? "聊天" : "正则"}</span>
                     <span class="st-bgloader-trigger-name">${b(r.name)}</span>
                     <span class="st-bgloader-trigger-pattern">${b(r.pattern)}</span>
                     <button type="button" class="menu_button menu_button_icon menu_button_danger st-bgloader-trigger-del"><i class="fa-solid fa-trash"></i></button>
-                `, o.querySelector(".st-bgloader-trigger-check")?.addEventListener("change", (d) => {
+                `, l.querySelector(".st-bgloader-trigger-check")?.addEventListener("change", (d) => {
         r.enabled = d.target.checked, this.save();
-      }), o.querySelector(".st-bgloader-trigger-del")?.addEventListener("click", () => {
-        this.settings.triggerRules.splice(l, 1), this.save(), this.updateTriggersUI();
-      }), e.appendChild(o);
+      }), l.querySelector(".st-bgloader-trigger-del")?.addEventListener("click", () => {
+        this.settings.triggerRules.splice(o, 1), this.save(), this.updateTriggersUI();
+      }), e.appendChild(l);
     });
     const i = this.panel?.querySelector("#st_trigger_form"), s = this.panel?.querySelector("#st_trigger_add_btn"), a = this.panel?.querySelector("#st_trigger_cancel_btn"), n = this.panel?.querySelector("#st_trigger_confirm_btn");
     s && i && (s.onclick = () => {
@@ -2372,17 +2429,17 @@ class Le {
     }), a && i && s && (a.onclick = () => {
       i.style.display = "none", s.style.display = "block";
     }), n && i && s && (n.onclick = () => {
-      const r = this.panel?.querySelector("#st_trigger_type")?.value, l = this.panel?.querySelector("#st_trigger_name")?.value.trim(), o = this.panel?.querySelector("#st_trigger_pattern")?.value.trim();
-      if (!l || !o) {
+      const r = this.panel?.querySelector("#st_trigger_type")?.value, o = this.panel?.querySelector("#st_trigger_name")?.value.trim(), l = this.panel?.querySelector("#st_trigger_pattern")?.value.trim();
+      if (!o || !l) {
         alert("请填写规则名称和匹配文本");
         return;
       }
       const d = {
         id: "trig_" + Date.now(),
-        name: l,
+        name: o,
         enabled: !0,
         type: r,
-        pattern: o,
+        pattern: l,
         action: {
           preset: this.settings.activePresetId,
           weather: this.settings.weather.type
@@ -2680,21 +2737,21 @@ class $e {
     i && i.remove();
     const s = document.createElement("div");
     s.id = "st_bg_mini_player", s.className = "st-bg-mini-player";
-    const a = this.audioEngine.getCurrentTrack(), r = (a ? a.name : "无音频").replace(/[\(\（][^\)\）]*[\)\）]/g, "").trim(), l = this.audioEngine.isPlaying(), o = this.audioEngine.getPlaybackMode(), d = this.isVisible && (!this.capsuleOnPlayOnly || l);
+    const a = this.audioEngine.getCurrentTrack(), r = (a ? a.name : "无音频").replace(/[\(\（][^\)\）]*[\)\）]/g, "").trim(), o = this.audioEngine.isPlaying(), l = this.audioEngine.getPlaybackMode(), d = this.isVisible && (!this.capsuleOnPlayOnly || o);
     s.classList.add(d ? "visible" : "hidden"), s.innerHTML = `
             <div class="st-bg-mini-capsule">
                 <button class="st-bg-mini-btn" id="st_mini_prev" title="上一曲">
                     <i class="fa-solid fa-backward-step"></i>
                 </button>
-                <button class="st-bg-mini-btn st-bg-mini-play" id="st_mini_play" title="${l ? "暂停" : "播放"}">
-                    <i class="fa-solid ${l ? "fa-pause" : "fa-play"}"></i>
+                <button class="st-bg-mini-btn st-bg-mini-play" id="st_mini_play" title="${o ? "暂停" : "播放"}">
+                    <i class="fa-solid ${o ? "fa-pause" : "fa-play"}"></i>
                 </button>
                 <button class="st-bg-mini-btn" id="st_mini_next" title="下一曲">
                     <i class="fa-solid fa-forward-step"></i>
                 </button>
                 <div class="st-bg-mini-track" id="st_mini_title" title="${b(r)}">${b(r)}</div>
                 <button class="st-bg-mini-btn st-bg-mini-mode" id="st_mini_mode" title="模式">
-                    <i class="fa-solid ${this.getModeIcon(o)}"></i>
+                    <i class="fa-solid ${this.getModeIcon(l)}"></i>
                 </button>
             </div>
         `, document.body.appendChild(s), this.container = s, this.bindEvents(), this.unsubscribeTrack?.(), this.unsubscribePlayState?.(), this.unsubscribeTrack = this.audioEngine.addTrackListener((f) => {
@@ -3029,12 +3086,12 @@ class Fe {
   async preloadMedia(e, t) {
     const i = Array.isArray(e) ? e : [e], s = [], a = t?.concurrency || 3;
     let n = 0;
-    const r = [...i], l = Array.from({ length: Math.min(a, r.length) }, async () => {
+    const r = [...i], o = Array.from({ length: Math.min(a, r.length) }, async () => {
       for (; r.length > 0; ) {
-        const o = r.shift();
+        const l = r.shift();
         try {
-          const { item: d, isNew: f } = await this.ext.getCacheManager().preloadUrl(o), h = {
-            url: o,
+          const { item: d, isNew: f } = await this.ext.getCacheManager().preloadUrl(l), h = {
+            url: l,
             success: !0,
             cached: !f,
             size: d.size || 0
@@ -3042,17 +3099,17 @@ class Fe {
           s.push(h);
         } catch (d) {
           s.push({
-            url: o,
+            url: l,
             success: !1,
             cached: !1,
             size: 0,
             error: d?.message || String(d)
           });
         }
-        n++, t?.onProgress?.(n, i.length, o), this.emit("preload-progress", n, i.length, o);
+        n++, t?.onProgress?.(n, i.length, l), this.emit("preload-progress", n, i.length, l);
       }
     });
-    return await Promise.all(l), this.emit("preload-complete", s), s;
+    return await Promise.all(o), this.emit("preload-complete", s), s;
   }
   // --- Event Bus ---
   on(e, t) {
@@ -3342,31 +3399,31 @@ class qe {
     if (i === "pulse") {
       let a = 0;
       const n = Math.min(12, this.dataArray.length);
-      for (let o = 0; o < n; o++)
-        a += this.dataArray[o];
-      const r = a / n / 255, l = Math.pow(r, 2) * 0.35 * s;
+      for (let l = 0; l < n; l++)
+        a += this.dataArray[l];
+      const r = a / n / 255, o = Math.pow(r, 2) * 0.35 * s;
       if (this.pumpTargetEl) {
-        const o = 1 + l * 0.015;
-        this.pumpTargetEl.style.transform = `scale(${o})`, this.pumpTargetEl.style.transition = "transform 0.06s ease-out";
+        const l = 1 + o * 0.015;
+        this.pumpTargetEl.style.transform = `scale(${l})`, this.pumpTargetEl.style.transition = "transform 0.06s ease-out";
       }
     } else if (i === "spectrum") {
       if (!this.ctx) return;
       const a = this.ctx;
       a.clearRect(0, 0, this.width, this.height);
       const n = this.dataArray.length, r = Math.max(3, this.width / n * 1.6);
-      let l = 0;
-      const o = this.currentOptions.color || "#4fa3d1";
+      let o = 0;
+      const l = this.currentOptions.color || "#4fa3d1";
       for (let d = 0; d < n; d++) {
         const f = this.dataArray[d] / 255 * s, h = Math.min(this.height, f * (this.height - 10));
         if (h > 1) {
           const u = a.createLinearGradient(0, this.height, 0, this.height - h);
-          u.addColorStop(0, `${o}22`), u.addColorStop(0.7, `${o}aa`), u.addColorStop(1, `${o}ff`), a.fillStyle = u;
+          u.addColorStop(0, `${l}22`), u.addColorStop(0.7, `${l}aa`), u.addColorStop(1, `${l}ff`), a.fillStyle = u;
           const p = this.height - h;
           a.beginPath();
           const y = Math.min(r / 2, 3);
-          typeof a.roundRect == "function" ? a.roundRect(l, p, r - 1.5, h, [y, y, 0, 0]) : a.rect(l, p, r - 1.5, h), a.fill();
+          typeof a.roundRect == "function" ? a.roundRect(o, p, r - 1.5, h, [y, y, 0, 0]) : a.rect(o, p, r - 1.5, h), a.fill();
         }
-        if (l += r, l > this.width) break;
+        if (o += r, o > this.width) break;
       }
     }
   }
@@ -3500,14 +3557,14 @@ class Ue {
     const i = (r) => {
       typeof r == "string" ? this.evaluateMessage(r) : r && typeof r.mes == "string" && this.evaluateMessage(r.mes);
     }, s = (r) => {
-      const l = typeof r == "string" ? r : r?.chatId || r?.id;
-      l && this.evaluateChat(String(l));
+      const o = typeof r == "string" ? r : r?.chatId || r?.id;
+      o && this.evaluateChat(String(o));
     }, a = (r) => {
-      const l = typeof r == "string" ? r : r?.name || r?.avatar;
-      l && this.evaluateCharacter(String(l));
-    }, n = (r, l) => {
-      e.on(r, l), this.eventSourceUnlisteners.push(() => {
-        typeof e.removeListener == "function" ? e.removeListener(r, l) : typeof e.off == "function" ? e.off(r, l) : typeof e.removeEventListener == "function" && e.removeEventListener(r, l);
+      const o = typeof r == "string" ? r : r?.name || r?.avatar;
+      o && this.evaluateCharacter(String(o));
+    }, n = (r, o) => {
+      e.on(r, o), this.eventSourceUnlisteners.push(() => {
+        typeof e.removeListener == "function" ? e.removeListener(r, o) : typeof e.off == "function" ? e.off(r, o) : typeof e.removeEventListener == "function" && e.removeEventListener(r, o);
       });
     };
     t ? (t.MESSAGE_RECEIVED && n(t.MESSAGE_RECEIVED, i), t.CHARACTER_MESSAGE_RENDERED && n(t.CHARACTER_MESSAGE_RENDERED, i), t.CHAT_CHANGED && n(t.CHAT_CHANGED, s), t.CHARACTER_PAGE_LOADED && n(t.CHARACTER_PAGE_LOADED, a)) : (n("message_received", i), n("character_message_rendered", i), n("chat_changed", s));
@@ -3602,10 +3659,10 @@ class Ve {
    */
   startRain(e) {
     const t = 2 * e.sampleRate, i = e.createBuffer(1, t, e.sampleRate), s = i.getChannelData(0);
-    let a = 0, n = 0, r = 0, l = 0, o = 0, d = 0, f = 0;
+    let a = 0, n = 0, r = 0, o = 0, l = 0, d = 0, f = 0;
     for (let p = 0; p < t; p++) {
       const y = Math.random() * 2 - 1;
-      a = 0.99886 * a + y * 0.0555179, n = 0.99332 * n + y * 0.0750759, r = 0.969 * r + y * 0.153852, l = 0.8665 * l + y * 0.3104856, o = 0.55 * o + y * 0.5329522, d = -0.7616 * d - y * 0.016898, s[p] = (a + n + r + l + o + d + f + y * 0.5362) * 0.11, f = y * 0.115926;
+      a = 0.99886 * a + y * 0.0555179, n = 0.99332 * n + y * 0.0750759, r = 0.969 * r + y * 0.153852, o = 0.8665 * o + y * 0.3104856, l = 0.55 * l + y * 0.5329522, d = -0.7616 * d - y * 0.016898, s[p] = (a + n + r + o + l + d + f + y * 0.5362) * 0.11, f = y * 0.115926;
     }
     const h = e.createBufferSource();
     h.buffer = i, h.loop = !0;
@@ -3628,16 +3685,16 @@ class Ve {
    */
   startWind(e) {
     const t = 2 * e.sampleRate, i = e.createBuffer(1, t, e.sampleRate), s = i.getChannelData(0);
-    for (let o = 0; o < t; o++)
-      s[o] = Math.random() * 2 - 1;
+    for (let l = 0; l < t; l++)
+      s[l] = Math.random() * 2 - 1;
     const a = e.createBufferSource();
     a.buffer = i, a.loop = !0;
     const n = e.createBiquadFilter();
     n.type = "bandpass", n.frequency.value = 400, n.Q.value = 3;
     const r = e.createOscillator();
     r.frequency.value = 0.2;
-    const l = e.createGain();
-    l.gain.value = 250, r.connect(l), l.connect(n.frequency), a.connect(n), n.connect(this.gainNode), r.start(0), a.start(0), this.lfoOsc = r, this.activeSource = a;
+    const o = e.createGain();
+    o.gain.value = 250, r.connect(o), o.connect(n.frequency), a.connect(n), n.connect(this.gainNode), r.start(0), a.start(0), this.lfoOsc = r, this.activeSource = a;
   }
   destroy() {
     this.stop(), this.teardownInteractionListener(), this.ctx && (this.ctx.close().catch(() => {

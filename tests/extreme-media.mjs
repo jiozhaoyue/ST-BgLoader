@@ -405,7 +405,19 @@ try {
         return { focusMoved, enterApplied: window.__kbApplied === true };
     });
     await shot('c11-library-grid');
+    // 视频卡片首帧缩略图断言（B5）：等待惰性生成后，video 卡的预览层应有背景图
+    await new Promise(r => setTimeout(r, 12000));
+    const thumbs = await page.evaluate(() => {
+        const cards = [...document.querySelectorAll('#st_bgloader_grid .st-bgloader-media-card')];
+        const videoCards = cards.filter(c => c.querySelector('.st-bg-native-badge.video, .st-bgloader-media-badge.video'));
+        const painted = videoCards.filter(c => {
+            const img = c.querySelector('.st-bgloader-card-img');
+            return img && (img.style.backgroundImage || '').includes('url("data:image/jpeg');
+        });
+        return { videoCards: videoCards.length, painted: painted.length };
+    });
     report({ id: 'c11-kb', title: '媒体网格键盘可达性（ArrowRight 移焦 / Enter 应用）', pass: kb.focusMoved && kb.enterApplied, note: `focusMoved=${kb.focusMoved} enterApplied=${kb.enterApplied}`, itemId: null });
+    report({ id: 'c11-thumb', title: '视频卡片首帧缩略图', pass: thumbs.videoCards > 0 && thumbs.painted > 0, note: `videoCards=${thumbs.videoCards} painted=${thumbs.painted}`, itemId: null });
 
     // ---------- 清理（探针零残留：以上传登记表为准）----------
     const allIds = await page.evaluate(() => window.__xmCreated.splice(0));

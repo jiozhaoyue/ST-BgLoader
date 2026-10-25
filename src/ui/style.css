@@ -722,6 +722,21 @@
     align-items: center;
 }
 
+/* Full-bleed preview layer inside a media card (image sources set the background inline;
+   video sources get a first-frame thumbnail painted in asynchronously). */
+.st-bgloader-card-img {
+    position: absolute;
+    inset: 0;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+}
+
+/* Placeholder tint shown while a video thumbnail is being generated (or when it failed). */
+.st-bgloader-card-img-pending {
+    background: rgba(0, 0, 0, 0.35);
+}
+
 .st-bgloader-active-tag {
     font-size: 0.8em;
     color: var(--st-bg-status-ok, #4fae6b);

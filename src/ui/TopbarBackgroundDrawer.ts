@@ -74,6 +74,9 @@ export class TopbarBackgroundDrawer {
     private searchDebounceTimer: number | null = null;
     /** Monotonic token for in-flight grid refreshes: only the newest run may write the grid. */
     private refreshGeneration = 0;
+    /** Video first-frame thumbnails (itemId → dataURL), generated lazily per grid render. */
+    private thumbCache = new Map<string, string>();
+    private thumbInflight = new Map<string, Promise<string | null>>();
 
     constructor(
         settings: BgLoaderSettings,
@@ -956,6 +959,7 @@ export class TopbarBackgroundDrawer {
             const isActive = this.settings.activeMediaId === item.id;
             card.className = `st-bgloader-media-card ${isActive ? 'active' : ''}`;
             card.title = item.name;
+            card.dataset.itemId = item.id;
 
             let iconClass = 'fa-file-image';
             if (item.type === 'video') iconClass = 'fa-file-video';
@@ -964,7 +968,9 @@ export class TopbarBackgroundDrawer {
 
             const previewContent = item.type === 'image'
                 ? `<div class="st-bgloader-card-img" style="background-image: url('${escapeHtml(item.url)}')"></div>`
-                : `<div class="st-bgloader-card-icon"><i class="fa-solid ${iconClass} fa-2x"></i></div>`;
+                : item.type === 'video'
+                    ? `<div class="st-bgloader-card-img st-bgloader-card-img-pending"></div>`
+                    : `<div class="st-bgloader-card-icon"><i class="fa-solid ${iconClass} fa-2x"></i></div>`;
 
             const displayName = item.name.replace(/[\(\（][^\)\）]*[\)\）]/g, '').trim() || item.name;
 
@@ -1034,6 +1040,109 @@ export class TopbarBackgroundDrawer {
             fragment.appendChild(card);
         });
         grid.appendChild(fragment);
+        void this.populateVideoThumbnails(items, generation);
+    }
+
+    /**
+     * Fills video cards with first-frame thumbnails after the grid renders. Lazily generated
+     * (2 at a time, seek ~1/3 into the stream), cached per item for the session; failures fall
+     * back to the empty placeholder tile silently. Generation-guarded so a newer grid refresh
+     * is never painted by a stale run.
+     */
+    private async populateVideoThumbnails(items: MediaItem[], generation: number): Promise<void> {
+        const queue = items.filter(i => i.type === 'video');
+        const paint = (item: MediaItem, dataUrl: string) => {
+            if (generation !== this.refreshGeneration || !this.panel) return;
+            const img = this.panel.querySelector(
+                `#st_bgloader_grid .st-bgloader-media-card[data-item-id="${CSS.escape(item.id)}"] .st-bgloader-card-img`,
+            ) as HTMLElement | null;
+            if (img) {
+                img.style.backgroundImage = `url('${dataUrl}')`;
+                img.classList.remove('st-bgloader-card-img-pending');
+            }
+        };
+        const worker = async () => {
+            while (queue.length > 0) {
+                const item = queue.shift()!;
+                const dataUrl = await this.getVideoThumbnail(item);
+                if (dataUrl) paint(item, dataUrl);
+            }
+        };
+        await Promise.all(Array.from({ length: Math.min(2, queue.length) }, worker));
+    }
+
+    private async getVideoThumbnail(item: MediaItem): Promise<string | null> {
+        const cached = this.thumbCache.get(item.id);
+        if (cached) return cached;
+        const inflight = this.thumbInflight.get(item.id);
+        if (inflight) return inflight;
+        const task = this.makeVideoThumb(item)
+            .then((dataUrl) => {
+                if (dataUrl) this.thumbCache.set(item.id, dataUrl);
+                return dataUrl;
+            })
+            .finally(() => this.thumbInflight.delete(item.id));
+        this.thumbInflight.set(item.id, task);
+        return task;
+    }
+
+    private makeVideoThumb(item: MediaItem): Promise<string | null> {
+        return new Promise((resolve) => {
+            let video: HTMLVideoElement | null = null;
+            let settled = false;
+            const done = (dataUrl: string | null) => {
+                if (settled) return;
+                settled = true;
+                window.clearTimeout(timer);
+                if (video) {
+                    video.removeEventListener('loadeddata', onLoadedData);
+                    video.removeEventListener('seeked', onSeeked);
+                    video.removeEventListener('error', onError);
+                    video.removeAttribute('src');
+                    video.load();
+                    video.remove();
+                    video = null;
+                }
+                resolve(dataUrl);
+            };
+            // Bounded wait (L1-MR-7): a stalled source must not leave the promise pending.
+            const timer = window.setTimeout(() => done(null), 8000);
+            const onLoadedData = () => {
+                try {
+                    const target = (video && Number.isFinite(video.duration)) ? Math.min(0.5, video.duration / 3) : 0.1;
+                    video!.currentTime = target;
+                } catch {
+                    done(null);
+                }
+            };
+            const onSeeked = () => {
+                try {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = 240;
+                    canvas.height = 135;
+                    canvas.getContext('2d')!.drawImage(video!, 0, 0, 240, 135);
+                    done(canvas.toDataURL('image/jpeg', 0.6));
+                } catch {
+                    done(null);
+                }
+            };
+            const onError = () => done(null);
+
+            this.cacheManager.getMediaBlobUrl(item)
+                .then((url) => {
+                    if (settled) return;
+                    video = document.createElement('video');
+                    video.muted = true;
+                    video.preload = 'metadata';
+                    video.style.display = 'none';
+                    video.addEventListener('loadeddata', onLoadedData);
+                    video.addEventListener('seeked', onSeeked);
+                    video.addEventListener('error', onError);
+                    document.body.appendChild(video);
+                    video.src = url;
+                })
+                .catch(() => done(null));
+        });
     }
 
     private async handleFileUpload(file: File): Promise<void> {
