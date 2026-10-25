@@ -535,7 +535,7 @@ export class STBgLoaderExtension {
         this.notifiedMediaRenderError = true;
         try {
             const toastr = (window as unknown as { toastr?: { warn(msg: string, title?: string): void } }).toastr;
-            toastr?.warn('背景媒体加载失败（文件可能损坏或格式不受支持），已保留上一背景，详见控制台', 'ST-BgLoader');
+            toastr?.warn('背景媒体加载失败（文件可能损坏或格式不受支持），详见控制台', 'ST-BgLoader');
         } catch {
             // toastr unavailable — the media-error event and console log carry the signal.
         }

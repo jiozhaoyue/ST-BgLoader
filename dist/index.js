@@ -4363,7 +4363,7 @@ class at {
     if (!this.notifiedMediaRenderError) {
       this.notifiedMediaRenderError = !0;
       try {
-        window.toastr?.warn("背景媒体加载失败（文件可能损坏或格式不受支持），已保留上一背景，详见控制台", "ST-BgLoader");
+        window.toastr?.warn("背景媒体加载失败（文件可能损坏或格式不受支持），详见控制台", "ST-BgLoader");
       } catch {
       }
     }

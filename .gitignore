@@ -19,3 +19,4 @@ instance-backup/
 
 # Local test artifacts (screenshots etc.)
 test-artifacts/
+tests/e2e-artifacts/
