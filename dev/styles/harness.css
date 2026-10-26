@@ -1,0 +1,178 @@
+/* Dev harness chrome only — every selector is namespaced under .st-bgloader-dev-*
+   so this file can never leak into the extension's own stylesheet (L1-MR-3). */
+
+.st-bgloader-dev-app {
+    --st-bgloader-dev-bg: #14161c;
+    --st-bgloader-dev-panel: #1d2129;
+    --st-bgloader-dev-border: #2c323d;
+    --st-bgloader-dev-text: #e6e9ef;
+    --st-bgloader-dev-muted: #98a2b3;
+    --st-bgloader-dev-accent: #6ea8fe;
+
+    margin: 0;
+    min-height: 100vh;
+    background: var(--st-bgloader-dev-bg);
+    color: var(--st-bgloader-dev-text);
+    font-family: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+    font-size: 14px;
+}
+
+.st-bgloader-dev-topbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px;
+    background: var(--st-bgloader-dev-panel);
+    border-bottom: 1px solid var(--st-bgloader-dev-border);
+    position: sticky;
+    top: 0;
+    z-index: 20;
+}
+
+.st-bgloader-dev-brand {
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+
+.st-bgloader-dev-note {
+    color: var(--st-bgloader-dev-muted);
+    font-size: 12px;
+}
+
+.st-bgloader-dev-spacer {
+    flex: 1;
+}
+
+.st-bgloader-dev-status {
+    font-size: 12px;
+    color: var(--st-bgloader-dev-muted);
+    white-space: nowrap;
+}
+
+.st-bgloader-dev-status.st-bgloader-dev-ok {
+    color: #6ee7a8;
+}
+
+.st-bgloader-dev-status.st-bgloader-dev-bad {
+    color: #ff8b8b;
+}
+
+.st-bgloader-dev-btn {
+    background: #262c37;
+    color: var(--st-bgloader-dev-text);
+    border: 1px solid var(--st-bgloader-dev-border);
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.st-bgloader-dev-btn:hover {
+    border-color: var(--st-bgloader-dev-accent);
+}
+
+.st-bgloader-dev-main {
+    display: grid;
+    grid-template-columns: minmax(320px, 1fr) minmax(280px, 1fr);
+    gap: 16px;
+    padding: 16px;
+    max-width: 1180px;
+}
+
+.st-bgloader-dev-card {
+    background: var(--st-bgloader-dev-panel);
+    border: 1px solid var(--st-bgloader-dev-border);
+    border-radius: 10px;
+    padding: 14px 16px;
+}
+
+.st-bgloader-dev-h2 {
+    margin: 0 0 10px;
+    font-size: 14px;
+    font-weight: 600;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+}
+
+.st-bgloader-dev-hint {
+    font-size: 11px;
+    font-weight: 400;
+    color: var(--st-bgloader-dev-muted);
+}
+
+.st-bgloader-dev-slot {
+    min-height: 72px;
+    border: 1px dashed var(--st-bgloader-dev-border);
+    border-radius: 8px;
+    padding: 8px;
+}
+
+.st-bgloader-dev-chat {
+    min-height: 72px;
+    border: 1px dashed var(--st-bgloader-dev-border);
+    border-radius: 8px;
+    padding: 8px;
+}
+
+.st-bgloader-dev-mes {
+    display: flex;
+    gap: 8px;
+    font-size: 13px;
+}
+
+.st-bgloader-dev-mes-name {
+    color: var(--st-bgloader-dev-accent);
+    white-space: nowrap;
+}
+
+.st-bgloader-dev-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.st-bgloader-dev-drawer {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 460px;
+    max-width: 92vw;
+    background: var(--st-bgloader-dev-panel);
+    border-left: 1px solid var(--st-bgloader-dev-border);
+    box-shadow: -8px 0 24px rgba(0, 0, 0, 0.35);
+    transform: translateX(102%);
+    transition: transform 0.18s ease;
+    overflow-y: auto;
+    z-index: 30;
+}
+
+.st-bgloader-dev-drawer.st-bgloader-dev-open {
+    transform: translateX(0);
+}
+
+.st-bgloader-dev-toast {
+    position: fixed;
+    right: 16px;
+    bottom: 16px;
+    max-width: 380px;
+    padding: 10px 14px;
+    border-radius: 8px;
+    background: #262c37;
+    border: 1px solid var(--st-bgloader-dev-border);
+    color: var(--st-bgloader-dev-text);
+    font-size: 13px;
+    z-index: 60;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+}
+
+.st-bgloader-dev-toast.st-bgloader-dev-toast-error {
+    border-color: #7f2d2d;
+    background: #3a1f1f;
+}
+
+.st-bgloader-dev-toast.st-bgloader-dev-toast-warn {
+    border-color: #7a5b1f;
+    background: #3a3020;
+}

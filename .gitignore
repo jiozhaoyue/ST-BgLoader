@@ -20,3 +20,6 @@ instance-backup/
 # Local test artifacts (screenshots etc.)
 test-artifacts/
 tests/e2e-artifacts/
+
+# Dev harness runtime data (mock server storage: media, manifest, settings)
+dev/.data/

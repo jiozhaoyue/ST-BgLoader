@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ST-BgLoader · 开发预览台</title>
+    <link rel="stylesheet" href="./styles/harness.css" />
+</head>
+
+<body class="st-bgloader-dev-app">
+    <header class="st-bgloader-dev-topbar">
+        <span class="st-bgloader-dev-brand">ST-BgLoader · Dev Harness</span>
+        <span class="st-bgloader-dev-note">不需要酒馆运行时；宿主能力由 dev/host-stub.ts 提供</span>
+        <span class="st-bgloader-dev-spacer"></span>
+        <span class="st-bgloader-dev-status" id="dev-status">启动中…</span>
+        <button class="st-bgloader-dev-btn" id="dev-unlock-audio" type="button">点击解锁音频</button>
+        <button class="st-bgloader-dev-btn" id="backgrounds-drawer-toggle" type="button" title="打开背景抽屉">背景</button>
+    </header>
+
+    <main class="st-bgloader-dev-main">
+        <section class="st-bgloader-dev-card">
+            <h2 class="st-bgloader-dev-h2">扩展设置面板<span class="st-bgloader-dev-hint">宿主锚点 #extensions_settings</span></h2>
+            <div id="extensions_settings" class="st-bgloader-dev-slot"></div>
+        </section>
+
+        <section class="st-bgloader-dev-card">
+            <h2 class="st-bgloader-dev-h2">模拟对话<span class="st-bgloader-dev-hint">用于触发消息类事件</span></h2>
+            <div id="chat" class="st-bgloader-dev-chat">
+                <div class="st-bgloader-dev-mes">
+                    <span class="st-bgloader-dev-mes-name">User</span>
+                    <div class="st-bgloader-dev-mes-text" id="dev-chat-line">窗外开始下雨了，我们在旧书店门口躲一会儿。</div>
+                </div>
+            </div>
+            <div class="st-bgloader-dev-actions">
+                <button class="st-bgloader-dev-btn" id="dev-emit-message" type="button">模拟收到消息</button>
+                <button class="st-bgloader-dev-btn" id="dev-emit-chat" type="button">模拟切换聊天</button>
+            </div>
+        </section>
+    </main>
+
+    <aside id="Backgrounds" class="st-bgloader-dev-drawer">
+        <div id="bg_menu_content"></div>
+    </aside>
+
+    <script type="module" src="./boot.ts"></script>
+</body>
+
+</html>
