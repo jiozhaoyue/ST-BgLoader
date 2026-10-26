@@ -110,6 +110,12 @@ export class STBgLoaderExtension {
             this.atmosphereFX.handleBackgroundVisibilityChange(false);
             this.audioVisualizer.handleBackgroundVisibilityChange(false);
             this.nativeController?.releaseNativeBackground();
+            // P2-5: the master switch means "the plugin is off", so sound stops with the visuals.
+            // Leaving BGM/ambience running behind an empty stage reads as a ghost state. The
+            // generator's own options are not written back — re-enabling deliberately stays
+            // silent rather than startling the user with a sudden track.
+            this.audioEngine.stopTrack(300);
+            this.ambientSoundGenerator.setSound({ ...this.settings.ambientSound, type: 'off' });
         }
     }
 

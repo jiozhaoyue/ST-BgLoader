@@ -4270,7 +4270,7 @@ class at {
    * and push the pre-convergence state over the remote one).
    */
   applyMasterEnabled(e) {
-    e ? (this.topbarDrawer?.mount(), this.nativeController?.start(this.settings.nativeTakeover), this.mediaMount.setVisible(this.settings.backgroundVisible), this.atmosphereFX.handleBackgroundVisibilityChange(this.settings.backgroundVisible), this.audioVisualizer.handleBackgroundVisibilityChange(this.settings.backgroundVisible)) : (this.topbarDrawer?.unmount(), this.nativeController?.stop(), this.mediaMount.clear(), this.atmosphereFX.handleBackgroundVisibilityChange(!1), this.audioVisualizer.handleBackgroundVisibilityChange(!1), this.nativeController?.releaseNativeBackground());
+    e ? (this.topbarDrawer?.mount(), this.nativeController?.start(this.settings.nativeTakeover), this.mediaMount.setVisible(this.settings.backgroundVisible), this.atmosphereFX.handleBackgroundVisibilityChange(this.settings.backgroundVisible), this.audioVisualizer.handleBackgroundVisibilityChange(this.settings.backgroundVisible)) : (this.topbarDrawer?.unmount(), this.nativeController?.stop(), this.mediaMount.clear(), this.atmosphereFX.handleBackgroundVisibilityChange(!1), this.audioVisualizer.handleBackgroundVisibilityChange(!1), this.nativeController?.releaseNativeBackground(), this.audioEngine.stopTrack(300), this.ambientSoundGenerator.setSound({ ...this.settings.ambientSound, type: "off" }));
   }
   clearActiveBackground() {
     this.settings.activeMediaId = null, this.mediaMount.clear(), this.nativeController?.releaseNativeBackground(), this.saveSettings(), this.settingsDrawer?.updateActiveMedia(null), this.topbarDrawer && this.topbarDrawer.refreshMediaGrid();
