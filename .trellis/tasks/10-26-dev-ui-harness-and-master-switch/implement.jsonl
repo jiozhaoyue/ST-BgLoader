@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/frontend/host-native-ui.md", "reason": "宿主接缝与 DOM 锚点规范——预览台要复刻的正是这些锚点，且不得破坏「与宿主不可区分」原则"}
+{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "子系统类与 destroy 契约——P2-5 改动涉及 AudioEngine/AmbientSoundGenerator 的调用语义"}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "测试门槛、CSS 门禁与探针卫生——新增 dev-harness 套件须遵守同一套门槛"}
+{"file": ".trellis/spec/frontend/state-management.md", "reason": "settings 真源与 localStorage 降级约定——mock 服务端需按同一真源语义实现读写往返"}
+{"file": ".trellis/spec/frontend/type-safety.md", "reason": "strict 配置与类型边界，新增 dev/ 与 tests/ 的 TS/MJS 须遵守"}
