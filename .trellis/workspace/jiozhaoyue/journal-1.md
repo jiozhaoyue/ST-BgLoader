@@ -643,3 +643,32 @@ Added procedural WebAudio ambient soundscape synthesizer, frosted glass transpar
 ### Status
 
 [OK] **Completed**
+
+
+## Session 24: 独立 UI 预览台（免酒馆）+ P2-5 主开关视觉音频同停
+<!-- trellis-session: v=2 fp=d808d1cbcd94eb19 -->
+
+**Date**: 2026-10-26
+**Task**: 独立 UI 预览台（免酒馆）+ P2-5 主开关视觉音频同停
+**Branch**: `master`
+
+### Summary
+
+用户诉求：不想启酒馆就能看设置 UI，并询问是否有必要把 Luker 逐块拆开独立运行。实测宿主耦合仅 9 文件约 60 处（已有 HostBridge 集中层、toastr/eventSource 均可选、设置层有 localStorage 降级、媒体只依赖 3 个端点），故否决「完整拆分 Luker」（逆向 jQuery 单体、数周工期、随上游失效），改为宿主桩 + mock 端点方案：npm run dev:ui 起 Vite dev（root=dev，URL 形状与真宿主一致），14 项自检断言全绿（启动/抽屉挂载/媒体库上传-删除-刷新往返/设置文档持久化/主开关音频）。两个真坑：① 页面若挂在 /dev/ 下，插件的相对路径 backgrounds/<file> 会解析成 /dev/backgrounds/* 全 404；② upload 端点必须返回纯文本文件名（ServerOrigin 直接把它当文件名），返回 JSON 会让插件请求 backgrounds/{json} 并把垃圾条目写进清单。同时按用户裁定收口 P2-5：主开关关闭时同时停 BGM（300ms 淡出）与环境音，重开不自动续播、不写回用户音频配置。验收：dev-harness 14/14、:8003 真宿主 e2e 24/24、type-check/build/check:css 全绿。并发提示：本轮 :8003 一度被另一会话（ST-zip-converter 的 e2e 矩阵）占用并连带杀进程，按并发纪律等其释放后才取用。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `9f01330` | fix(core): 主开关关闭时同停 BGM 与环境音（P2-5） |
+| `7617c13` | feat(dev): 免酒馆的独立 UI 预览台（宿主桩 + mock 端点 + 自检套件） |
+| `c61267f` | docs: 预览台用法与主开关语义（README + wiki + spec 契约） |
+| `895a086` | docs(task): 规划与验收工件（PRD/design/implement/jsonl） |
+
+### Testing
+
+- [OK] dev-harness 14/14；:8003 e2e 24/24；type-check / build / check:css 全绿
+
+### Status
+
+[OK] **Completed**
