@@ -108,20 +108,33 @@ git clone https://github.com/jiozhaoyue/ST-BgLoader.git
 ```bash
 npm install
 npm run build      # 极速打包出 dist/index.js 与 dist/style.css
+npm run dev:ui     # 独立 UI 预览台（不需要启动酒馆），见下节
 npm run type-check # TypeScript 严格类型检查
 npm run check:css  # CSS 作用域门禁：裸选择器 / 扩展前缀 / box-shadow 三合一自查（对 src 生效）
 ```
 
+### 独立 UI 预览台（无需酒馆实例）
+```bash
+npm run dev:ui     # 打开 http://localhost:5173/
+```
+预览台把宿主的必要接缝（事件源、上下文、toastr、四个 DOM 锚点）用宿主桩补齐，并用中间件模拟
+`/api/backgrounds/*` 三个端点，数据落在 `dev/.data/`（已 gitignore）。可以完整操作扩展设置面板、
+顶栏背景抽屉、媒体库上传/删除/搜索/过滤/排序，以及 BGM 与环境音，**无需启动 SillyTavern 或 Luker**。
+
+> 预览台是开发工具，**不替代真机验收**：宿主桩可能滞后于真实宿主行为，发布前仍需在 Dev 实例上跑一遍
+> `e2e` / `smoke` 套件。产品构建（`npm run build`）不包含 `dev/` 的任何代码。
+
 ### 自动化测试套件
 项目配备了完整的自动化质量门禁套件：
 - `npm run check:css`：CSS 作用域静态门禁（无需实例，随时可跑）；
+- `node tests/dev-harness.mjs`：预览台自检（免实例，需先 `npm run dev:ui`，14 项断言）；
 - `node tests/e2e.mjs`：端到端功能回归测试（24 项断言）；
 - `node tests/stress.mjs`：极限并发切换、大文件流、异常容错与显存泄漏压力测试；
 - `node tests/authority.mjs`：服务端存储与 Authority 扩展交互能力测试；
 - `node tests/extreme-media.mjs`：极端媒体实测（超大图 / 真实视频 / 损坏与截断文件 / 伪装扩展名 / 超长文件名 / 超长音频 / 沙箱脚本 / 快速切换，逐项截图留证并自动清理）；
 - `node tests/smoke-ui.mjs`：真实 UI 冒烟（搜索/过滤/点击应用/显隐/天气/视觉器/场景/抽屉开合，逐步截图并全量复原）。
 
-> ⚠️ **运行门禁前置条件**：测试套件需连接运行中的酒馆本地实例，并通过环境变量指定 `TEST_TARGET_URL`（如 `http://localhost:8001`）。**严禁针对真实数据区或生产实例运行 E2E 测试**（端口 8002/8004 严禁作为测试目标）。
+> ⚠️ **运行门禁前置条件**：除 `check:css` 与 `dev-harness` 外，测试套件需连接运行中的酒馆本地实例，并通过环境变量指定 `TEST_TARGET_URL`（如 `http://localhost:8001`）。**严禁针对真实数据区或生产实例运行 E2E 测试**（端口 8002/8004 严禁作为测试目标）。
 
 ---
 

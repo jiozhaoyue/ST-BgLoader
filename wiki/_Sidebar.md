@@ -12,5 +12,6 @@
 * [⚡ Smart Triggers & Scenes (智能场景触发器)](Smart-Triggers-and-Scene-Automation.md)
 * [🎭 Character Card Integration (角色卡集成指南)](Character-Card-Integration.md)
 * [🚀 Performance & Caching (性能优化与缓存体系)](Performance-and-Caching-Guide.md)
+* [🧪 Development Harness (免酒馆的独立 UI 预览台)](Development-Harness.md)
 * [❓ FAQ & Troubleshooting (常见问题排查)](FAQ-and-Troubleshooting.md)
 

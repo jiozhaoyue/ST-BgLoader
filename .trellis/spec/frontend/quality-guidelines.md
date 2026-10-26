@@ -158,3 +158,22 @@ holds real (Dev) settings, so they carry production obligations:
   zero-byte files for reliable decode failures.
 - **Extreme-media corpus uploads are tracked in an in-page registry** (`window.__xmCreated`)
   and cleaned through it — per-case result fields miss multi-upload cases and leave residue.
+
+## Dev harness & master-switch semantics (added 2026-10-26)
+
+- **The harness never reaches `dist/`.** `vite.config.dev.ts` serves `root: 'dev'`; the product
+  build still goes through `vite.config.ts` (lib mode, entry `src/index.ts`). Any harness code
+  that ends up importable from `src/` is a defect — the stub lives in `dev/` only.
+- **Mock endpoints must match `ServerOrigin` byte-for-byte.** In particular
+  `POST /api/backgrounds/upload` answers with the stored filename as **plain text**
+  (`uploadFile` uses the body verbatim as the file name); returning JSON makes the plugin
+  request `backgrounds/{"ok":true,...}` and poisons the manifest with a garbage entry.
+  Missing `st-bg-loader-{settings,manifest}.json` returning 404 is the documented first-run path,
+  not an error.
+- **Master switch stops sound, not just visuals.** `applyMasterEnabled(false)` unmounts media AND
+  calls `AudioEngine.stopTrack(300)` + `AmbientSoundGenerator.setSound({...ambient, type:'off'})`.
+  Re-enabling deliberately does **not** resume audio (a sudden track is worse than silence), and
+  the generator's stored options are never written back to settings.
+- **Harness results are not acceptance.** Host stubs drift from real hosts; release gates still run
+  `e2e` / `smoke` against a Dev instance. `tests/dev-harness.mjs` covers boot, drawer, media-library
+  round-trip, settings persistence and the master-switch audio contract.
