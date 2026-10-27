@@ -9,6 +9,7 @@ import { HostBridge } from './bridge/HostBridge';
 import { NativeBackgroundController } from './ui/NativeBackgroundController';
 import { MiniPlayer } from './ui/MiniPlayer';
 import { PublicAPI } from './api/PublicAPI';
+import { PostMessageBridge } from './api/PostMessageBridge';
 import { AtmosphereFX } from './fx/AtmosphereFX';
 import { AudioVisualizer } from './visualizer/AudioVisualizer';
 import { ParallaxController } from './core/ParallaxController';
@@ -51,6 +52,8 @@ export class STBgLoaderExtension {
     private authorityBridge: AuthorityBridge = new AuthorityBridge();
     private settingsSync: SettingsSync | null = null;
     private agentBridge: AgentBridge | null = null;
+    /** 跨 iframe JSON-RPC 端点桥（init 时启动；纯浏览器可用，无宿主依赖）。 */
+    private postMessageBridge: PostMessageBridge | null = null;
     public publicApi: PublicAPI;
 
     constructor() {
@@ -411,6 +414,16 @@ export class STBgLoaderExtension {
         await this.startSettingsSync();
         this.syncAgentTools();
 
+        // 10.6 PostMessageBridge：让 iframe 内脚本（酒馆助手等）经 postMessage 调用全部
+        // 白名单端点。纯浏览器能力，无宿主依赖；失败只降级不阻断初始化（L0-11）。
+        try {
+            this.postMessageBridge = new PostMessageBridge(this.publicApi);
+            this.postMessageBridge.start();
+            this.publicApi.setEventBroadcaster((event, args) => this.postMessageBridge?.broadcastEvent(event, args));
+        } catch (err) {
+            console.warn('[ST-BgLoader] PostMessageBridge unavailable:', err);
+        }
+
         // 11. Hook into SillyTavern EventSource
         this.hookSillyTavernEvents();
 
@@ -625,6 +638,21 @@ export class STBgLoaderExtension {
             setFilters: (filters) => this.publicApi.setFilters(filters),
             applyScene: (sceneId) => this.publicApi.applyScene(sceneId),
         };
+    }
+
+    /**
+     * 应用一份已收敛的完整设置（PublicAPI.updateSettings/importSettings 的落点）。
+     * 与 reconcileRemoteConflict 同一条应用路径：子系统全量同步 + 两个抽屉回填 + 事件，
+     * 保证 API 写入不旁路 UI 与远端镜像（否则抽屉下一次 save() 会把旧状态整体写回）。
+     */
+    public applyConvergedSettings(next: BgLoaderSettings): void {
+        this.settings = next;
+        this.saveSettings();
+        this.applySettingsToSubsystems();
+        this.enforceQuotaIfChanged();
+        this.topbarDrawer?.applyRemoteSettings(next);
+        this.settingsDrawer?.applyRemoteSettings(next);
+        this.publicApi.emit('settings-sync', next);
     }
 
     private async startSettingsSync(): Promise<void> {

@@ -60,6 +60,10 @@ class StubEventSource {
 
 const eventSource = new StubEventSource();
 
+// Real hosts expose the event source as a window global (window.eventSource) — the
+// extension's PublicAPI event mirror binds to that global, so the stub must too.
+(window as any).eventSource = eventSource;
+
 const event_types = {
     APP_READY: 'app_ready',
     MESSAGE_SENT: 'message_sent',

@@ -109,6 +109,21 @@ export class AudioVisualizer {
         }
     }
 
+    /**
+     * 当前频谱快照（PublicAPI.getVisualizerData 的数据源，只读端点）。
+     * 返回内部 dataArray 引用——调用方（PublicAPI）负责立即拷贝，不得持有。
+     * 无 analyser 时返回 null（未播放 / 宿主不支持），调用方转空数组，永不挂起。
+     */
+    public getSpectrum(): Uint8Array | null {
+        if (!this.analyser || !this.dataArray) return null;
+        try {
+            this.analyser.getByteFrequencyData(this.dataArray);
+        } catch {
+            return null;
+        }
+        return this.dataArray;
+    }
+
     public setOptions(options: VisualizerOptions): void {
         this.currentOptions = { ...options };
         this.isSilent = false;

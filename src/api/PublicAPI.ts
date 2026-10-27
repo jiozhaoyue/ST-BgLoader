@@ -16,9 +16,15 @@ import {
     AmbientSoundType,
     SceneSnapshot,
     WEATHER_TYPES,
+    BgLoaderSettings,
+    mergeSettings,
+    PlaybackMode,
 } from '../types';
 import type { STBgLoaderExtension } from '../index';
 import { detectMediaType } from '../core/mediaType';
+import { API_VERSION, getEndpointCategories, ENDPOINT_METHODS } from './EndpointRegistry';
+
+export const PLAYBACK_MODES: readonly string[] = ['loop', 'single', 'shuffle'];
 
 export interface BackgroundOptions {
     type?: MediaType;
@@ -40,9 +46,18 @@ export type EventCallback = (...args: any[]) => void;
 export class PublicAPI {
     private ext: STBgLoaderExtension;
     private eventListeners: Map<string, Set<EventCallback>> = new Map();
+    /** PostMessageBridge 在位标志（getCapabilities 上报用；由桥自身置位）。 */
+    public bridgeActive: boolean = false;
+    /** 跨 iframe 事件推送钩子（index 装配 PostMessageBridge 后注入；可空）。 */
+    private eventBroadcaster: ((event: string, args: unknown[]) => void) | null = null;
 
     constructor(extension: STBgLoaderExtension) {
         this.ext = extension;
+    }
+
+    /** index.ts 装配时注入；桥 stop() 后传 null 摘除。 */
+    public setEventBroadcaster(fn: ((event: string, args: unknown[]) => void) | null): void {
+        this.eventBroadcaster = fn;
     }
 
     /**
@@ -517,6 +532,222 @@ export class PublicAPI {
         return results;
     }
 
+    // --- Discovery（发现接口：调用方特性检测用） ---
+
+    public getApiVersion(): { api: number; plugin: string } {
+        let pluginVersion = 'unknown';
+        try {
+            const manifest = (window as unknown as { manifest?: { version?: string } }).manifest;
+            if (manifest?.version) pluginVersion = manifest.version;
+        } catch {
+            // 独立页/harness 无 manifest——保持 unknown
+        }
+        return { api: API_VERSION, plugin: pluginVersion };
+    }
+
+    public getCapabilities(): {
+        api: number;
+        postMessageBridge: boolean;
+        eventChannels: string[];
+        categories: Record<string, string[]>;
+    } {
+        return {
+            api: API_VERSION,
+            postMessageBridge: this.bridgeActive,
+            eventChannels: ['bus', 'eventSource', 'customEvent'],
+            categories: getEndpointCategories(),
+        };
+    }
+
+    public listMethods(): string[] {
+        // 与 EndpointRegistry 对表（登记表是唯一事实源，见 EndpointRegistry 头注）
+        return ENDPOINT_METHODS.slice();
+    }
+
+    // --- Media library management（媒体库管理端点） ---
+
+    /**
+     * 上传一个 Blob/File 进媒体库（与顶栏抽屉上传同路径：saveMedia(..., 'server')）。
+     * 返回新条目。type 省略时按文件名探测。
+     */
+    public async uploadMedia(blob: Blob | File, name?: string, type?: MediaType): Promise<MediaItem> {
+        if (!(blob instanceof Blob)) {
+            throw new Error('INVALID_PARAMS: uploadMedia(blob) 需要 Blob 或 File');
+        }
+        if (name !== undefined && typeof name !== 'string') {
+            throw new Error('INVALID_PARAMS: name 必须是字符串');
+        }
+        const fileName = (name || (blob as File).name || `upload_${Date.now()}`).trim();
+        if (!fileName) {
+            throw new Error('INVALID_PARAMS: name 不能为空');
+        }
+        const mediaType = type ?? detectMediaType(fileName);
+        const item = await this.ext.getCacheManager().saveMedia(blob, fileName, mediaType, 'server');
+        this.emit('media-added', item);
+        return item;
+    }
+
+    /**
+     * 删除媒体条目并联动清理播放面（与顶栏抽屉 onMediaDeleted 同语义）：
+     * 正作背景则清背景，正在播放则停轨，随后刷新播放列表。
+     */
+    public async deleteMedia(id: string): Promise<boolean> {
+        this._assertId(id, 'deleteMedia');
+        const cm = this.ext.getCacheManager();
+        const item = await cm.getMedia(id);
+        if (!item) return false;
+
+        await cm.deleteMedia(id);
+        if (this.ext.getSettings().activeMediaId === id) {
+            this.ext.clearActiveBackground();
+        }
+        const ae = this.ext.getAudioEngine();
+        if (ae.getCurrentTrack()?.id === id) {
+            ae.stopTrack();
+        }
+        const items = await cm.listMedia();
+        ae.setPlaylist(items.filter(i => i.type === 'audio'));
+        this.emit('media-deleted', id);
+        return true;
+    }
+
+    public async getMediaInfo(id: string): Promise<MediaItem | null> {
+        this._assertId(id, 'getMediaInfo');
+        const item = await this.ext.getCacheManager().getMedia(id);
+        return item ? { ...item } : null;
+    }
+
+    /**
+     * 取一个可在本会话内复用的 blob URL（CacheManager 内部有在途去重与生命周期管理）。
+     * 该 URL 仅本会话有效——跨会话复用请改用 getMediaInfo().url 或重新调用本方法。
+     */
+    public async getMediaUrl(id: string): Promise<string | null> {
+        this._assertId(id, 'getMediaUrl');
+        const item = await this.ext.getCacheManager().getMedia(id);
+        if (!item) return null;
+        return this.ext.getCacheManager().getMediaBlobUrl(item);
+    }
+
+    // --- Playlist control（播放列表端点） ---
+
+    public getPlaylist(): MediaItem[] {
+        return this.ext.getAudioEngine().getPlaylist().map(item => ({ ...item }));
+    }
+
+    public setPlaybackMode(mode: PlaybackMode): void {
+        if (!PLAYBACK_MODES.includes(mode)) {
+            throw new Error(`INVALID_PARAMS: playbackMode 必须是 ${PLAYBACK_MODES.join('/')} 之一`);
+        }
+        this.ext.getSettings().playbackMode = mode;
+        this.ext.getAudioEngine().setPlaybackMode(mode);
+        this.ext.saveSettings();
+        this.emit('playback-mode-change', mode);
+    }
+
+    /** 跳到播放列表第 index 首并播放；越界返回 false（不抛错）。 */
+    public async jumpToTrack(index: number): Promise<boolean> {
+        if (!Number.isInteger(index) || index < 0) {
+            throw new Error('INVALID_PARAMS: index 必须是非负整数');
+        }
+        const playlist = this.ext.getAudioEngine().getPlaylist();
+        if (index >= playlist.length) return false;
+        const item = playlist[index];
+        const url = await this.ext.getCacheManager().getMediaBlobUrl(item);
+        await this.ext.getAudioEngine().playMediaItem(item, url);
+        this.emit('track-change', item);
+        return true;
+    }
+
+    // --- Settings endpoints（设置读写端点） ---
+
+    /** 只读快照（深拷贝；调用方改它不会影响插件状态）。 */
+    public getSettings(): BgLoaderSettings {
+        return JSON.parse(JSON.stringify(this.ext.getSettings())) as BgLoaderSettings;
+    }
+
+    /**
+     * 合并更新设置：patch 与当前设置合并后走 mergeSettings 全量收敛，
+     * 与顶栏抽屉/远端收敛同一条应用路径（不旁路子系统同步）。
+     */
+    public updateSettings(patch: Partial<BgLoaderSettings>): BgLoaderSettings {
+        if (!patch || typeof patch !== 'object' || Array.isArray(patch)) {
+            throw new Error('INVALID_PARAMS: updateSettings(patch) 需要 plain object');
+        }
+        const merged = mergeSettings({ ...this.ext.getSettings(), ...patch });
+        this.ext.applyConvergedSettings(merged);
+        return this.getSettings();
+    }
+
+    /** 导出设置快照（JSON 序列化安全，可直接存文件或发给 importSettings）。 */
+    public exportSettings(): BgLoaderSettings {
+        return this.getSettings();
+    }
+
+    /** 导入设置（整体替换，走 mergeSettings 收敛；非法 JSON 结构会静默回退默认值）。 */
+    public importSettings(payload: unknown): BgLoaderSettings {
+        const merged = mergeSettings(payload);
+        this.ext.applyConvergedSettings(merged);
+        return this.getSettings();
+    }
+
+    // --- Master switch（主开关端点；语义同 P2-5：关 = 视听同停） ---
+
+    public setMasterEnabled(enabled: boolean): void {
+        if (typeof enabled !== 'boolean') {
+            throw new Error('INVALID_PARAMS: setMasterEnabled(enabled) 需要 boolean');
+        }
+        this.ext.setMasterEnabled(enabled);
+        this.emit('master-switch', enabled);
+    }
+
+    public isEnabled(): boolean {
+        return this.ext.getSettings().enabled !== false;
+    }
+
+    // --- Cache endpoints（缓存端点） ---
+
+    public async getCacheStats(): Promise<{
+        usedBytes: number;
+        itemCount: number;
+        quotaBytes: number;
+        lruAutoClean: boolean;
+    }> {
+        const usage = await this.ext.getCacheManager().getCacheUsage();
+        const settings = this.ext.getSettings();
+        return {
+            usedBytes: usage.usedBytes,
+            itemCount: usage.itemCount,
+            quotaBytes: settings.cacheQuotaMB * 1024 * 1024,
+            lruAutoClean: settings.lruAutoClean,
+        };
+    }
+
+    /** 清空全部缓存与媒体库（破坏性端点：等同设置面板的清空按钮）。 */
+    public async clearCache(): Promise<void> {
+        await this.ext.getCacheManager().clearAll();
+        this.ext.clearActiveBackground();
+        this.ext.getAudioEngine().setPlaylist([]);
+        this.emit('cache-cleared');
+    }
+
+    // --- Visualizer data（可视化数据只读端点） ---
+
+    /**
+     * 当前频谱快照（0-255 字节数组副本）。无 analyser（未播放/不支持）时返回 []，
+     * 永不挂起——供其他插件做自己的可视化。
+     */
+    public getVisualizerData(): number[] {
+        const spectrum = this.ext.getAudioVisualizer().getSpectrum();
+        return spectrum ? Array.from(spectrum) : [];
+    }
+
+    /** 路径内部共用：id 参数守卫。 */
+    private _assertId(id: unknown, caller: string): void {
+        if (typeof id !== 'string' || id.length === 0) {
+            throw new Error(`INVALID_PARAMS: ${caller}(id) 需要非空字符串 id`);
+        }
+    }
+
     // --- Event Bus ---
 
     public on(event: string, callback: EventCallback): () => void {
@@ -532,6 +763,7 @@ export class PublicAPI {
     }
 
     public emit(event: string, ...args: any[]): void {
+        // ① 内部总线（既有订阅面，语义不变）
         this.eventListeners.get(event)?.forEach(cb => {
             try {
                 cb(...args);
@@ -539,5 +771,29 @@ export class PublicAPI {
                 console.error(`[ST-BgLoader PublicAPI] Error in listener for "${event}":`, err);
             }
         });
+        // ② 酒馆 eventSource 镜像（`st_bgloader:<event>`；宿主缺失/抛错静默降级，L0-11）
+        try {
+            const es = (window as unknown as { eventSource?: { emit?(name: string, ...a: unknown[]): void } }).eventSource;
+            if (es && typeof es.emit === 'function') {
+                es.emit(`st_bgloader:${event}`, ...args);
+            }
+        } catch {
+            // 宿主事件源不可用——①③ 两通道已覆盖订阅需求
+        }
+        // ③ DOM CustomEvent 镜像（`st-bgloader:<event>`，detail 统一为 { args }，
+        //    让任何脚本零依赖监听；与 CSS 双前缀纪律同型的命名空间隔离）
+        try {
+            document.dispatchEvent(new CustomEvent(`st-bgloader:${event}`, { detail: { args } }));
+        } catch {
+            // 无文档环境（非浏览器宿主）
+        }
+        // ④ PostMessageBridge：推给 TTL 内活跃过的 iframe 调用方
+        if (this.eventBroadcaster) {
+            try {
+                this.eventBroadcaster(event, args);
+            } catch {
+                // 广播失败不影响本地订阅面
+            }
+        }
     }
 }
