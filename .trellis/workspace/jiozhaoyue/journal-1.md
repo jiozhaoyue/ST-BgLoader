@@ -672,3 +672,39 @@ Added procedural WebAudio ambient soundscape synthesizer, frosted glass transpar
 ### Status
 
 [OK] **Completed**
+
+
+## Session 25: 夜间端点大扩容：58 端点登记源 + postMessage 桥 + 事件三通道 + Stop hook 修复
+<!-- trellis-session: v=2 fp=overnight-endpoint-expansion-20261028 -->
+
+**Date**: 2026-10-28
+**Task**: 10-27-overnight-endpoint-expansion（已归档 archive/2026-10/）
+**Branch**: `master`
+
+### Summary
+
+用户夜间指令：继续加功能修 bug、提升健壮性性能、**开放极多端点供其他酒馆功能/插件调用**，工作至 06:00 收尾交接；先因会话反复被 provider「系统繁忙/重试达上限」中断，完成两层保活基建后进入开发。**保活基建（仓外）**：实证 ZCode 运行时（zcode.cjs 反查）Stop 续命唯一通路是 stdout `{"continue":true}`——全局 `goal-continuation.mjs` 原用 stderr+exit2 故从不生效，已改四个分支并实测（continue JSON/无状态放行/complete 放行/过截止放行）；配套 `<project>/.zcode/goal-state.json` 状态门（已 gitignore）；用户另启用每 5 分钟「继续」轮询 cron 双保险。**核心开发**：`EndpointRegistry`（58 端点 12 分类唯一登记源）；PublicAPI +21 方法（发现三件套/媒体库五端点/播放列表三端点/设置四端点走 applyConvergedSettings 收敛路径/缓存两端点/主开关/只读频谱/getActiveMedia/showTopbarDrawer）；`PostMessageBridge`（iframe 内酒馆助手脚本经 window.parent.postMessage 调全部白名单端点：单次响应 FIFO 512、30s 有界超时、迟到 rejection 兜底、params≤16、错误帧只给三码、事件只推 60s 内活跃调用方）；`emit()` 三通道广播（总线 + 酒馆 eventSource `st_bgloader:*` + DOM CustomEvent `st-bgloader:*`，28 处既有 emit 自动获得）。**巡检修复**：activeSceneId 不在 DEFAULT_SETTINGS 被任何 mergeSettings 路径静默丢弃（P2）；refreshMediaGrid rAF 合帧（可测：同帧 3 失效→1 重建）；视频缩略图缓存 64 条 LRU + 删除失效；dev-harness 删除步骤改走扩展 deleteMedia（裸 fetch 绕过清单管理曾致下次 boot 恢复 404 背景，两轮复现）；mock 中间件自愈补种 bgDir；authority S7.2/S7.3 改基线对照+轮询（多页共享 profile 去抖写竞争曾误判，直连探针实证写路径健康）。**测试基建**：新增 tests/api-harness.mjs（28 断言：登记表↔实现零漂移双向对照、桥四路径、三通道一致性、媒体库/设置/缓存/播放列表端点往返、合帧可测量）。**验证矩阵**：type-check/build/check:css 全绿；dev-harness 14/14 + api-harness 28/28（清空 .data 干净环境）；真机 Dev ST :8001——e2e 24/24 + stress 4/4 + authority 18/18 + smoke 11/11 + extreme-media 14/14（清理 13/13 零残留）。文档：wiki §12-17 六节 + 事件表 23→28；README 门禁清单；spec/frontend/public-endpoints.md 契约页（自包含）。全程显式 pathspec 提交、暂存区逐一校验、即时推送。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `8ff3b12` | feat(api): 对外端点大扩容——19 个新方法 + postMessage JSON-RPC 桥 + 事件三通道广播 |
+| `387fb0e` | chore(repo): gitignore ZCode 会话运行时状态（goal-state.json） |
+| `897c5a6` | fix(core+ui): 巡检修复批——activeSceneId 合并丢弃/网格合帧/缩略图 LRU/套件删除路径/mock 自愈 |
+| `6d01989` | docs: 对外端点契约全量文档化（wiki §12-17 + README 门禁 + spec 契约页） |
+| `9ad0bd3` | test(authority): S7.2/S7.3 改基线对照+轮询——消除多页共享 profile 的去抖写竞争 |
+| `02c4801` | feat(api): 收官端点批——getActiveMedia/showTopbarDrawer + 桥滥用守卫 |
+
+### Verification
+
+- [OK] `npm run type-check` / `npm run build` / `npm run check:css` 全绿（dist 230.92 kB）
+- [OK] dev-harness 14/14 + api-harness 28/28（dev/.data 清空后干净环境复跑）
+- [OK] 真机 Dev ST :8001：e2e 24/24、stress 4/4、authority 18/18、smoke 11/11、extreme-media 14/14（测试条目清理零残留）
+- [OK] goal-continuation.mjs 四分支实测（continue JSON / 无状态 / complete / 过截止）
+- [OK] 提交全部显式 pathspec、暂存区校验、origin master 已推送
+- [SKIP] Dev Luker :8003 本轮不在线（curl 000），双实例矩阵未覆盖 Luker 侧
+
+### Status
+
+[OK] **Completed**
