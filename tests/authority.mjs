@@ -434,15 +434,27 @@ async function main() {
             ok('S7.1 local-only settings migrated to the server', migrated.ok === true, `revision=${migrated.revision}`);
 
             // S7.2 live write round-trip: a settings change reaches the server document.
+            // Poll instead of a single fetch: sibling pages' debounced background writes +
+            // the shared localStorage profile let a one-shot read land on a stale doc
+            // (S7.2/S7.3 once failed while a direct probe proved the write path healthy).
             const roundTrip = await page2.evaluate(async () => {
                 const ext = window.STBgLoader;
+                const baseRes = await fetch(`/backgrounds/st-bg-loader-settings.json?t=${Date.now()}`, { cache: 'no-store' });
+                const baselineRev = baseRes.ok ? (await baseRes.json())?.revision ?? 0 : 0;
                 ext.getSettings().volume = 0.42;
                 ext.saveSettings();
                 await ext.getServerSettings().flush();
-                const r = await fetch(`/backgrounds/st-bg-loader-settings.json?t=${Date.now()}`, { cache: 'no-store' });
-                if (!r.ok) return { ok: false };
-                const doc = await r.json();
-                return { ok: doc.settings && doc.settings.volume === 0.42, revision: doc.revision };
+                for (let i = 0; i < 20; i++) {
+                    const r = await fetch(`/backgrounds/st-bg-loader-settings.json?t=${Date.now()}`, { cache: 'no-store' });
+                    if (r.ok) {
+                        const doc = await r.json();
+                        if (doc.settings?.volume === 0.42 && doc.revision > baselineRev) {
+                            return { ok: true, revision: doc.revision };
+                        }
+                    }
+                    await new Promise(res => setTimeout(res, 200));
+                }
+                return { ok: false, revision: baselineRev };
             });
             ok('S7.2 settings change round-trips to the server', roundTrip.ok === true, `revision=${roundTrip.revision}`);
 
