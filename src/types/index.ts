@@ -337,6 +337,9 @@ export const DEFAULT_SETTINGS: BgLoaderSettings = {
         saturate: 100,
     },
     activePresetId: 'default',
+    // mergeSettings 只拷贝此表出现过的键：activeSceneId 一度缺席，导致会话内
+    // applyScene 记录的当前场景在重启/远端收敛/importSettings 时被静默丢弃。
+    activeSceneId: undefined as unknown as string,
     userPresets: {},
     interactiveBackground: false,
     backgroundVisible: true,

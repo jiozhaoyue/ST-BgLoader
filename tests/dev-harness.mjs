@@ -121,17 +121,19 @@ try {
         document.querySelectorAll('#st_bgloader_grid .st-bgloader-media-card').length);
     step('AC2 上传结果刷新后仍在', afterReload > baseline, `刷新后=${afterReload} 基线=${baseline}`);
 
-    // delete it again so the harness data stays clean
+    // delete it again so the harness data stays clean.
+    // Must go through the extension's deleteMedia (catalog + file together): the bare
+    // mock endpoint only removes the file, leaving a catalog entry + activeMediaId that
+    // the NEXT boot would try to restore as a 404 background (observed twice).
     const deleted = await page.evaluate(async (name) => {
         if (!name) return false;
-        const res = await fetch('/api/backgrounds/delete', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ bg: name }),
-        });
-        return res.ok;
+        const api = window.STBgLoader.getAPI();
+        const items = await api.getMediaList();
+        const item = items.find(i => i.name === name);
+        if (!item) return false;
+        return api.deleteMedia(item.id);
     }, uploadedName);
-    step('AC2 删除回到基线', deleted);
+    step('AC2 删除回到基线（走扩展 deleteMedia）', deleted);
 
     // ---- AC3: master toggle persists to the mock server document ----
     await page.evaluate(() => {

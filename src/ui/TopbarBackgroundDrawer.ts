@@ -76,6 +76,7 @@ export class TopbarBackgroundDrawer {
     private refreshGeneration = 0;
     /** Video first-frame thumbnails (itemId → dataURL), generated lazily per grid render. */
     private thumbCache = new Map<string, string>();
+    private static readonly THUMB_CACHE_CAP = 64;
     private thumbInflight = new Map<string, Promise<string | null>>();
 
     constructor(
@@ -931,7 +932,24 @@ export class TopbarBackgroundDrawer {
         if (sortEl) sortEl.value = this.sortOrder;
     }
 
-    public async refreshMediaGrid(): Promise<void> {
+    /**
+     * rAF 合帧入口（L1-MR-9）：同一帧内到达的多次失效（上传→挂载→配额清扫的连发，
+     * 或删除→统计的连发）只触发一次网格重建。调用方签名不变（返回共享的 pending）。
+     */
+    public refreshMediaGrid(): Promise<void> {
+        if (this.refreshPending) return this.refreshPending;
+        this.refreshPending = new Promise<void>((resolve) => {
+            requestAnimationFrame(() => {
+                this.refreshPending = null;
+                resolve(this.refreshMediaGridNow());
+            });
+        });
+        return this.refreshPending;
+    }
+
+    private refreshPending: Promise<void> | null = null;
+
+    private async refreshMediaGridNow(): Promise<void> {
         const grid = this.panel?.querySelector('#st_bgloader_grid');
         if (!grid) return;
 
@@ -1018,6 +1036,8 @@ export class TopbarBackgroundDrawer {
                 if (confirm('确认删除？')) {
                     try {
                         await this.cacheManager.deleteMedia(item.id);
+                        // 缩略图缓存同步失效：否则重建网格会命中旧缓存（或滞留已删条目）
+                        this.thumbCache.delete(item.id);
                         await this.callbacks.onMediaDeleted(item.id);
                     } catch (err) {
                         console.error('[ST-BgLoader] 删除媒体失败:', err);
@@ -1097,7 +1117,16 @@ export class TopbarBackgroundDrawer {
         if (inflight) return inflight;
         const task = this.makeVideoThumb(item)
             .then((dataUrl) => {
-                if (dataUrl) this.thumbCache.set(item.id, dataUrl);
+                if (dataUrl) {
+                    // LRU：先删再设保持 Map 插入序 = 最近使用序；dataUrl 是完整位图
+                    // 字符串（数十 KB/条），无上限会在长会话里线性吃内存。
+                    this.thumbCache.delete(item.id);
+                    this.thumbCache.set(item.id, dataUrl);
+                    if (this.thumbCache.size > TopbarBackgroundDrawer.THUMB_CACHE_CAP) {
+                        const oldest = this.thumbCache.keys().next().value;
+                        if (oldest !== undefined) this.thumbCache.delete(oldest);
+                    }
+                }
                 return dataUrl;
             })
             .finally(() => this.thumbInflight.delete(item.id));

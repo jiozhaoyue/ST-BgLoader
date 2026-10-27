@@ -172,6 +172,22 @@ try {
     step('媒体库 deleteMedia → true 且查无', media.deleted === true && media.gone === true);
     step('媒体库 删除不存在项 → false 不抛', media.deleteMissing === true);
 
+    // ---- R8/D3: refreshMediaGrid rAF 合帧可测量（同帧 3 次失效只重建 1 次） ----
+    const coalesce = await page.evaluate(async () => {
+        const drawer = window.STBgLoader.getTopbarDrawer();
+        if (!drawer) return { measured: false, rebuilds: -1 };
+        let rebuilds = 0;
+        const orig = drawer.refreshMediaGridNow.bind(drawer);
+        drawer.refreshMediaGridNow = async (...a) => { rebuilds++; return orig(...a); };
+        drawer.refreshMediaGrid();
+        drawer.refreshMediaGrid();
+        drawer.refreshMediaGrid();
+        await new Promise(r => setTimeout(r, 350));
+        drawer.refreshMediaGridNow = orig;
+        return { measured: true, rebuilds };
+    });
+    step('性能 网格重建同帧三次失效合帧为一次', coalesce.rebuilds === 1, `rebuilds=${coalesce.rebuilds}`);
+
     // ---- R2/A1-4: 播放列表 / 设置 / 缓存 / 可视化端点 ----
     const rest = await page.evaluate(async () => {
         const a = window.STBgLoader.getAPI();

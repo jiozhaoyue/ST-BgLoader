@@ -142,6 +142,10 @@ export function devMockServer(): Plugin {
         const rawUrl = req.url ?? '/';
         const pathname = decodeURIComponent(rawUrl.split('?')[0]);
 
+        // 自愈：configureServer 时 seed 过的目录可能在中途被清（清理脚本/手动删除），
+        // 任何请求到达时补种，避免 readdir ENOENT 500。
+        if (!fs.existsSync(bgDir)) seed();
+
         try {
             if (pathname === '/api/backgrounds/all' && req.method === 'POST') {
                 await readBody(req);
