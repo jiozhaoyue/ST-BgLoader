@@ -23,3 +23,6 @@ tests/e2e-artifacts/
 
 # Dev harness runtime data (mock server storage: media, manifest, settings)
 dev/.data/
+
+# ZCode 会话运行时状态（不tracked）
+.zcode/goal-state.json
