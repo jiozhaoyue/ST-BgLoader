@@ -278,7 +278,13 @@ await window.stBgLoader.preloadMedia([
 
 ## 📡 11. 事件监听总线 (Event Bus)
 
-`window.stBgLoader` 提供了强类型的事件总线监听支持：
+`window.stBgLoader` 的事件在**三个通道**同步广播，按你的运行环境任选其一：
+
+| 通道 | 监听方式 | 适用场景 |
+| --- | --- | --- |
+| ① 内部总线 | `api.on(event, cb)` | 同窗口脚本（最全语义） |
+| ② 酒馆事件源 | `eventSource.on('st_bgloader:<event>', cb)` | 走酒馆标准事件机制的其他扩展 |
+| ③ DOM 自定义事件 | `document.addEventListener('st-bgloader:<event>', e => e.detail.args)` | 零依赖监听（无法拿到 api 引用时） |
 
 ```javascript
 // 监听媒体变更
@@ -300,12 +306,17 @@ window.stBgLoader.on('play-state-change', (isPlaying) => {
 unsub();
 ```
 
-### 全量 23 个事件对照表
+### 全量 28 个事件对照表
 
 | 事件名 (`Event Name`) | 回调参数 | 触发时机 |
 | --- | --- | --- |
 | `media-change` | `(item: MediaItem \| null)` | 背景媒体发生切换或被清空时 |
 | `media-error` | `(info: { type: 'image' \| 'video' })` | 已挂载的图片/视频解码失败时（损坏字节、404、不支持的编码） |
+| `media-added` | `(item: MediaItem)` | 有媒体通过 API 加入媒体库时 |
+| `media-deleted` | `(id: string)` | 有媒体通过 API 从媒体库删除时 |
+| `master-switch` | `(enabled: boolean)` | 主开关开启/关闭时（关闭 = 视听同停） |
+| `playback-mode-change` | `(mode: 'loop' \| 'single' \| 'shuffle')` | 播放模式切换时 |
+| `cache-cleared` | `()` | 缓存与媒体库被整体清空时 |
 | `background-visibility-change` | `(visible: boolean)` | 背景图层显隐状态切换时 |
 | `track-change` | `(item: MediaItem \| null)` | 当前播放的 BGM 音轨发生切换时 |
 | `play-state-change` | `(isPlaying: boolean)` | 音频开始播放或暂停时 |
@@ -327,4 +338,128 @@ unsub();
 | `preload-progress` | `(completed: number, total: number, currentUrl: string)` | 批量预热流式资源进度更新时 |
 | `preload-complete` | `(results: PreloadResult[])` | 批量预热全部完成时 |
 | `settings-sync` | `(settings: BgLoaderSettings)` | 全局配置持久化保存或跨设备同步完成时 |
+
+---
+
+## 🧭 12. 端点发现接口 (Discovery APIs)
+
+供调用方做特性检测，避免硬编码版本判断。
+
+### `api.getApiVersion(): { api: number; plugin: string }`
+返回 API 协议版本（当前 `2`）与插件版本。
+
+### `api.getCapabilities(): { api, postMessageBridge: boolean, eventChannels: string[], categories: Record<string, string[]> }`
+能力表：桥是否在位、可用事件通道、按分类聚合的端点清单。
+
+### `api.listMethods(): string[]`
+全部白名单端点方法名（与 `EndpointRegistry` 登记表同源，`st-bgloader:postMessage` 桥只放行此清单）。
+
+---
+
+## 📚 13. 媒体库管理端点 (Media Library APIs)
+
+### `api.uploadMedia(blob, name?, type?): Promise<MediaItem>`
+把一个 `Blob`/`File` 存入媒体库（与设置面板上传同路径，落服务端原生目录）。`type` 省略时按文件名自动嗅探。
+
+### `api.deleteMedia(id): Promise<boolean>`
+删除媒体并联动清理播放面（正作背景则清背景、正在播放则停轨、刷新播放列表）。删除不存在项返回 `false` 不抛错。
+
+### `api.getMediaInfo(id): Promise<MediaItem | null>`
+按 id 取媒体条目详情（副本，改动不影响插件状态）。
+
+### `api.getMediaUrl(id): Promise<string | null>`
+取一个本会话内可复用的 `blob:` URL（供其他插件直接渲染该媒体；生命周期由 CacheManager 管理，跨会话无效）。
+
+---
+
+## 🎛️ 14. 播放列表与主开关端点 (Playlist & Master APIs)
+
+### `api.getPlaylist(): MediaItem[]`
+当前 BGM 播放列表（副本）。
+
+### `api.setPlaybackMode(mode: 'loop' | 'single' | 'shuffle'): void`
+设置播放模式；非法值抛 `INVALID_PARAMS`。
+
+### `api.jumpToTrack(index: number): Promise<boolean>`
+跳到播放列表第 `index` 首并播放；越界返回 `false`。
+
+### `api.setMasterEnabled(enabled: boolean): void` / `api.isEnabled(): boolean`
+主开关（关闭 = 背景与 BGM/环境音同停，P2-5 语义）。
+
+---
+
+## ⚙️ 15. 设置读写端点 (Settings APIs)
+
+### `api.getSettings(): BgLoaderSettings`
+只读深拷贝快照。
+
+### `api.updateSettings(patch): BgLoaderSettings`
+合并更新：patch 与当前设置合并后走与设置面板/远端收敛**同一条**应用路径（子系统全量同步 + 两个抽屉回填），不会旁路 UI。
+
+### `api.exportSettings(): BgLoaderSettings` / `api.importSettings(payload): BgLoaderSettings`
+导出快照 / 整体导入（走 `mergeSettings` 收敛，非法结构回退默认值）。
+
+---
+
+## 💾 16. 缓存与运行时数据端点 (Cache & Runtime Data APIs)
+
+### `api.getCacheStats(): Promise<{ usedBytes, itemCount, quotaBytes, lruAutoClean }>`
+缓存用量统计（含配额与自动清扫开关状态）。
+
+### `api.clearCache(): Promise<void>`
+清空缓存与媒体库（**破坏性端点**，等同设置面板清空按钮）。
+
+### `api.getVisualizerData(): number[]`
+当前频谱快照（0–255 字节数组副本）。未播放/不支持时返回 `[]`，永不挂起——供其他插件做自己的可视化。
+
+---
+
+## 🌉 17. 跨 iframe PostMessage 桥（酒馆助手脚本接入）
+
+酒馆助手（TavernHelper / JS-Slash-Runner）等脚本运行在 **iframe** 内，拿不到 `window.stBgLoader`。本插件在宿主窗口监听 postMessage 请求，任何 iframe 内脚本可直接调用**全部白名单端点**（`listMethods()` 清单）。
+
+**帧协议**（`source` 恒为 `'st-bgloader'`）：
+
+```text
+请求  { source:'st-bgloader', kind:'request',  id, method, params?: any[] }
+响应  { source:'st-bgloader', kind:'response', id, result? } | { ..., error: { code, message } }
+事件  { source:'st-bgloader', kind:'event',    event, args: any[] }
+```
+
+- `id` 由调用方生成，**同一 id 本会话内永远只回一次**（并发与先后重发都忽略）；
+- 任何方法 30s 内必须返回，超时回 `error.code = 'InvokeError'`（消息含 `BRIDGE_TIMEOUT`）；
+- 错误码：`UnknownMethod`（不在白名单）/ `InvalidParams` / `InvokeError`；
+- 事件推送只发给**近 60 秒内成功调用过**的 iframe（隐式订阅，无需注册）。
+
+**客户端样板**（直接粘进酒馆助手脚本）：
+
+```javascript
+(async () => {
+    const pending = new Map();
+    window.addEventListener('message', (ev) => {
+        const d = ev.data;
+        if (d?.source !== 'st-bgloader' || d.kind !== 'response') return;
+        const p = pending.get(d.id);
+        if (!p) return;
+        pending.delete(d.id);
+        d.error ? p.reject(new Error(`${d.error.code}: ${d.error.message}`)) : p.resolve(d.result);
+    });
+    let seq = 0;
+    const call = (method, ...params) => new Promise((resolve, reject) => {
+        const id = `bg_${Date.now()}_${seq++}`;
+        pending.set(id, { resolve, reject });
+        window.parent.postMessage({ source: 'st-bgloader', kind: 'request', id, method, params }, '*');
+        setTimeout(() => { if (pending.has(id)) { pending.delete(id); reject(new Error('timeout')); } }, 35000);
+    });
+
+    // —— 用法示例 ——
+    console.log(await call('getApiVersion'));               // { api: 2, plugin: '…' }
+    await call('setBackground', 'bg_id_or_url');
+    await call('setWeather', 'rain');
+    await call('setVolume', 0.4);
+    const state = await call('getPlaybackState');
+    console.log('当前状态:', state);
+})();
+```
+
 

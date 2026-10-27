@@ -20,6 +20,7 @@ This directory contains guidelines for frontend development. Fill in each file w
 | [State Management](./state-management.md) | settings object, cloud mirror, media library pointers | Filled |
 | [Quality Guidelines](./quality-guidelines.md) | E2E bar, UI code standards | Filled |
 | [Host-Native UI](./host-native-ui.md) | Stay indistinguishable from the host: use its seams (drawer/theme vars/menu_button), no glow, inline-style policy | Filled |
+| [Public Endpoints](./public-endpoints.md) | 对外端点契约：EndpointRegistry 白名单、postMessage 桥帧协议、事件三通道、设置收敛路径、api-harness 质量门 | Filled |
 | [Type Safety](./type-safety.md) | strict config, central type module, cast boundaries | Filled |
 
 ---

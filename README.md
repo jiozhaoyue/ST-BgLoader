@@ -128,6 +128,7 @@ npm run dev:ui     # 打开 http://localhost:5173/
 项目配备了完整的自动化质量门禁套件：
 - `npm run check:css`：CSS 作用域静态门禁（无需实例，随时可跑）；
 - `node tests/dev-harness.mjs`：预览台自检（免实例，需先 `npm run dev:ui`，14 项断言）；
+- `node tests/api-harness.mjs`：对外端点面自检（免实例，需先 `npm run dev:ui`，25 项断言：发现接口 / postMessage 桥往返与错误帧 / 事件三通道一致性 / 媒体库-设置-缓存-播放列表端点往返 / 登记表零漂移 / 网格合帧）；
 - `node tests/e2e.mjs`：端到端功能回归测试（24 项断言）；
 - `node tests/stress.mjs`：极限并发切换、大文件流、异常容错与显存泄漏压力测试；
 - `node tests/authority.mjs`：服务端存储与 Authority 扩展交互能力测试；
