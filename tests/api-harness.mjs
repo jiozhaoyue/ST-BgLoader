@@ -104,6 +104,7 @@ try {
                 send('probe-ok', 'getApiVersion');
                 send('probe-unknown', 'emit');
                 send('probe-invalid', 'jumpToTrack', [-1]);
+                send('probe-params', 'getSettings', Array.from({ length: 17 }, (_, i) => i));
                 send('probe-dup', 'isEnabled');
                 send('probe-dup', 'isEnabled'); // 重复 id：必须只回一次
                 setTimeout(resolve, 1600);
@@ -123,6 +124,8 @@ try {
         byId['probe-invalid']?.error?.code || 'no-frame');
     const dupResponses = bridge.responses.filter(r => r.id === 'probe-dup').length;
     step('桥 重复 id 单次响应', dupResponses === 1, `responses=${dupResponses}`);
+    step('桥 params 超 16 项上限 → InvalidParams', byId['probe-params']?.error?.code === 'InvalidParams',
+        byId['probe-params']?.error?.code || 'no-frame');
 
     // ---- A4: 事件三通道一致性（bus / eventSource / CustomEvent）+ 桥事件推送 ----
     const channels = await page.evaluate(async () => {
@@ -187,6 +190,23 @@ try {
         return { measured: true, rebuilds };
     });
     step('性能 网格重建同帧三次失效合帧为一次', coalesce.rebuilds === 1, `rebuilds=${coalesce.rebuilds}`);
+
+    // ---- 补充端点：getActiveMedia / showTopbarDrawer ----
+    const extra = await page.evaluate(async () => {
+        const a = window.STBgLoader.getAPI();
+        const out = {};
+        const active = await a.getActiveMedia();
+        out.activeOk = active === null || typeof active?.id === 'string';
+        const wasOpen = document.querySelector('#Backgrounds')?.classList.contains('openDrawer') ?? false;
+        a.showTopbarDrawer(!wasOpen);
+        const toggled = (document.querySelector('#Backgrounds')?.classList.contains('openDrawer') ?? false) !== wasOpen;
+        a.showTopbarDrawer(wasOpen);
+        const restored = (document.querySelector('#Backgrounds')?.classList.contains('openDrawer') ?? false) === wasOpen;
+        out.drawer = toggled && restored;
+        return out;
+    });
+    step('端点 getActiveMedia 返回 null 或条目', extra.activeOk === true);
+    step('端点 showTopbarDrawer 开合且复原', extra.drawer === true);
 
     // ---- R2/A1-4: 播放列表 / 设置 / 缓存 / 可视化端点 ----
     const rest = await page.evaluate(async () => {

@@ -370,6 +370,12 @@ unsub();
 ### `api.getMediaUrl(id): Promise<string | null>`
 取一个本会话内可复用的 `blob:` URL（供其他插件直接渲染该媒体；生命周期由 CacheManager 管理，跨会话无效）。
 
+### `api.getActiveMedia(): Promise<MediaItem | null>`
+当前激活的背景条目（`getPlaybackState` 只给 id，本端点直接给解析后的条目；未设置/引用失效返回 `null`）。
+
+### `api.showTopbarDrawer(open: boolean): boolean`
+程序化开合顶栏背景抽屉（复用宿主原生开合钮语义；宿主 DOM 不可用时返回 `false`）。
+
 ---
 
 ## 🎛️ 14. 播放列表与主开关端点 (Playlist & Master APIs)
@@ -427,6 +433,7 @@ unsub();
 ```
 
 - `id` 由调用方生成，**同一 id 本会话内永远只回一次**（并发与先后重发都忽略）；
+- `params` 数组不得超过 **16 项**（超限回 `InvalidParams`）；
 - 任何方法 30s 内必须返回，超时回 `error.code = 'InvokeError'`（消息含 `BRIDGE_TIMEOUT`）；
 - 错误码：`UnknownMethod`（不在白名单）/ `InvalidParams` / `InvokeError`；
 - 事件推送只发给**近 60 秒内成功调用过**的 iframe（隐式订阅，无需注册）。

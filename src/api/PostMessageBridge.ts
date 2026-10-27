@@ -25,6 +25,8 @@ const REQUEST_TIMEOUT_MS = 30_000;
 const EVENT_SUBSCRIBER_TTL_MS = 60_000;
 /** 已服务 id 登记上限（FIFO 淘汰）：同一 id 本会话内永远只回一次。 */
 const SERVED_IDS_CAP = 512;
+/** 单请求参数个数上限：白名单方法都没有超长参数表，超限视为滥用。 */
+const MAX_PARAMS = 16;
 
 interface BridgeRequest {
     source?: string;
@@ -97,9 +99,19 @@ export class PostMessageBridge {
         }
 
         const params = Array.isArray(data.params) ? data.params : [];
+        if (params.length > MAX_PARAMS) {
+            this.respond(source, data.id, {
+                error: { code: 'InvalidParams', message: `params 超过 ${MAX_PARAMS} 项上限` },
+            });
+            return;
+        }
         let result: unknown;
+        const call = Promise.resolve(fn.apply(this.api, params));
+        // 超时裁决后迟到的 rejection 不得成为 unhandledrejection（L1-MR-7）：
+        // race 之外挂一个空 catch 兜底，原 promise 仍参与 race。
+        call.catch(() => {});
         try {
-            result = await this.withTimeout(Promise.resolve(fn.apply(this.api, params)), data.method);
+            result = await this.withTimeout(call, data.method);
         } catch (err) {
             this.respond(source, data.id, {
                 error: {

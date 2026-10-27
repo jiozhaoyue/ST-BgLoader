@@ -82,7 +82,10 @@ export const ENDPOINTS: readonly EndpointMeta[] = [
     { method: 'deleteMedia', category: 'media', async: true },
     { method: 'getMediaInfo', category: 'media', async: true },
     { method: 'getMediaUrl', category: 'media', async: true },
+    { method: 'getActiveMedia', category: 'media', async: true },
     { method: 'preloadMedia', category: 'media', async: true },
+    // --- background（补充：程序化开合顶栏抽屉） ---
+    { method: 'showTopbarDrawer', category: 'background', async: false },
     // --- playlist ---
     { method: 'getPlaylist', category: 'playlist', async: false },
     { method: 'setPlaybackMode', category: 'playlist', async: false },

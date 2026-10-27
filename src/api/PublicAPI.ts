@@ -22,6 +22,7 @@ import {
 } from '../types';
 import type { STBgLoaderExtension } from '../index';
 import { detectMediaType } from '../core/mediaType';
+import { HostBridge as HostBridgeSingleton } from '../bridge/HostBridge';
 import { API_VERSION, getEndpointCategories, ENDPOINT_METHODS } from './EndpointRegistry';
 
 export const PLAYBACK_MODES: readonly string[] = ['loop', 'single', 'shuffle'];
@@ -655,6 +656,31 @@ export class PublicAPI {
         const url = await this.ext.getCacheManager().getMediaBlobUrl(item);
         await this.ext.getAudioEngine().playMediaItem(item, url);
         this.emit('track-change', item);
+        return true;
+    }
+
+    /**
+     * 当前激活的背景条目（getPlaybackState 只给 id，本端点直接给解析后的条目）。
+     * 未设置/引用已失效时返回 null。
+     */
+    public async getActiveMedia(): Promise<MediaItem | null> {
+        const id = this.ext.getSettings().activeMediaId;
+        if (!id) return null;
+        const item = await this.ext.getCacheManager().getMedia(id);
+        return item ? { ...item } : null;
+    }
+
+    /**
+     * 程序化开合顶栏背景抽屉（复用宿主原生开合钮的点击语义）。
+     * 宿主 DOM 不可用时返回 false。
+     */
+    public showTopbarDrawer(open: boolean): boolean {
+        if (typeof open !== 'boolean') {
+            throw new Error('INVALID_PARAMS: showTopbarDrawer(open) 需要 boolean');
+        }
+        const bridge = HostBridgeSingleton.getInstance();
+        if (open) return bridge.openBackgroundDrawer();
+        bridge.closeBackgroundDrawer();
         return true;
     }
 
