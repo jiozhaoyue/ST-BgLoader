@@ -33,6 +33,7 @@ ST-BgLoader 的设置管理采用多层持久化体系：
 | `showMiniPlayer` | `boolean` | `true` | 是否在界面右下角显示浮动音乐胶囊小播放器 | 顶栏抽屉 > 详细设置 > BGM与音频设置 |
 | `capsuleOnPlayOnly` | `boolean` | `true` | 迷你音乐胶囊是否仅在正在播放音频时自动显现 | 顶栏抽屉 > 详细设置 > BGM与音频设置 |
 | `playbackMode` | `PlaybackMode` | `'loop'` | 播放模式：`'loop'` (循环), `'single'` (单曲), `'shuffle'` (随机) | 顶栏抽屉 > 详细设置 > BGM与音频设置 |
+| `bgmAutoAdvance` | `{ enabled, intervalSec, fadeMs }` | `{ false, 300, 800 }` | BGM 播放列表自动轮播：间隔（30–3600 秒，UI 以分钟输入）到点淡出切下一曲；`fadeMs` 为切曲淡入淡出时长（0–2000，0=硬切）。列表 <2 首或未播放不计时；单曲循环模式不轮播 | 顶栏抽屉 > 详细设置 > 音乐 > 自动轮播 |
 | `cacheQuotaMB` | `number` | `1024` | 浏览器端本地热缓存最大配额限制 (MB) | 顶栏抽屉 > 详细设置 > 缓存与存储配置 |
 | `lruAutoClean` | `boolean` | `true` | 当缓存超过配额时是否自动使用 LRU 策略清理最久未访问媒体 | 顶栏抽屉 > 详细设置 > 缓存与存储配置 |
 | `nativeTakeover` | `TakeoverLevel` | `'all'` | 对酒馆原生背景选择的接管级别 (`'off'`, `'non-image'`, `'all'`) | 顶栏抽屉 > 详细设置 > 高级接管模式 |

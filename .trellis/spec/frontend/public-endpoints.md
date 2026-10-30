@@ -15,7 +15,7 @@
 
 ## 2. EndpointRegistry：白名单唯一登记源（MUST）
 
-`src/api/EndpointRegistry.ts` 是**唯一**登记表（56 端点，12 分类）。纪律：
+`src/api/EndpointRegistry.ts` 是**唯一**登记表（62 端点，12 分类；2026-10-28 建立时 56，2026-10-31 夜间批 F1/F2 增 setBgmAutoAdvance/getBgmAutoAdvance（audio）与 exportScenes/importScenes（scenes）→ 60/62）。纪律：
 
 1. **新增公开方法必须同 PR 登记**——`listMethods()`、postMessage 桥白名单、
    `getCapabilities().categories` 三者都以它为事实源；

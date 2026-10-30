@@ -244,6 +244,17 @@ window.stBgLoader.applyScene('cyber_rain');
 ### `api.deleteScene(id: string): boolean`
 删除自定义场景（内置场景不可删除）。
 
+### `api.exportScenes(ids?: string[]): SceneExportEnvelope`（v2 新增）
+导出用户场景为**可分享 JSON 信封** `{ format: 'st-bgloader-scenes', version: 1, exportedAt, scenes[] }`；`ids` 缺省导出全部用户场景（内置场景为常量，不参与导出）。返回值直接 `JSON.stringify` 存文件即可分享。
+
+### `api.importScenes(payload): { added, updated, skipped } | null`（v2 新增）
+导入分享的场景文件，**语义合并**：同 id 覆盖、其余既有场景不动；逐场景字段白名单清洗（未知字段丢弃、形状非法条目跳过并计入 `skipped`）；信封非法（format/version 不符）整体拒绝返回 `null`、现状零改动。
+
+```javascript
+const r = window.stBgLoader.importScenes(JSON.parse(fileText));
+if (r) toastr.success(`新增 ${r.added} / 更新 ${r.updated} / 跳过 ${r.skipped}`);
+```
+
 ### `api.cycleWeather(): WeatherType`
 按顺时针快速轮换天气模式 (`off` -> `rain` -> `snow` -> `sakura` -> `cyber_motes` -> `scanlines`)。
 
@@ -306,7 +317,7 @@ window.stBgLoader.on('play-state-change', (isPlaying) => {
 unsub();
 ```
 
-### 全量 28 个事件对照表
+### 全量 29 个事件对照表
 
 | 事件名 (`Event Name`) | 回调参数 | 触发时机 |
 | --- | --- | --- |
@@ -319,6 +330,7 @@ unsub();
 | `cache-cleared` | `()` | 缓存与媒体库被整体清空时 |
 | `background-visibility-change` | `(visible: boolean)` | 背景图层显隐状态切换时 |
 | `track-change` | `(item: MediaItem \| null)` | 当前播放的 BGM 音轨发生切换时 |
+| `bgm-auto-advance-change` | `(opts: { enabled, intervalSec, fadeMs })` | BGM 播放列表自动轮播配置变更时（v2 新增） |
 | `play-state-change` | `(isPlaying: boolean)` | 音频开始播放或暂停时 |
 | `volume-change` | `(volume: number)` | 主音量滑块被调节时 (0.0~1.0) |
 | `mute-change` | `(muted: boolean)` | 切换全局静音状态时 |
@@ -388,6 +400,12 @@ unsub();
 
 ### `api.jumpToTrack(index: number): Promise<boolean>`
 跳到播放列表第 `index` 首并播放；越界返回 `false`。
+
+### `api.setBgmAutoAdvance(enabled: boolean, intervalSec?: number, fadeMs?: number): void`（v2 新增）
+BGM 播放列表**自动轮播**：`intervalSec`（30–3600，默认 300）到点后淡出当前曲并切换下一曲，再以 `fadeMs`（0–2000，默认 800；0 = 硬切）淡入。约束：列表 ≥2 首且正在播放才计时；`single`（单曲循环）模式不轮播；每次手动切歌重置倒计时；主开关关闭即停。
+
+### `api.getBgmAutoAdvance(): { enabled, intervalSec, fadeMs }`（v2 新增）
+读取自动轮播当前配置。
 
 ### `api.setMasterEnabled(enabled: boolean): void` / `api.isEnabled(): boolean`
 主开关（关闭 = 背景与 BGM/环境音同停，P2-5 语义）。
