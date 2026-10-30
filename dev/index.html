@@ -6,6 +6,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>ST-BgLoader · 开发预览台</title>
     <link rel="stylesheet" href="./styles/harness.css" />
+    <!-- 真宿主带 FontAwesome；预览台用本地 vendored 副本使图标可见（勿升级改动，L1-MR-11 惯例；
+     CDN 外链曾挂住 dev-harness 的 networkidle 导航——外链不入测试路径）。 -->
+    <link rel="stylesheet" href="./vendor/fontawesome/css/all.min.css" />
 </head>
 
 <body class="st-bgloader-dev-app">

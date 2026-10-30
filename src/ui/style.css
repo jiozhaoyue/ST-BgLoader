@@ -106,7 +106,11 @@
 }
 
 .st-bgloader-slider-row label {
-    flex: 0 0 65px;
+    /* auto-width + nowrap: a fixed 65px box wrapped longer CJK labels ("轮播淡入淡出")
+       into a cramped vertical stub next to the slider. */
+    flex: 0 0 auto;
+    min-width: 65px;
+    white-space: nowrap;
     font-size: 0.85em;
 }
 
@@ -401,8 +405,12 @@
     margin-top: 10px;
 }
 
-.st-bgloader-btn-row button {
+.st-bgloader-btn-row button,
+.st-bgloader-btn-row label {
+    /* label 参与均衡拉伸：导入类按钮是 <label for=…>（内嵌隐藏 file input），
+       旧规则只给 button flex:1，导出/导入同行时一宽一窄。 */
     flex: 1;
+    text-align: center;
 }
 
 /* ---------------------------------------------------------------------------
@@ -469,10 +477,12 @@
     margin-top: 4px;
 }
 
-/* Preset/scene control row labels */
+/* Preset/scene control row labels — auto-width + nowrap for the same reason as the
+   slider rows above ("轮播间隔:" used to wrap inside a fixed 50px box). */
 .st-bgloader-preset-row > label {
     font-size: 0.85em;
-    flex: 0 0 50px;
+    flex: 0 0 auto;
+    white-space: nowrap;
 }
 
 .st-bgloader-preset-row > label.st-bgloader-label-sm {
@@ -735,6 +745,57 @@
 /* Placeholder tint shown while a video thumbnail is being generated (or when it failed). */
 .st-bgloader-card-img-pending {
     background: rgba(0, 0, 0, 0.35);
+}
+
+/* 卡片底部信息条（card-info/name/meta）与文件型占位图标（card-icon）：
+   模板类此前长期无样式——名称裸叠在预览图上，亮图直接不可读。深色底与
+   .st-bgloader-media-card-title 同款（黑-alpha 磨砂层，主题中性）。 */
+.st-bgloader-card-info {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    padding: 4px 6px;
+    background: rgba(0, 0, 0, 0.75);
+}
+
+.st-bgloader-card-name {
+    font-size: 0.75em;
+    color: var(--SmartThemeEmColor, #eeeeee);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.st-bgloader-media-card.active .st-bgloader-card-name {
+    color: var(--SmartThemeQuoteColor, #4fa3d1);
+    font-weight: 600;
+}
+
+.st-bgloader-card-meta {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.65em;
+    min-width: 0;
+}
+
+/* 卡片内的类型徽标复用了宿主网格的 .st-bg-native-badge（absolute 左上角定位）；
+   在信息条里必须回到常规流，否则它压在名称行上。 */
+.st-bgloader-media-card .st-bg-native-badge {
+    position: static;
+    pointer-events: auto;
+}
+
+.st-bgloader-card-icon {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--SmartThemeBodyColor, #aaaaaa);
+    opacity: 0.75;
 }
 
 .st-bgloader-active-tag {
