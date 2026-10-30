@@ -44,6 +44,67 @@ export interface AudioOptions {
 
 export type EventCallback = (...args: any[]) => void;
 
+/** F2 场景分享信封（exportScenes 产出 / importScenes 消费）。 */
+export interface SceneExportEnvelope {
+    format: 'st-bgloader-scenes';
+    version: 1;
+    exportedAt: string;
+    scenes: SceneSnapshot[];
+}
+
+const SCENES_EXPORT_FORMAT = 'st-bgloader-scenes';
+const SCENES_EXPORT_VERSION = 1;
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function pickString(src: Record<string, unknown>, key: string): string | undefined {
+    const v = src[key];
+    return typeof v === 'string' && v.length > 0 ? v : undefined;
+}
+
+function pickPlainObject(src: Record<string, unknown>, key: string): Record<string, unknown> | undefined {
+    const v = src[key];
+    return isPlainRecord(v) ? v : undefined;
+}
+
+/**
+ * 单场景白名单清洗：只拷贝已知字段且逐字段校验基本形状，未知字段一律丢弃——
+ * 恶意/陈旧导出文件不能把任意键灌进设置文档。id 必须是非空字符串；name 缺省回落 id。
+ */
+function sanitizeImportedScene(raw: unknown): SceneSnapshot | null {
+    if (!isPlainRecord(raw)) return null;
+    const id = typeof raw.id === 'string' ? raw.id.trim() : '';
+    if (!id) return null;
+    const name = typeof raw.name === 'string' && raw.name.trim().length > 0 ? raw.name.trim() : id;
+
+    const scene: SceneSnapshot = { id, name };
+    const mediaId = pickString(raw, 'mediaId');
+    if (mediaId) scene.mediaId = mediaId;
+    const mediaUrl = pickString(raw, 'mediaUrl');
+    if (mediaUrl) scene.mediaUrl = mediaUrl;
+    const bgmUrl = pickString(raw, 'bgmUrl');
+    if (bgmUrl) scene.bgmUrl = bgmUrl;
+    const presetId = pickString(raw, 'presetId');
+    if (presetId) scene.presetId = presetId;
+    const filters = pickPlainObject(raw, 'filters');
+    if (filters) scene.filters = filters as unknown as VisualFilters;
+    const weather = pickPlainObject(raw, 'weather');
+    if (weather) scene.weather = weather as unknown as WeatherOptions;
+    const visualizer = pickPlainObject(raw, 'visualizer');
+    if (visualizer) scene.visualizer = visualizer as unknown as VisualizerOptions;
+    const parallax = pickPlainObject(raw, 'parallax');
+    if (parallax && typeof parallax.enabled === 'boolean' && typeof parallax.intensity === 'number') {
+        scene.parallax = { enabled: parallax.enabled, intensity: parallax.intensity };
+    }
+    const ambientSound = pickPlainObject(raw, 'ambientSound');
+    if (ambientSound) scene.ambientSound = ambientSound as unknown as AmbientSoundOptions;
+    if (typeof raw.frostedChat === 'boolean') scene.frostedChat = raw.frostedChat;
+    return scene;
+}
+
+
 export class PublicAPI {
     private ext: STBgLoaderExtension;
     private eventListeners: Map<string, Set<EventCallback>> = new Map();
@@ -480,6 +541,61 @@ export class PublicAPI {
             this.emit('scenes-change', sceneManager.getAllScenes());
         }
         return deleted;
+    }
+
+    /**
+     * 导出场景为可分享 JSON（F2）。默认导出全部用户场景；`ids` 过滤（内置场景是常量，
+     * 不参与导出）。返回结构可直接 JSON.stringify 存文件。
+     */
+    public exportScenes(ids?: string[]): SceneExportEnvelope {
+        const all = this.ext.getSceneManager()?.getUserScenes() ?? {};
+        let scenes = Object.values(all);
+        if (Array.isArray(ids) && ids.length > 0) {
+            const wanted = new Set(ids.filter((x): x is string => typeof x === 'string'));
+            scenes = scenes.filter(s => wanted.has(s.id));
+        }
+        return {
+            format: SCENES_EXPORT_FORMAT,
+            version: SCENES_EXPORT_VERSION,
+            exportedAt: new Date().toISOString(),
+            scenes: scenes.map(s => ({ ...s })),
+        };
+    }
+
+    /**
+     * 导入场景（F2）：信封形状校验 + 逐场景字段白名单清洗；同名（同 id）覆盖、其余既有
+     * 场景不动（语义合并）。信封非法整体拒绝（返回 null，现状零改动）；单场景形状非法
+     * 跳过并计入 skipped。
+     */
+    public importScenes(payload: unknown): { added: number; updated: number; skipped: number } | null {
+        if (!isPlainRecord(payload)) return null;
+        const obj = payload as Record<string, unknown>;
+        if (obj.format !== SCENES_EXPORT_FORMAT || obj.version !== SCENES_EXPORT_VERSION) return null;
+        if (!Array.isArray(obj.scenes)) return null;
+
+        const sceneManager = this.ext.getSceneManager();
+        if (!sceneManager) return null;
+
+        let added = 0;
+        let updated = 0;
+        let skipped = 0;
+        for (const raw of obj.scenes) {
+            const scene = sanitizeImportedScene(raw);
+            if (!scene) {
+                skipped += 1;
+                continue;
+            }
+            const existed = !!sceneManager.getScene(scene.id);
+            sceneManager.saveScene(scene);
+            if (existed) updated += 1; else added += 1;
+        }
+
+        if (added + updated > 0) {
+            this.ext.getSettings().scenes = sceneManager.getUserScenes();
+            this.ext.saveSettings();
+            this.emit('scenes-change', sceneManager.getAllScenes());
+        }
+        return { added, updated, skipped };
     }
 
     /**

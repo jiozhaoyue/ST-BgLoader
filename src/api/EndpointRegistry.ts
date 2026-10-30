@@ -74,6 +74,8 @@ export const ENDPOINTS: readonly EndpointMeta[] = [
     { method: 'saveCurrentScene', category: 'scenes', async: false },
     { method: 'getScenes', category: 'scenes', async: false },
     { method: 'deleteScene', category: 'scenes', async: false },
+    { method: 'exportScenes', category: 'scenes', async: false },
+    { method: 'importScenes', category: 'scenes', async: false },
     // --- triggers ---
     { method: 'addTriggerRule', category: 'triggers', async: false },
     { method: 'removeTriggerRule', category: 'triggers', async: false },

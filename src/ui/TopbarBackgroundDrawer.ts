@@ -47,6 +47,10 @@ export interface TopbarBackgroundDrawerCallbacks {
     onAmbientSoundChanged?: (options: AmbientSoundOptions) => void;
     onFrostedChatChanged?: (options: { enabled: boolean; blur: number; opacity: number }) => void;
     onSceneApplied?: (sceneId: string) => void;
+    /** F2 场景分享：导出当前用户场景信封（null = 无场景管理器）。 */
+    onScenesExport?: () => unknown;
+    /** F2 场景分享：语义合并导入；null = 信封非法。 */
+    onScenesImport?: (payload: unknown) => { added: number; updated: number; skipped: number } | null;
 }
 
 const NATIVE_HIDDEN_CLASS = 'st-bg-native-hidden';
@@ -271,6 +275,13 @@ export class TopbarBackgroundDrawer {
                                 <button type="button" id="st_scene_apply_btn" class="menu_button" title="应用"><i class="fa-solid fa-play"></i> 应用</button>
                                 <button type="button" id="st_scene_save_btn" class="menu_button" title="保存"><i class="fa-solid fa-floppy-disk"></i></button>
                                 <button type="button" id="st_scene_del_btn" class="menu_button" title="删除"><i class="fa-solid fa-trash"></i></button>
+                            </div>
+                            <div class="st-bgloader-btn-row">
+                                <button type="button" id="st_scene_export_btn" class="menu_button" title="导出全部用户场景为可分享 JSON"><i class="fa-solid fa-file-arrow-down"></i> 导出场景</button>
+                                <label for="st_scene_import_file" class="menu_button" title="导入场景（同 id 覆盖，其余不动）">
+                                    <i class="fa-solid fa-file-arrow-up"></i> 导入场景
+                                    <input type="file" id="st_scene_import_file" class="st-bgloader-hidden" accept=".json" />
+                                </label>
                             </div>
                         `,
                     })}
@@ -1399,6 +1410,54 @@ export class TopbarBackgroundDrawer {
                     this.updateSceneSelect();
                 }
             };
+        }
+
+        // F2 场景分享：导出全部用户场景 / 导入合并（同 id 覆盖、其余不动）。
+        const sceneExportBtn = this.panel?.querySelector<HTMLButtonElement>('#st_scene_export_btn');
+        if (sceneExportBtn) {
+            sceneExportBtn.onclick = () => {
+                const payload = this.callbacks.onScenesExport?.();
+                if (!payload) return;
+                const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(payload, null, 2));
+                const anchor = document.createElement('a');
+                anchor.setAttribute('href', dataStr);
+                anchor.setAttribute('download', `st-bgloader-scenes-${Date.now()}.json`);
+                document.body.appendChild(anchor);
+                anchor.click();
+                anchor.remove();
+            };
+        }
+
+        const sceneImportInput = this.panel?.querySelector<HTMLInputElement>('#st_scene_import_file');
+        if (sceneImportInput) {
+            sceneImportInput.addEventListener('change', () => {
+                const file = sceneImportInput.files?.[0];
+                // 先清空选择：同一文件改内容后要能再次选取。
+                sceneImportInput.value = '';
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    let parsed: unknown;
+                    try {
+                        parsed = JSON.parse(event.target?.result as string);
+                    } catch {
+                        alert('导入失败：不是有效的 JSON 文件');
+                        return;
+                    }
+                    const result = this.callbacks.onScenesImport?.(parsed);
+                    if (!result) {
+                        alert('导入失败：不是本插件导出的场景文件（format/version 不符）');
+                        return;
+                    }
+                    this.updateSceneSelect();
+                    const summary = `场景导入完成：新增 ${result.added} / 更新 ${result.updated}` +
+                        (result.skipped ? ` / 跳过 ${result.skipped}` : '');
+                    try {
+                        (window as unknown as { toastr?: { success(msg: string): void } }).toastr?.success(summary);
+                    } catch { /* toastr 不在时静默——选择器已刷新，结果可从场景列表核对 */ }
+                };
+                reader.readAsText(file);
+            });
         }
     }
 

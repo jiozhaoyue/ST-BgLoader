@@ -328,6 +328,12 @@ export class STBgLoaderExtension {
             onSceneApplied: (sceneId) => {
                 this.publicApi.applyScene(sceneId);
             },
+            onScenesExport: () => {
+                return this.publicApi.exportScenes();
+            },
+            onScenesImport: (payload) => {
+                return this.publicApi.importScenes(payload);
+            },
             onMediaSelected: async (item) => {
                 await this.applyMedia(item);
             },

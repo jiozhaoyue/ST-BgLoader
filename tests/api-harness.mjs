@@ -257,6 +257,76 @@ try {
     step('F1 非法参数钳制（NaN/-50 不越界）', rest.aaClamp === true);
     step('F1 关闭 setBgmAutoAdvance(false)', rest.aaOff === true);
 
+    // ---- F2: 场景导出/导入（信封校验 + 语义合并 + 非法输入现状零改动） ----
+    const f2 = await page.evaluate(() => {
+        const a = window.STBgLoader.getAPI();
+        const out = {};
+        const before = a.getScenes();
+
+        // 1) 导出信封形状
+        const env = a.exportScenes();
+        out.envelope = env.format === 'st-bgloader-scenes' && env.version === 1
+            && Array.isArray(env.scenes) && typeof env.exportedAt === 'string';
+
+        // 2) 语义合并：同 id 覆盖
+        if (env.scenes.length > 0) {
+            const renamed = JSON.parse(JSON.stringify(env));
+            renamed.scenes[0] = { ...renamed.scenes[0], name: renamed.scenes[0].name + '_harness' };
+            const r1 = a.importScenes(renamed);
+            out.updateMerge = r1 && r1.updated >= 1 && a.getScenes()[env.scenes[0].id]?.name.endsWith('_harness');
+        } else {
+            // 无用户场景时先造一个再测（结束前清理）
+            a.saveCurrentScene('f2_harness_tmp');
+            const env2 = a.exportScenes();
+            const renamed = JSON.parse(JSON.stringify(env2));
+            renamed.scenes[0].name += '_harness';
+            const r1 = a.importScenes(renamed);
+            out.updateMerge = r1 && r1.updated >= 1;
+            a.deleteScene(renamed.scenes[0].id);
+        }
+
+        // 3) 新 id 导入 → added
+        const fresh = { format: 'st-bgloader-scenes', version: 1, exportedAt: new Date().toISOString(), scenes: [{ id: 'f2_harness_fresh', name: 'F2 新场景', presetId: 'default' }] };
+        const r2 = a.importScenes(fresh);
+        out.addMerge = r2 && r2.added === 1 && !!a.getScenes()['f2_harness_fresh'];
+
+        // 4) 非法信封 → null 且现状零改动
+        const snapshotBefore = JSON.stringify(a.getScenes());
+        out.rejectBad = a.importScenes({ format: 'other' }) === null
+            && a.importScenes({ format: 'st-bgloader-scenes', version: 2, scenes: [] }) === null
+            && a.importScenes('not-an-object') === null
+            && JSON.stringify(a.getScenes()) === snapshotBefore;
+
+        // 5) 字段白名单：未知字段被丢弃、形状非法条目跳过
+        const dirty = { format: 'st-bgloader-scenes', version: 1, scenes: [
+            { id: 'f2_harness_dirty', name: '脏场景', evil: 'x', presetId: 'default' },
+            { bad: true },
+            null,
+        ] };
+        const r3 = a.importScenes(dirty);
+        const dirtyScene = a.getScenes()['f2_harness_dirty'];
+        out.sanitize = r3 && r3.added === 1 && r3.skipped === 2
+            && dirtyScene && !('evil' in dirtyScene);
+        if (dirtyScene) a.deleteScene('f2_harness_dirty');
+
+        // 清理
+        a.deleteScene('f2_harness_fresh');
+        if (env.scenes.length === 0) { /* f2_harness_tmp 已在分支内删除 */ }
+        // 恢复原名（若走了覆盖分支）
+        if (out.updateMerge && env.scenes.length > 0) {
+            a.importScenes({ format: 'st-bgloader-scenes', version: 1, exportedAt: env.exportedAt, scenes: env.scenes });
+        }
+        out.count = Object.keys(a.getScenes()).length;
+        out.beforeCount = Object.keys(before).length;
+        return out;
+    });
+    step('F2 exportScenes 信封形状', f2.envelope === true);
+    step('F2 同 id 导入覆盖（updated≥1）', f2.updateMerge === true);
+    step('F2 新 id 导入新增（added=1）', f2.addMerge === true);
+    step('F2 非法信封拒绝且现状零改动', f2.rejectBad === true);
+    step('F2 字段白名单清洗 + 非法条目跳过', f2.sanitize === true);
+    step('F2 清理后场景数复原', f2.count === f2.beforeCount, `count=${f2.count} before=${f2.beforeCount}`);
+
     // 清理：恢复音量、移除探测 iframe
     await page.evaluate(() => {
         window.__apiProbeRestore?.();
