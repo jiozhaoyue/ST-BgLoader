@@ -268,6 +268,18 @@ export class AudioEngine {
         // A fresh playlist gets a full skip budget: an all-corrupt list may then burn through
         // exactly one pass before auto-skip stops (refilled only by tracks that really play).
         this.errorSkipBudget = Math.max(this.errorSkipBudget, this.playlist.length);
+        // Index normalization (a replaced playlist used to keep a raw numeric index: deleting
+        // a track shifted every later track down by one, so currentIndex silently pointed at
+        // a DIFFERENT song; a shorter list left it out of bounds with getCurrentTrack()=null).
+        // Keep pointing at the same song by id when it survives; otherwise reset to the head.
+        const current = this.getCurrentTrack();
+        const previousId = this.currentIndex >= 0 && current ? current.id : null;
+        if (previousId) {
+            const kept = this.playlist.findIndex(p => p.id === previousId);
+            this.currentIndex = kept !== -1 ? kept : (this.playlist.length > 0 ? 0 : -1);
+        } else if (this.currentIndex >= this.playlist.length) {
+            this.currentIndex = this.playlist.length > 0 ? 0 : -1;
+        }
         if (this.playlist.length > 0 && this.currentIndex === -1) {
             this.currentIndex = 0;
             if (autoPlay) {
@@ -428,6 +440,10 @@ export class AudioEngine {
             this.attachedVideo.volume = 0;
         }
 
+        // setTimeout-driven (16ms), NOT requestAnimationFrame: rAF stops entirely in a hidden
+        // tab, which left a fade-in/fade-out frozen mid-way and the element unpaused. Volume
+        // fades must complete even when the tab is hidden (the auto-advance scheduler relies
+        // on stopTrack's fade actually pausing the old track).
         const step = () => {
             const elapsed = performance.now() - startTime;
             const progress = Math.min(1, elapsed / durationMs);
@@ -441,13 +457,13 @@ export class AudioEngine {
             }
 
             if (progress < 1) {
-                this.fadeTimer = requestAnimationFrame(step);
+                this.fadeTimer = window.setTimeout(step, 16);
             } else {
                 this.applyVolume();
             }
         };
 
-        this.fadeTimer = requestAnimationFrame(step);
+        this.fadeTimer = window.setTimeout(step, 16);
     }
 
     public stopTrack(fadeOutMs: number = 300): void {
@@ -465,6 +481,7 @@ export class AudioEngine {
         const startVolume = this.audioElement.volume;
         const startTime = performance.now();
 
+        // setTimeout-driven, not rAF — see fadeInVolume for the hidden-tab rationale.
         const step = () => {
             const elapsed = performance.now() - startTime;
             const progress = Math.min(1, elapsed / fadeOutMs);
@@ -472,7 +489,7 @@ export class AudioEngine {
                 this.audioElement.volume = startVolume * (1 - progress);
             }
             if (progress < 1) {
-                this.fadeTimer = requestAnimationFrame(step);
+                this.fadeTimer = window.setTimeout(step, 16);
             } else {
                 if (this.audioElement) {
                     this.audioElement.pause();
@@ -483,7 +500,7 @@ export class AudioEngine {
         };
 
         this.clearFade();
-        this.fadeTimer = requestAnimationFrame(step);
+        this.fadeTimer = window.setTimeout(step, 16);
     }
 
     public handleVisibilityChange(hidden: boolean, pauseOnBlur: boolean): void {
@@ -524,7 +541,7 @@ export class AudioEngine {
 
     private clearFade(): void {
         if (this.fadeTimer !== null) {
-            cancelAnimationFrame(this.fadeTimer);
+            window.clearTimeout(this.fadeTimer);
             this.fadeTimer = null;
         }
     }

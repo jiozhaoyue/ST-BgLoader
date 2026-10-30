@@ -451,6 +451,16 @@ export class STBgLoaderExtension {
     }
 
     private async applyMedia(item: MediaItem, persist: boolean = true): Promise<void> {
+        // Audio is never a background: the mount path used to flip to an EMPTY opaque layer
+        // (target layer is cleaned before the type switch, and audio renders nothing into it),
+        // visually blanking the current background, and persisted the audio id in
+        // activeMediaId so every reload restored a blank stage. Audio routes to the same
+        // engine path PublicAPI.playBGM uses; the background stays untouched.
+        if (item.type === 'audio') {
+            await this.audioEngine.playMediaItem(item);
+            return;
+        }
+
         const previousActiveId = this.settings.activeMediaId;
         if (persist) {
             this.settings.activeMediaId = item.id;
