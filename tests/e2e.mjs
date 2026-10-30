@@ -385,13 +385,20 @@ async function runE2ETests() {
             ext.settings.capsuleOnPlayOnly = true;
             ext.miniPlayer.setCapsuleOnPlayOnly(true);
 
-            // Initially stopped: should be hidden
+            // Isolate from earlier tests: fake blob tracks left in the playlist keep the
+            // error-skip machinery cycling, which races the capsule visibility checks below.
+            ext.audioEngine.setPlaylist([]);
             ext.audioEngine.stopTrack(0);
+            ext.miniPlayer.hide();
+            // Settle: any play-state(false) listener armed a 1200ms hide timer — let it fire
+            // BEFORE the assertions instead of at a random point around them.
+            await new Promise(r => setTimeout(r, 1300));
             ext.miniPlayer.hide();
             const initiallyHidden = player ? player.classList.contains('hidden') : false;
 
             // Start playing: should auto-show
             await ext.publicApi.playBGM('blob:fake-capsule-track', { title: 'Capsule Ambient' });
+            await new Promise(r => setTimeout(r, 1300));
             ext.miniPlayer.show();
             const playingVisible = player ? player.classList.contains('visible') : false;
 
@@ -817,8 +824,63 @@ async function runE2ETests() {
         }
         console.log('✅ Test 24 Passed: Weather cycling API verified.');
 
+        // 25. Test v2 Endpoints: BGM Auto-Advance & Scene Export/Import (real-host roundtrip)
+        console.log('🧪 Test 25: Testing v2 endpoints (bgmAutoAdvance / exportScenes / importScenes)...');
+        const v2Result = await page.evaluate(() => {
+            const api = window.stBgLoader;
+            const out = {};
+
+            // F1: roundtrip + persistence into settings
+            api.setBgmAutoAdvance(true, 90, 200);
+            const aa = api.getBgmAutoAdvance();
+            out.aaRoundtrip = aa.enabled === true && aa.intervalSec === 90 && aa.fadeMs === 200
+                && api.getSettings().bgmAutoAdvance.intervalSec === 90;
+            api.setBgmAutoAdvance(false);
+            out.aaOff = api.getBgmAutoAdvance().enabled === false;
+
+            // F2: export envelope → rename → import updates → fresh id adds → bad envelope rejected
+            const env = api.exportScenes();
+            out.envelope = env.format === 'st-bgloader-scenes' && env.version === 1 && Array.isArray(env.scenes);
+            if (env.scenes.length === 0) {
+                api.saveCurrentScene('e2e_v2_tmp');
+            }
+            const env2 = api.exportScenes();
+            const target = env2.scenes[env2.scenes.length - 1];
+            const renamed = JSON.parse(JSON.stringify(env2));
+            renamed.scenes[renamed.scenes.length - 1].name = target.name + '_e2e';
+            const r1 = api.importScenes(renamed);
+            out.updateMerge = r1 && r1.updated >= 1;
+            const r2 = api.importScenes({ format: 'st-bgloader-scenes', version: 1, exportedAt: new Date().toISOString(), scenes: [{ id: 'e2e_v2_fresh', name: 'E2E 新场景', presetId: 'default' }] });
+            out.addMerge = r2 && r2.added === 1 && !!api.getScenes()['e2e_v2_fresh'];
+            out.rejectBad = api.importScenes({ format: 'nope' }) === null
+                && api.importScenes('junk') === null;
+            const dirty = { format: 'st-bgloader-scenes', version: 1, scenes: [{ id: 'e2e_v2_dirty', name: '脏', evil: 1, presetId: 'default' }, { bad: true }] };
+            const r3 = api.importScenes(dirty);
+            const dirtyScene = api.getScenes()['e2e_v2_dirty'];
+            out.sanitize = r3 && r3.added === 1 && r3.skipped === 1 && dirtyScene && !('evil' in dirtyScene);
+
+            // cleanup
+            api.deleteScene('e2e_v2_fresh');
+            api.deleteScene('e2e_v2_dirty');
+            if (env.scenes.length === 0) {
+                const tmp = api.exportScenes().scenes.find(s => s.name === 'e2e_v2_tmp');
+                if (tmp) api.deleteScene(tmp.id);
+            } else {
+                api.importScenes({ format: 'st-bgloader-scenes', version: 1, exportedAt: env.exportedAt, scenes: env.scenes });
+            }
+            out.cleaned = !api.getScenes()['e2e_v2_fresh'] && !api.getScenes()['e2e_v2_dirty'];
+            return out;
+        });
+        console.log('   v2 endpoints result:', v2Result);
+        if (!v2Result.aaRoundtrip || !v2Result.aaOff || !v2Result.envelope || !v2Result.updateMerge
+            || !v2Result.addMerge || !v2Result.rejectBad || !v2Result.sanitize || !v2Result.cleaned) {
+            console.error('❌ Test 25 Failed: v2 endpoint verification failed!', JSON.stringify(v2Result));
+            process.exit(1);
+        }
+        console.log('✅ Test 25 Passed: v2 endpoints (auto-advance + scene share) verified.');
+
         console.log('\n==========================================');
-        console.log('🎉 ALL 24 AUTOMATED E2E TESTS PASSED! 🎉');
+        console.log('🎉 ALL 25 AUTOMATED E2E TESTS PASSED! 🎉');
         console.log('==========================================\n');
 
     } catch (err) {
