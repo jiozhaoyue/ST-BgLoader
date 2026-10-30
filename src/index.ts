@@ -118,6 +118,8 @@ export class STBgLoaderExtension {
             // generator's own options are not written back — re-enabling deliberately stays
             // silent rather than startling the user with a sudden track.
             this.audioEngine.stopTrack(300);
+            // An off plugin must not keep rotating the playlist in the background either.
+            this.audioEngine.stopAutoAdvance();
             this.ambientSoundGenerator.setSound({ ...this.settings.ambientSound, type: 'off' });
         }
     }
@@ -538,6 +540,11 @@ export class STBgLoaderExtension {
         this.audioEngine.setMuted(this.settings.muted);
         this.audioEngine.setMuffled(this.settings.muffleBGM);
         this.audioEngine.setPlaybackMode(this.settings.playbackMode);
+        // F1: auto-advance follows the converged settings object (UI writes and remote
+        // convergence land here; PublicAPI additionally wires the engine directly for
+        // immediacy — both paths are idempotent).
+        const autoAdvance = this.settings.bgmAutoAdvance;
+        this.audioEngine.setAutoAdvance(autoAdvance.enabled, autoAdvance.intervalSec, autoAdvance.fadeMs);
         this.atmosphereFX.setWeather(this.settings.weather);
         this.audioVisualizer.setOptions(this.settings.visualizer);
         this.parallaxController.setOptions(this.settings.parallax);

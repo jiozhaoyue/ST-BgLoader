@@ -52,6 +52,8 @@ export const ENDPOINTS: readonly EndpointMeta[] = [
     { method: 'setMuted', category: 'audio', async: false },
     { method: 'setMuffled', category: 'audio', async: false },
     { method: 'getMuffled', category: 'audio', async: false },
+    { method: 'setBgmAutoAdvance', category: 'audio', async: false },
+    { method: 'getBgmAutoAdvance', category: 'audio', async: false },
     // --- effects ---
     { method: 'setFilters', category: 'effects', async: false },
     { method: 'applyPreset', category: 'effects', async: false },

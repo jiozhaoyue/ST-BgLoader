@@ -257,10 +257,104 @@ export class AudioEngine {
         if (this.audioElement) {
             this.audioElement.loop = mode === 'single';
         }
+        // 'single' means the user wants THIS track on repeat: drop the countdown now instead of
+        // letting it tick to a no-op. Switching back re-arms (next track start or, if playing,
+        // immediately below).
+        if (this.autoAdvanceTimer !== null) {
+            window.clearTimeout(this.autoAdvanceTimer);
+            this.autoAdvanceTimer = null;
+        }
+        if (mode !== 'single') {
+            this.armAutoAdvance();
+        }
     }
 
     public getPlaybackMode(): PlaybackMode {
         return this.playbackMode;
+    }
+
+    // --- BGM playlist auto-advance (F1) -----------------------------------------------
+    // One self-held setTimeout per countdown (never setInterval: a tick that lands while the
+    // previous switch is still settling must not stack). The countdown RESETS on every track
+    // start — manual switches included — so "switched by hand, jumped again 5s later" cannot
+    // happen. Guarded at tick time by isPlaying() / playlist length / playbackMode, so a
+    // stale timer that survived a pause simply does nothing.
+
+    private autoAdvanceTimer: number | null = null;
+    /** The fade-then-switch follow-up: armed by autoAdvanceTick, cancelled by any manual track start. */
+    private pendingAdvanceTimer: number | null = null;
+    private autoAdvanceConfig: { intervalSec: number; fadeMs: number } | null = null;
+
+    /** Enables/reconfigures the auto-advance countdown (values clamped to the setting's range). */
+    public setAutoAdvance(enabled: boolean, intervalSec: number = 300, fadeMs: number = 800): void {
+        if (!enabled) {
+            this.stopAutoAdvance();
+            return;
+        }
+        this.autoAdvanceConfig = {
+            intervalSec: Math.max(30, Math.min(3600, Math.floor(intervalSec))),
+            fadeMs: Math.max(0, Math.min(2000, Math.floor(fadeMs))),
+        };
+        this.armAutoAdvance();
+    }
+
+    public stopAutoAdvance(): void {
+        if (this.autoAdvanceTimer !== null) {
+            window.clearTimeout(this.autoAdvanceTimer);
+            this.autoAdvanceTimer = null;
+        }
+        if (this.pendingAdvanceTimer !== null) {
+            window.clearTimeout(this.pendingAdvanceTimer);
+            this.pendingAdvanceTimer = null;
+        }
+        this.autoAdvanceConfig = null;
+    }
+
+    /** True while a countdown is armed (UI status display / harness assertions). */
+    public isAutoAdvanceArmed(): boolean {
+        return this.autoAdvanceTimer !== null;
+    }
+
+    /** (Re)starts the countdown; a no-op unless enabled + playing + ≥2 tracks. */
+    private armAutoAdvance(): void {
+        if (this.autoAdvanceTimer !== null) {
+            window.clearTimeout(this.autoAdvanceTimer);
+            this.autoAdvanceTimer = null;
+        }
+        // A manual track start during the fade-out window cancels the scheduled auto switch:
+        // the user's pick already decided what plays next, and a stale follow-up would yank
+        // playback away from it a moment later.
+        if (this.pendingAdvanceTimer !== null) {
+            window.clearTimeout(this.pendingAdvanceTimer);
+            this.pendingAdvanceTimer = null;
+        }
+        const cfg = this.autoAdvanceConfig;
+        if (!cfg || this.playbackMode === 'single') return;
+        if (this.playlist.length < 2 || !this.isPlaying()) return;
+        this.autoAdvanceTimer = window.setTimeout(() => this.autoAdvanceTick(), cfg.intervalSec * 1000);
+    }
+
+    private autoAdvanceTick(): void {
+        this.autoAdvanceTimer = null;
+        const cfg = this.autoAdvanceConfig;
+        if (!cfg || this.playbackMode === 'single') return;
+        // State may have changed since arming (paused, list shrunk): re-evaluate, don't act.
+        if (this.playlist.length < 2 || !this.isPlaying()) return;
+        const fadeMs = cfg.fadeMs;
+        this.stopTrack(fadeMs);
+        // Wait out the fade-out BEFORE starting the next track (playTrack would clearFade and
+        // snap the volume back up mid-fade otherwise), then fade the new track in.
+        this.pendingAdvanceTimer = window.setTimeout(() => {
+            this.pendingAdvanceTimer = null;
+            if (!this.autoAdvanceConfig || this.playbackMode === 'single') return;
+            this.playNext()
+                .then(() => {
+                    if (fadeMs > 0) {
+                        this.fadeInVolume(this.volume, fadeMs);
+                    }
+                })
+                .catch((err) => console.error('[ST-BgLoader AudioEngine] Auto-advance failed:', err));
+        }, fadeMs + 30);
     }
 
     public setPlaylist(items: MediaItem[], autoPlay: boolean = false): void {
@@ -280,6 +374,9 @@ export class AudioEngine {
         } else if (this.currentIndex >= this.playlist.length) {
             this.currentIndex = this.playlist.length > 0 ? 0 : -1;
         }
+        // The countdown must re-evaluate against the NEW list: fewer than 2 tracks disarms it,
+        // and a longer list (re)arms it while playback continues.
+        this.armAutoAdvance();
         if (this.playlist.length > 0 && this.currentIndex === -1) {
             this.currentIndex = 0;
             if (autoPlay) {
@@ -333,6 +430,7 @@ export class AudioEngine {
                 await this.playCurrentTrack();
             } else {
                 await this.audioElement.play().catch(() => {});
+                this.armAutoAdvance();
             }
         } else {
             this.audioElement.pause();
@@ -417,10 +515,12 @@ export class AudioEngine {
                 new Promise((resolve) => {
                     settleTimer = window.setTimeout(resolve, PLAY_SETTLE_TIMEOUT_MS);
                 }),
-            ]).finally(() => {
-                // play() usually wins the race; without this the 10s bail-out timer would dangle.
-                window.clearTimeout(settleTimer);
-            });
+        ]).finally(() => {
+            // play() usually wins the race; without this the 10s bail-out timer would dangle.
+            window.clearTimeout(settleTimer);
+            // Every real track start (manual pick, skip, auto-advance) resets the countdown.
+            this.armAutoAdvance();
+        });
         } catch (err) {
             console.warn('[ST-BgLoader AudioEngine] Autoplay was prevented by browser policy:', err);
         }
@@ -518,6 +618,7 @@ export class AudioEngine {
             if (this.isPausedForBlur && this.audioElement) {
                 this.audioElement.play().catch(() => {});
                 this.isPausedForBlur = false;
+                this.armAutoAdvance();
             }
             if (this.attachedVideo) {
                 this.attachedVideo.play().catch(() => {});
@@ -548,6 +649,7 @@ export class AudioEngine {
 
     public destroy(): void {
         this.clearFade();
+        this.stopAutoAdvance();
         if (this.audioElement) {
             this.audioElement.pause();
             this.audioElement.src = '';

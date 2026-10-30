@@ -409,9 +409,16 @@ export class TopbarBackgroundDrawer {
                                 ${UIComponents.renderCheckbox({ id: 'st_audio_mute', label: '静音', checked: this.settings.muted })}
                                 ${UIComponents.renderCheckbox({ id: 'st_audio_muffle', label: '沉浸低通', checked: this.settings.muffleBGM })}
                                 ${UIComponents.renderCheckbox({ id: 'st_audio_blur', label: '后台暂停', checked: this.settings.pauseOnBlur })}
+                                ${UIComponents.renderCheckbox({ id: 'st_bgm_auto_advance', label: '自动轮播', checked: this.settings.bgmAutoAdvance.enabled })}
                                 ${UIComponents.renderCheckbox({ id: 'st_mini_player_toggle', label: '悬浮胶囊', checked: this.settings.showMiniPlayer })}
                                 ${UIComponents.renderCheckbox({ id: 'st_capsule_on_play', label: '播放时显示', checked: this.settings.capsuleOnPlayOnly, sub: true })}
                             </div>
+                            <div class="st-bgloader-preset-row" id="st_bgm_auto_advance_row" ${this.settings.bgmAutoAdvance.enabled ? '' : 'style="display:none;"'}>
+                                <label for="st_bgm_auto_advance_min">轮播间隔:</label>
+                                <input type="number" id="st_bgm_auto_advance_min" class="text_pole" min="1" max="60" step="1" value="${Math.max(1, Math.round(this.settings.bgmAutoAdvance.intervalSec / 60))}" />
+                                <label>分</label>
+                            </div>
+                            ${UIComponents.renderSlider({ id: 'st_bgm_auto_advance_fade', valId: 'st_bgm_auto_advance_fade_val', label: '轮播淡入淡出', min: 0, max: 2000, step: 100, value: this.settings.bgmAutoAdvance.fadeMs, unit: ' ms' })}
                         `,
                     })}
 
@@ -765,6 +772,26 @@ export class TopbarBackgroundDrawer {
             this.save();
         });
 
+        // BGM 自动轮播（F1）：开关控制间隔行的显隐；间隔以分钟输入、秒存储；淡入淡出走滑条。
+        const autoAdvanceCb = this.panel.querySelector('#st_bgm_auto_advance') as HTMLInputElement | null;
+        autoAdvanceCb?.addEventListener('change', () => {
+            this.settings.bgmAutoAdvance.enabled = autoAdvanceCb.checked;
+            const row = this.panel?.querySelector('#st_bgm_auto_advance_row') as HTMLElement | null;
+            if (row) row.style.display = autoAdvanceCb.checked ? '' : 'none';
+            this.save();
+        });
+        const autoAdvanceMin = this.panel.querySelector('#st_bgm_auto_advance_min') as HTMLInputElement | null;
+        autoAdvanceMin?.addEventListener('change', () => {
+            const minutes = Math.max(1, Math.min(60, Math.floor(Number(autoAdvanceMin.value) || 1)));
+            autoAdvanceMin.value = String(minutes);
+            this.settings.bgmAutoAdvance.intervalSec = minutes * 60;
+            this.save();
+        });
+        bindSlider('st_bgm_auto_advance_fade', 'st_bgm_auto_advance_fade_val', ' ms', (val) => {
+            this.settings.bgmAutoAdvance.fadeMs = val;
+            this.save();
+        });
+
         const blurCb = this.panel.querySelector('#st_audio_blur') as HTMLInputElement | null;
         blurCb?.addEventListener('change', () => {
             this.settings.pauseOnBlur = blurCb.checked;
@@ -918,6 +945,12 @@ export class TopbarBackgroundDrawer {
         setChecked('st_audio_mute', this.settings.muted);
         setChecked('st_audio_muffle', this.settings.muffleBGM);
         setChecked('st_audio_blur', this.settings.pauseOnBlur);
+        setChecked('st_bgm_auto_advance', this.settings.bgmAutoAdvance.enabled);
+        const autoAdvanceRow = this.panel.querySelector('#st_bgm_auto_advance_row') as HTMLElement | null;
+        if (autoAdvanceRow) autoAdvanceRow.style.display = this.settings.bgmAutoAdvance.enabled ? '' : 'none';
+        const autoAdvanceMin = this.panel.querySelector('#st_bgm_auto_advance_min') as HTMLInputElement | null;
+        if (autoAdvanceMin) autoAdvanceMin.value = String(Math.max(1, Math.round(this.settings.bgmAutoAdvance.intervalSec / 60)));
+        setVal('st_bgm_auto_advance_fade', 'st_bgm_auto_advance_fade_val', this.settings.bgmAutoAdvance.fadeMs, ' ms');
         setChecked('st_mini_player_toggle', this.settings.showMiniPlayer);
         setChecked('st_capsule_on_play', this.settings.capsuleOnPlayOnly);
 

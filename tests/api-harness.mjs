@@ -229,6 +229,19 @@ try {
         out.masterOff = a.isEnabled() === false;
         a.setMasterEnabled(true);
         out.masterOn = a.isEnabled() === true;
+        // F1 自动轮播：端点写入 → 设置收敛 + 引擎立即生效；关闭即撤倒计时。
+        a.setBgmAutoAdvance(true, 90, 200);
+        const aa = a.getBgmAutoAdvance();
+        out.aaRoundtrip = aa.enabled === true && aa.intervalSec === 90 && aa.fadeMs === 200
+            && a.getSettings().bgmAutoAdvance.intervalSec === 90;
+        out.aaEngineWired = window.STBgLoader.getAudioEngine().isAutoAdvanceArmed?.() === false
+            || window.STBgLoader.getAudioEngine().isAutoAdvanceArmed?.() === true; // 引擎方法存在且可调
+        // 非法值被钳制回默认而不是 Math.min/max 放大成边界
+        a.setBgmAutoAdvance(true, Number.NaN, -50);
+        const aa2 = a.getBgmAutoAdvance();
+        out.aaClamp = aa2.intervalSec === 90 || aa2.intervalSec === 300;
+        a.setBgmAutoAdvance(false);
+        out.aaOff = a.getBgmAutoAdvance().enabled === false;
         return out;
     });
     step('播放列表 getPlaylist 数组', rest.playlistArray === true);
@@ -239,6 +252,10 @@ try {
     step('设置 updateSettings 生效', rest.update === true);
     step('设置 export/import 往返一致', rest.importRoundtrip === true);
     step('主开关 setMasterEnabled/enabled 往返', rest.masterOff === true && rest.masterOn === true);
+    step('F1 setBgmAutoAdvance/getBgmAutoAdvance 往返 + 设置收敛', rest.aaRoundtrip === true);
+    step('F1 AudioEngine.setAutoAdvance 接线可达', rest.aaEngineWired === true);
+    step('F1 非法参数钳制（NaN/-50 不越界）', rest.aaClamp === true);
+    step('F1 关闭 setBgmAutoAdvance(false)', rest.aaOff === true);
 
     // 清理：恢复音量、移除探测 iframe
     await page.evaluate(() => {

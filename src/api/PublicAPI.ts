@@ -212,6 +212,34 @@ export class PublicAPI {
         return this.ext.getAudioEngine().getMuffled();
     }
 
+    /**
+     * BGM 播放列表自动轮播（F1）：enabled=false 关闭；未给的字段沿用当前值。
+     * 写设置走收敛路径（saveSettings + 子系统接线由 applySettingsToSubsystems 亦覆盖，
+     * 远端收敛与 UI 改动殊途同归），AudioEngine 立即生效。
+     */
+    public setBgmAutoAdvance(enabled: boolean, intervalSec?: number, fadeMs?: number): void {
+        const current = this.ext.getSettings().bgmAutoAdvance;
+        const next = {
+            enabled: !!enabled,
+            intervalSec: this._clampNum(intervalSec ?? current.intervalSec, 30, 3600, 300),
+            fadeMs: this._clampNum(fadeMs ?? current.fadeMs, 0, 2000, 800),
+        };
+        this.ext.getSettings().bgmAutoAdvance = next;
+        this.ext.getAudioEngine().setAutoAdvance(next.enabled, next.intervalSec, next.fadeMs);
+        this.ext.saveSettings();
+        this.emit('bgm-auto-advance-change', next);
+    }
+
+    public getBgmAutoAdvance(): { enabled: boolean; intervalSec: number; fadeMs: number } {
+        return { ...this.ext.getSettings().bgmAutoAdvance };
+    }
+
+    /** 数值钳制：非法输入（NaN/Infinity/越界）回落到默认值而不是被 Math.min/max 放大成边界。 */
+    private _clampNum(value: number, min: number, max: number, fallback: number): number {
+        if (typeof value !== 'number' || !Number.isFinite(value)) return fallback;
+        return Math.max(min, Math.min(max, Math.floor(value)));
+    }
+
     public setFilters(filters: Partial<VisualFilters>): void {
         const current = this.ext.getSettings().filters;
         const updated: VisualFilters = {

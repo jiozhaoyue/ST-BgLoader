@@ -177,6 +177,15 @@ export interface BgLoaderSettings {
     showMiniPlayer: boolean;
     capsuleOnPlayOnly: boolean;
     playbackMode: PlaybackMode;
+    /**
+     * BGM 播放列表自动轮播：intervalSec 到点后淡出当前曲并切下一曲（'single' 模式不轮播，
+     * 单曲循环的用户意图就是反复听这首）。列表 <2 首或未在播放时不计时。
+     */
+    bgmAutoAdvance: {
+        enabled: boolean;
+        intervalSec: number; // 30–3600
+        fadeMs: number;      // 0–2000，0 = 硬切
+    };
     cacheQuotaMB: number;
     lruAutoClean: boolean;
     /**
@@ -346,6 +355,7 @@ export const DEFAULT_SETTINGS: BgLoaderSettings = {
     showMiniPlayer: true,
     capsuleOnPlayOnly: true,
     playbackMode: 'loop',
+    bgmAutoAdvance: { enabled: false, intervalSec: 300, fadeMs: 800 },
     cacheQuotaMB: 1024,
     lruAutoClean: true,
     nativeTakeover: 'all',
