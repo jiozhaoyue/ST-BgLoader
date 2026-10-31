@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/frontend/index.md", "reason": "前端层规范索引：CSS 双前缀、UI 落点、宿主适配约束总览"}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "质量门禁与测试要求（npm test 门、CSS 门禁、有界等待）"}
+{"file": ".trellis/spec/frontend/state-management.md", "reason": "设置收敛路径与 DEFAULT_SETTINGS 合并纪律（F1 新字段必读）"}
+{"file": ".trellis/spec/frontend/public-endpoints.md", "reason": "对外端点契约：登记源零漂移与新增端点流程（F1/F2 必读）"}
