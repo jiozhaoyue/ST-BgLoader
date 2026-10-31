@@ -708,3 +708,40 @@ Added procedural WebAudio ambient soundscape synthesizer, frosted glass transpar
 ### Status
 
 [OK] **Completed**
+
+## Session 26: 夜间批：功能改进+F1自动轮播+F2场景分享+UI截图优化+4酒馆错峰测试
+<!-- trellis-session: v=2 fp=overnight-feature-ui-batch-20261031 -->
+
+**Date**: 2026-10-31
+**Task**: 10-31-overnight-feature-ui-batch（00:30 → 09:04）
+**Branch**: `master`
+
+### Summary
+
+从 zcode 会话 session_187ee27e3cc6a28d85453ddb8208d238 最后一长消息（10-28 01:24 交接报告）续接的新一轮夜间批。保活基建沿用上批（goal-continuation.mjs stdout continue 语义 + goal-state 状态门），按用户指令把轮询 hook 从 15 分钟改为 5 分钟纯「继续」。**巡检修复批（0a2e434）**：① applyMedia 音频分流（P2——音频经 MediaMount 挂载时目标层先清空再被切到全不透明，现有背景被空层盖掉且 audio id 写入 activeMediaId 导致刷新后空背景；改为与 playBGM 同路径直连 AudioEngine）；② AudioEngine.setPlaylist 索引规范化（列表替换曾保留裸数字索引，删曲后静默指向另一首歌/越界）；③ 淡入淡出 rAF→setTimeout(16ms)（隐藏页 rAF 停摆致淡出冻结不暂停）。**F1 BGM 自动轮播（24a048a）**：bgmAutoAdvance{enabled,intervalSec 30-3600,fadeMs 0-2000} 进 DEFAULT_SETTINGS+mergeSettings；AudioEngine 自持 setTimeout 倒计时（手动切歌重置、淡出完成后才切曲、淡出窗口内手动切歌取消待切、单曲循环不轮播、主开关同停）；PublicAPI setBgmAutoAdvance/getBgmAutoAdvance（58→60 端点）非法值钳制回落；抽屉音乐区开关+间隔+淡入淡出滑条+远端收敛回填。**F2 场景导出/导入（a4748a4）**：exportScenes/importScenes（60→62 端点）——st-bgloader-scenes 信封、语义合并（同 id 覆盖其余不动）、逐场景字段白名单清洗（未知字段丢弃/形状非法跳过）、非法信封整体拒绝零改动；抽屉场景区导出/导入按钮。**UI 截图优化批（9586a33）**：tests/screenshot-night.mjs 九视角截图驱动——卡片模板类 card-info/card-name/card-meta/card-icon 补齐 CSS（名称裸叠亮图不可读→磨砂信息条+ellipsis+激活强调）、卡片内徽标 absolute 压名→作用域覆写 static、slider/preset 行 label 定宽压 CJK 竖排→auto+nowrap、btn-row 导出/导入失衡→label 纳入 flex:1、dev 预览台补 vendored FontAwesome（外链 CDN 会挂住 dev-harness 的 networkidle）。**F1 真机轮转验证（7df9092）**：页内生成 60s 可播 WAV 使轮播成为观察窗唯一切换源（0.3s 短曲会被 ended 循环淹没——33s 内 97 次 track-change 全是既有 loop 行为；fake blob 会触发错误跳轨）。**e2e 增补（ff6b823）**：Test 25 v2 端点真机往返 + Test 12 去竞态（隔离播放列表+沉降 1200ms 隐藏定时器）。**文档（5f06183/303b1bf）**：4 新端点入 wiki/事件表 29/设置表/spec 登记源 62；新增 spec/ops/instance-test-ops.md 运维契约页（chdir 启动/子进程树清理/third-party 扫描语义/被测物身份核验）。**4 酒馆错峰测试**：8001 Dev ST 全量矩阵（e2e 25/25+stress 4/4+smoke 11/11+authority 18/18+extreme-media 14/14 清理零残留）、8003 Dev Luker e2e 25/25（补上批 SKIP 的 Luker 侧）、8002/8004 Real 只读探活零写操作，全部实例停回离线原状。**运维事故三连（已沉淀 spec）**：① ST 以 ./config.yaml 相对 cwd 解析，裸绝对路径启动在仓根创建默认配置（已删，改 chdir+file:// URL 启动式）；② TaskStop 不收割宿主子进程树且可延迟重绑端口（三次按端口 PID 清杀）；③ Dev ST 扩展为 10-26 陈旧平拷贝→改 junction 后，改名留原地的 stale 拷贝被 third-party 扫描当第二扩展加载（双 fx 画布→Test 15 假失败）→移出发现路径至 _stale-extensions-backup。**重要教训**：junction 修复前的"全绿矩阵"实际跑在陈旧扩展上——被测物身份核验（grep 新增符号）后才复跑才算数。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `0a2e434` | fix(core+audio): 巡检修复批——音频误当背景挂载清空舞台/播放列表索引漂移/隐藏页淡出冻结 |
+| `24a048a` | feat(bgm): F1 播放列表自动轮播——可配置间隔/淡入淡出，走收敛路径 + 2 个新端点 |
+| `a4748a4` | feat(scenes): F2 场景快照导出/导入——可分享 JSON + 语义合并 + 字段白名单清洗 |
+| `9586a33` | style(ui): 截图驱动优化批——卡片信息条样式补齐/标签不换行/按钮均衡 + 预览台 vendored FontAwesome |
+| `5f06183` | docs: F1/F2 契约同步——4 新端点入 API 参考/事件表 29/设置表/spec 登记源 62 |
+| `7df9092` | test(f1): 自动轮播一次性真机验证——30s 最小间隔完整轮转可观测 |
+| `ff6b823` | test(e2e): Test 25 v2 端点真机往返 + Test 12 去竞态加固 |
+| `303b1bf` | docs(spec): 实例测试运维契约——chdir 启动/子进程树清理/third-party 扫描语义/被测物身份核验 |
+
+### Verification
+
+- [OK] 静态门：type-check / build（242.38 kB）/ check:css 全绿
+- [OK] 免实例套件：dev-harness 14/14 + api-harness 38/38（F1×4 + F2×6 新断言）
+- [OK] 真机当前代码：8001 e2e 25/25 + stress 4/4 + smoke 11/11 + authority 18/18（S7.3 紧随 extreme-media 的负载抖动，独立复跑过）+ extreme-media 14/14（零残留）；8003 e2e 25/25
+- [OK] F1 轮转真机验证：30s 间隔完整轮转（恰一次 track-change、曲目 1→2、再布防）
+- [OK] 4 酒馆错峰：8001/8003 Dev 全量；8002/8004 Real 只读探活（HTTP 200）零写操作；全部实例停回离线原状
+- [OK] 提交显式 pathspec、暂存区校验、逐提交推送 origin master（8 提交 0a2e434→303b1bf 全部同步）
+
+### Status
+
+[OK] **Completed**
