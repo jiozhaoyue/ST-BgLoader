@@ -26,3 +26,9 @@ dev/.data/
 
 # ZCode 会话运行时状态（不tracked）
 .zcode/goal-state.json
+
+# P0 整改（2026-11-19 审计）：防再发泄露
+.agents/mcp_config.json
+data/
+*.bak
+.zcode/config.json.bak-*

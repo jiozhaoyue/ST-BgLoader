@@ -78,7 +78,7 @@ ST-BgLoader 针对四大主流酒馆平台进行了深度环境感知与统一�
 | **PureTavern** | `window.__PURE_TAVERN__` | `#backgrounds-drawer-toggle` | `#bg_menu_content` / 抽屉 | 纯前端/远程后端解耦 |
 | **TauriTavern** | `window.Tauri` / `__TAURI__` | 原生顶栏选择器 | 原生容器选择器 | 原生应用安全沙箱环境 |
 
-所有宿主探测与适配逻辑均完全收敛在 [`src/bridge/HostBridge.ts`](file:///d:/Repo/Tavern-repo/My-repo/ST-BgLoader/src/bridge/HostBridge.ts) 模块内，杜绝在业务代码中散落 `if (isLuker)` 类的脏逻辑。
+所有宿主探测与适配逻辑均完全收敛在 [`src/bridge/HostBridge.ts`](<实例目录>/src/bridge/HostBridge.ts) 模块内，杜绝在业务代码中散落 `if (isLuker)` 类的脏逻辑。
 
 ---
 

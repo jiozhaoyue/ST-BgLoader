@@ -1,7 +1,7 @@
 # 设置项参考指南 (Settings Reference)
 
 > 本文档为 ST-BgLoader 全部设置项的权威真源对照表。
-> 代码定义见 [`src/types/index.ts`](file:///d:/Repo/Tavern-repo/My-repo/ST-BgLoader/src/types/index.ts)。
+> 代码定义见 [`src/types/index.ts`](<实例目录>/src/types/index.ts)。
 
 ---
 
