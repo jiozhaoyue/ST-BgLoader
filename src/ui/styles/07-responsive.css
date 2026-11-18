@@ -1,0 +1,65 @@
+/* =========================================================================
+   07-responsive — 移动端基线（本轮必须，问答定案）
+   断点与宿主官方一致：mobile-styles.css 主断点 1000px、小屏 450px（Luker 同款）。
+   桌面窄窗走同一套纯宽度断点（无 UA 嗅探，问答定案「同断点同步」）。
+   窄屏形态：随宿主抽屉全屏接管（宿主已把 .drawer-content 置 100dvw），
+   本面板只需放开自身高度上限并收敛滚动。
+   ========================================================================= */
+
+@media screen and (max-width: 1000px) {
+    .st-bgloader-topbar-panel {
+        min-height: 320px;
+        max-height: none;
+    }
+
+    .st-bgloader-media-grid {
+        max-height: 40vh;
+    }
+
+    .st-bgloader-topbar-header {
+        padding: 6px 8px;
+        gap: 6px;
+    }
+}
+
+@media screen and (max-width: 450px) {
+    .st-bgloader-media-grid {
+        grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+        gap: 6px;
+    }
+
+    .st-bgloader-seg {
+        flex-wrap: wrap;
+    }
+
+    .st-bgloader-media-card {
+        /* 96px 列 16:9 实际高约 54px，92px 占位会引起滚动跳动（红队 P1-3） */
+        contain-intrinsic-size: auto 54px;
+    }
+}
+
+/* -------------------------------------------------------------------------
+   抽屉滚动约束（Vercel Web Interface Guidelines：modals/drawers 显式设置
+   overscroll-behavior: contain，防滚动链穿透宿主页面）
+   选择器清单：顶栏主体 .st-bgloader-topbar-body / 媒体网格 .st-bgloader-media-grid /
+   触发器列表 .st-bgloader-trigger-list
+   ------------------------------------------------------------------------- */
+.st-bgloader-topbar-body,
+.st-bgloader-media-grid,
+.st-bgloader-trigger-list {
+    overscroll-behavior: contain;
+}
+
+/* -------------------------------------------------------------------------
+   动效降级：系统开启「减弱动态效果」时移除我们的过渡（不动宿主动画）
+   ------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+    .st-bgloader-media-card,
+    .st-bgloader-tab-btn,
+    .st-bgloader-seg-btn,
+    .st-bg-mini-player,
+    .st-bgloader-group-chevron,
+    .st-bgloader-dropzone {
+        transition: none;
+    }
+}

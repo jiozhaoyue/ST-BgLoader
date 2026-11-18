@@ -1,0 +1,82 @@
+/* =========================================================================
+   05-miniplayer — 悬浮播放胶囊
+   The capsule keeps its own dark-glass look on every theme
+   (theme-neutral by design): fixed dark rgba backdrop with light text is intentional.
+   No box-shadow at all (user decision, 2026-09-26): the boundary is carried entirely by
+   the border, whose contrast is raised to compensate for the removed elevation shadow.
+   z-index 走分档变量 --st-z-float（00-tokens），不再硬编码。
+   ========================================================================= */
+
+.st-bg-mini-player {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: var(--st-z-float);
+    user-select: none;
+    pointer-events: auto;
+    transition: opacity 0.35s ease, transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.st-bg-mini-player.hidden {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(12px) scale(0.96);
+}
+
+.st-bg-mini-player.visible {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0) scale(1);
+}
+
+.st-bg-mini-capsule {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    border-radius: 24px;
+    background: rgba(20, 20, 28, 0.75);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    color: #fff;
+    font-size: 0.85em;
+    transition: border-color 0.2s;
+}
+
+.st-bg-mini-capsule:hover {
+    border-color: rgba(255, 255, 255, 0.45);
+}
+
+.st-bg-mini-btn {
+    background: none;
+    border: none;
+    color: #ddd;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.15s;
+    min-width: var(--st-touch-min);
+    min-height: var(--st-touch-min);
+}
+
+.st-bg-mini-btn:hover {
+    color: var(--st-bg-accent);
+}
+
+.st-bg-mini-play {
+    font-size: 1.1em;
+    color: #fff;
+}
+
+.st-bg-mini-track {
+    max-width: 140px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-weight: 500;
+    opacity: 0.9;
+}

@@ -1,0 +1,166 @@
+/* =========================================================================
+   02-topbar-drawer — 顶栏抽屉增强面板骨架（#Backgrounds 内）
+   增强式内嵌（问答定案 2026-11-19）：原生抽屉内容完全保留可见可用，
+   本面板挂载其后，底色透明融入宿主抽屉，不再替换式遮盖。
+   ========================================================================= */
+
+.st-bgloader-topbar-panel {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 420px;
+    max-height: 85vh;
+    color: var(--st-bg-text);
+    /* 透明融入：面板嵌在宿主原生抽屉内，底色交还宿主（增强式内嵌定案）。
+       分区靠边框与轻表面层，不靠整块深底。 */
+    background: transparent;
+    border-radius: 6px;
+    box-sizing: border-box;
+}
+
+.st-bgloader-topbar-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--st-bg-border);
+    /* 顶栏薄纱：黑-alpha 中性层保证快捷钮在任意亮图上可读 */
+    background: rgba(0, 0, 0, 0.25);
+    position: sticky;
+    top: 0;
+    z-index: var(--st-z-header);
+}
+
+.st-bgloader-tab-bar {
+    display: flex;
+    gap: 6px;
+}
+
+.st-bgloader-tab-btn {
+    cursor: pointer;
+    border: 1px solid var(--st-bg-border);
+    background: rgba(0, 0, 0, 0.25);
+    color: var(--st-bg-text);
+    padding: 5px 12px;
+    border-radius: 4px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.9em;
+    min-height: var(--st-touch-min);
+    transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.st-bgloader-tab-btn:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.st-bgloader-tab-btn.active {
+    border-color: var(--st-bg-accent);
+    background: color-mix(in srgb, var(--st-bg-accent) 22%, rgba(0, 0, 0, 0.4));
+    color: var(--st-bg-accent);
+    font-weight: 600;
+}
+
+.st-bgloader-topbar-actions {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+}
+
+.st-bgloader-topbar-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 6px;
+}
+
+.st-bgloader-tab-content {
+    display: none;
+}
+
+.st-bgloader-tab-content.active {
+    display: block;
+}
+
+.st-bgloader-toolbar-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    align-items: center;
+    margin-bottom: 6px;
+}
+
+.st-bgloader-search-wrap {
+    flex: 1 1 auto;
+    min-width: 120px;
+}
+
+.st-bgloader-search-wrap input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 4px 8px;
+    font-size: 0.9em;
+}
+
+.st-bgloader-toolbar-row select {
+    flex: 0 0 76px;
+    width: 76px;
+    padding: 4px 4px;
+    font-size: 0.9em;
+    border-radius: 4px;
+    border: 1px solid var(--st-bg-border);
+    background: rgba(0, 0, 0, 0.25);
+    color: var(--st-bg-text);
+}
+
+.st-bgloader-upload-box {
+    margin-bottom: 6px;
+    padding: 6px;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid var(--st-bg-border);
+    border-radius: 4px;
+}
+
+/* 顶栏场景快切下拉（定案：三快捷+场景下拉入顶栏） */
+.st-bgloader-scene-quick {
+    max-width: 140px;
+    min-width: 90px;
+    padding: 4px 6px;
+    font-size: 0.9em;
+    border-radius: 4px;
+    border: 1px solid var(--st-bg-border);
+    background: rgba(0, 0, 0, 0.25);
+    color: var(--st-bg-text);
+    min-height: var(--st-touch-min);
+}
+
+/* 媒体 Tab 场景管理条（定案：场景入媒体 Tab） */
+.st-bgloader-scene-bar {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    flex: 1;
+    min-width: 0;
+}
+
+.st-bgloader-scene-bar select {
+    flex: 1;
+    min-width: 0;
+    padding: 4px 8px;
+    border-radius: 4px;
+    border: 1px solid var(--st-bg-border);
+    background: rgba(0, 0, 0, 0.25);
+    color: var(--st-bg-text);
+    font-size: 0.9em;
+    min-height: var(--st-touch-min);
+}
+
+/* 顶层图标快捷钮触摸目标 ≥36px（规范复检 P2 定案覆盖） */
+.st-bgloader-topbar-actions .menu_button,
+.st-bgloader-scene-bar .menu_button,
+.st-bgloader-toolbar-row .menu_button {
+    min-height: var(--st-touch-min);
+    min-width: var(--st-touch-min);
+}

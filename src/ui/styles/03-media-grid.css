@@ -1,0 +1,251 @@
+/* =========================================================================
+   03-media-grid — 媒体库网格与卡片（悬停信息条 + 懒挂载 + 多选）
+   ========================================================================= */
+
+.st-bgloader-media-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 10px;
+    max-height: 280px;
+    overflow-y: auto;
+    padding: 5px;
+}
+
+.st-bgloader-media-card {
+    position: relative;
+    border-radius: 6px;
+    overflow: hidden;
+    background: var(--st-bg-surface);
+    border: 1px solid var(--st-bg-border);
+    cursor: pointer;
+    aspect-ratio: 16 / 9;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    transition: border-color 0.15s;
+    /* 窗口化（定案：懒加载+窗口化）：离屏卡片跳过渲染（web.dev 实测 7x），
+       auto 保留可访问性树；intrinsic-size 以 16:9 卡在 130px 列宽下的高约 92px 占位。 */
+    content-visibility: auto;
+    contain-intrinsic-size: auto 92px;
+}
+
+.st-bgloader-media-card:hover {
+    border-color: var(--st-bg-accent);
+}
+
+/* Selection is expressed with a border + a tinted fill + an accented title, never a glow:
+   native ST thumbnails mark the selected background the same way (border/overlay), and a
+   glow reads as a non-native button effect. The fixed-rgba line is the color-mix fallback. */
+.st-bgloader-media-card.active {
+    border: 2px solid var(--st-bg-accent);
+    background: rgba(79, 163, 209, 0.18);
+    background: color-mix(in srgb, var(--st-bg-accent) 18%, var(--st-bg-surface));
+}
+
+/* The title bar keeps its fixed dark backdrop, so an accent-colored label stays readable on
+   both light and dark themes without hardcoding a foreground color. */
+.st-bgloader-media-card.active .st-bgloader-media-card-title {
+    color: var(--st-bg-accent);
+    font-weight: 600;
+}
+
+.st-bgloader-media-badge {
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    font-size: 0.7em;
+    font-weight: bold;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.7);
+    color: #fff;
+    text-transform: uppercase;
+}
+
+/* Media-type badge colors come from the semantic exception tokens (00-tokens):
+   they encode meaning and must not drift with the theme. */
+.st-bgloader-media-badge.video { background: var(--st-bg-badge-video); }
+.st-bgloader-media-badge.audio { background: var(--st-bg-badge-audio); }
+.st-bgloader-media-badge.html { background: var(--st-bg-badge-html); }
+.st-bgloader-media-badge.svg { background: var(--st-bg-badge-svg); }
+.st-bgloader-media-badge.image { background: var(--st-bg-badge-image); }
+
+.st-bgloader-media-card-title {
+    font-size: 0.75em;
+    padding: 4px 6px;
+    background: rgba(0, 0, 0, 0.75);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* 删除钮：悬停显现（问答定案），触摸目标 ≥36px（--st-touch-min）。
+   警示色为语义例外（--st-bg-warn），不随主题。 */
+.st-bgloader-media-delete {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: var(--st-touch-min);
+    height: var(--st-touch-min);
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.6);
+    color: var(--st-bg-warn);
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    opacity: 0;
+    transition: opacity 0.15s;
+}
+
+.st-bgloader-media-card:hover .st-bgloader-media-delete,
+.st-bgloader-media-card:focus-within .st-bgloader-media-delete {
+    opacity: 1;
+}
+
+/* Full-bleed preview layer inside a media card (image sources set the background inline;
+   video sources get a first-frame thumbnail painted in asynchronously). */
+.st-bgloader-card-img {
+    position: absolute;
+    inset: 0;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+}
+
+/* Placeholder tint shown while a video thumbnail is being generated (or when it failed). */
+.st-bgloader-card-img-pending {
+    background: rgba(0, 0, 0, 0.35);
+}
+
+/* 卡片底部信息条（card-info/name/meta）与文件型占位图标（card-icon）：
+   深色底与 .st-bgloader-media-card-title 同款（黑-alpha 磨砂层，主题中性）。 */
+.st-bgloader-card-info {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    padding: 4px 6px;
+    background: rgba(0, 0, 0, 0.75);
+}
+
+.st-bgloader-card-name {
+    font-size: 0.75em;
+    color: var(--st-bg-text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.st-bgloader-media-card.active .st-bgloader-card-name {
+    color: var(--st-bg-accent);
+    font-weight: 600;
+}
+
+.st-bgloader-card-meta {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.65em;
+    min-width: 0;
+}
+
+/* 卡片内的类型徽标复用了宿主网格的 .st-bg-native-badge（absolute 左上角定位）；
+   在信息条里必须回到常规流，否则它压在名称行上。 */
+.st-bgloader-media-card .st-bg-native-badge {
+    position: static;
+    pointer-events: auto;
+}
+
+.st-bgloader-card-icon {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--st-bg-text);
+    opacity: 0.75;
+}
+
+.st-bgloader-active-tag {
+    font-size: 0.8em;
+    color: var(--st-bg-status-ok);
+    font-weight: 600;
+}
+
+.st-bgloader-card-actions {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+}
+
+/* Centred empty-state placeholder spanning the whole media grid */
+.st-bgloader-empty-grid {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 20px;
+    opacity: 0.6;
+}
+
+.st-bgloader-empty-state {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 14px 6px;
+    color: var(--st-bg-text);
+    opacity: 0.7;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+}
+
+.st-bgloader-grid-loading {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 12px;
+    opacity: 0.7;
+}
+
+/* -------------------------------------------------------------------------
+   多选模式（批量删/批量换，问答定案）：选中卡用 accent 边框 + 对勾角标
+   ------------------------------------------------------------------------- */
+.st-bgloader-media-card.selected {
+    border: 2px solid var(--st-bg-accent);
+    outline: 1px dashed var(--st-bg-accent);
+    outline-offset: 2px;
+}
+
+.st-bgloader-select-mark {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--st-bg-accent);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    z-index: var(--st-z-badge);
+}
+
+.st-bgloader-multiselect-bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 8px;
+    margin-bottom: 6px;
+    border: 1px solid var(--st-bg-accent);
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--st-bg-accent) 10%, rgba(0, 0, 0, 0.2));
+}
+
+/* display:flex 会压过 [hidden] 的 UA 默认值——显式补一条，否则隐藏态失效 */
+.st-bgloader-multiselect-bar[hidden] {
+    display: none;
+}

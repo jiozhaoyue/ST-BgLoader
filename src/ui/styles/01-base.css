@@ -1,0 +1,435 @@
+/* =========================================================================
+   01-base — 面板底座 + 通用组件（行式布局 / 折叠组 / 分段胶囊 / 工具行）
+   ========================================================================= */
+
+/* Panel body spacing lives on the host's own .inline-drawer-content, which the host's
+   delegated handler animates with jQuery slideToggle(). Two consequences:
+     1. We must NOT set `display` on that element — the host's slideToggle() reads it to
+        decide the direction, so an extension-written `display` inverts the animation and
+        makes the drawer un-collapsible.
+     2. `flex` + `gap` are therefore unavailable; block-level children plus margin-bottom
+        give the same single-column spacing without touching any animated property. */
+.st-bgloader-panel .inline-drawer-content {
+    padding-top: 4px;
+}
+
+.st-bgloader-panel .inline-drawer-content > .st-bgloader-section {
+    margin-bottom: 6px;
+}
+
+.st-bgloader-panel .inline-drawer-content > .st-bgloader-section:last-child {
+    margin-bottom: 0;
+}
+
+.st-bgloader-section {
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid var(--st-bg-border);
+    border-radius: 6px;
+    padding: 6px 8px;
+    margin-bottom: 6px;
+}
+
+.st-bgloader-section h4 {
+    margin: 0 0 4px 0;
+    font-size: 0.95em;
+    font-weight: 600;
+    color: var(--st-bg-accent);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* Upload & URL Import Area */
+.st-bgloader-dropzone {
+    border: 2px dashed var(--st-bg-border);
+    border-radius: 4px;
+    padding: 10px;
+    text-align: center;
+    cursor: pointer;
+    background: rgba(255, 255, 255, 0.03);
+    transition: all 0.2s ease;
+}
+
+.st-bgloader-dropzone:hover, .st-bgloader-dropzone.dragover {
+    border-color: var(--st-bg-accent);
+    background: rgba(255, 255, 255, 0.08);
+}
+
+/* Import in progress (large upload / slow external URL) */
+.st-bgloader-dropzone.busy {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.st-bgloader-url-import {
+    display: flex;
+    gap: 4px;
+    margin-top: 6px;
+}
+
+.st-bgloader-url-import input {
+    flex: 1;
+    padding: 4px 8px;
+    border-radius: 4px;
+    border: 1px solid var(--st-bg-border);
+    background: rgba(0, 0, 0, 0.3);
+    color: inherit;
+    font-size: 0.9em;
+}
+
+/* Slider rows */
+.st-bgloader-slider-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 4px;
+    gap: 6px;
+}
+
+.st-bgloader-slider-row label {
+    /* auto-width + nowrap: a fixed 65px box wrapped longer CJK labels ("轮播淡入淡出")
+       into a cramped vertical stub next to the slider. */
+    flex: 0 0 auto;
+    min-width: 65px;
+    white-space: nowrap;
+    font-size: 0.85em;
+}
+
+.st-bgloader-slider-row input[type="range"] {
+    flex: 1;
+    accent-color: var(--st-bg-accent);
+}
+
+.st-bgloader-slider-val {
+    flex: 0 0 45px;
+    text-align: right;
+    font-family: monospace;
+}
+
+/* Preset & Dropdown Controls */
+.st-bgloader-preset-row {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 4px;
+    align-items: center;
+}
+
+.st-bgloader-preset-row select, .st-bgloader-preset-row input[type="text"] {
+    flex: 1;
+    padding: 4px 8px;
+    border-radius: 4px;
+    border: 1px solid var(--st-bg-border);
+    background: rgba(0, 0, 0, 0.3);
+    color: inherit;
+    font-size: 0.9em;
+}
+
+/* Preset/scene control row labels — auto-width + nowrap for the same reason as the
+   slider rows above ("轮播间隔:" used to wrap inside a fixed 50px box). */
+.st-bgloader-preset-row > label {
+    font-size: 0.85em;
+    flex: 0 0 auto;
+    white-space: nowrap;
+}
+
+.st-bgloader-preset-row > label.st-bgloader-label-sm {
+    flex: 0 0 45px;
+}
+
+.st-bgloader-preset-row > label.st-bgloader-label-md {
+    flex: 0 0 50px;
+}
+
+/* -------------------------------------------------------------------------
+   行式布局行（renderRow）——业界设置面板通用范式：标题左 + 控件右
+   ------------------------------------------------------------------------- */
+.st-bgloader-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    margin-bottom: 4px;
+    min-height: var(--st-touch-min);
+}
+
+.st-bgloader-row > label {
+    flex: 0 0 auto;
+    white-space: nowrap;
+    font-size: 0.85em;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.st-bgloader-row-control {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 4px;
+    min-width: 0;
+}
+
+/* -------------------------------------------------------------------------
+   折叠组（renderGroup）——自由折叠 + 开闭状态记忆（localStorage，视图态不进 settings）
+   不写宿主管辖的 display/height；自绘组用 hidden 属性切换内容层。
+   ------------------------------------------------------------------------- */
+.st-bgloader-group {
+    border: 1px solid var(--st-bg-border);
+    border-radius: 6px;
+    background: rgba(0, 0, 0, 0.2);
+    margin-bottom: 6px;
+}
+
+.st-bgloader-group-head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 8px;
+    cursor: pointer;
+    user-select: none;
+    min-height: var(--st-touch-min);
+}
+
+.st-bgloader-group-title {
+    color: var(--st-bg-accent);
+    font-weight: 600;
+    font-size: 0.95em;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 1;
+    min-width: 0;
+}
+
+.st-bgloader-group-actions {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+}
+
+.st-bgloader-group-chevron {
+    transition: transform 0.15s ease;
+    color: var(--st-bg-accent);
+}
+
+/* 宿主图标约定：up = 展开，down = 折叠（fa-circle-chevron-up/down 成对）；
+   自绘组用旋转表达同一语义，展开时箭头朝上。 */
+.st-bgloader-group[data-open="true"] .st-bgloader-group-chevron {
+    transform: rotate(180deg);
+}
+
+.st-bgloader-group-body {
+    padding: 0 8px 6px;
+}
+
+.st-bgloader-group-body[hidden] {
+    display: none;
+}
+
+/* 组内子区块标题（如「画面」组内的 滤镜/毛玻璃/转场）：accent 小标 + 上分隔线，
+   分隔走 border（项目 spec：Elevation=border），不引入阴影。 */
+.st-bgloader-group-subtitle {
+    margin: 6px 0 4px;
+    font-size: 0.85em;
+    font-weight: 600;
+    color: var(--st-bg-accent);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.st-bgloader-group-subtitle:not(:first-child) {
+    border-top: 1px solid var(--st-bg-border);
+    padding-top: 6px;
+    margin-top: 8px;
+}
+
+/* -------------------------------------------------------------------------
+   分段胶囊（renderSegmented）——单选类型过滤
+   ------------------------------------------------------------------------- */
+.st-bgloader-seg {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+}
+
+.st-bgloader-seg-btn {
+    cursor: pointer;
+    border: 1px solid var(--st-bg-border);
+    background: rgba(0, 0, 0, 0.25);
+    color: var(--st-bg-text);
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 0.85em;
+    min-height: var(--st-touch-min);
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+    transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.st-bgloader-seg-btn:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.st-bgloader-seg-btn.active {
+    border-color: var(--st-bg-accent);
+    background: color-mix(in srgb, var(--st-bg-accent) 22%, rgba(0, 0, 0, 0.4));
+    color: var(--st-bg-accent);
+    font-weight: 600;
+}
+
+/* -------------------------------------------------------------------------
+   键盘可达性：统一 focus 可见环（a11y 定案：focus-visible 全局）
+   ------------------------------------------------------------------------- */
+.st-bgloader-panel :focus-visible,
+.st-bg-mini-player :focus-visible,
+.st-bgloader-group-head:focus-visible {
+    outline: 2px solid var(--st-bg-accent);
+    outline-offset: 1px;
+}
+
+/* ---------------------------------------------------------------------------
+   Layout utilities
+   ---------------------------------------------------------------------------
+   These exist so SettingsDrawer's template does not carry structural inline
+   styles (P3-10). Inline styles are reserved for *dynamic values* the template
+   must interpolate (slider values, `selected`, `checked`) and for the two
+   elements JS toggles at runtime (`#st_trigger_form`, `#st_bgloader_grid` empty
+   states) — everything structural lives here instead.
+   --------------------------------------------------------------------------- */
+
+/* Vertical stack of checkbox/toggle rows */
+.st-bgloader-check-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 4px;
+}
+
+/* One checkbox + label row */
+.st-bgloader-check {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    font-size: 0.88em;
+    min-height: var(--st-touch-min);
+}
+
+/* A nested/indented option belonging to the check above it */
+.st-bgloader-check-sub {
+    margin-left: 14px;
+    font-size: 0.85em;
+    opacity: 0.85;
+}
+
+/* Inline checkbox row with a slight top offset (cloud / agent tools area) */
+.st-bgloader-check-inline {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.85em;
+    margin-top: 4px;
+}
+
+/* A check row that leads a group of controls */
+.st-bgloader-check-lead {
+    margin-bottom: 4px;
+}
+
+/* Section-internal separator */
+.st-bgloader-divider {
+    margin-top: 4px;
+    border-top: 1px solid var(--st-bg-border);
+    padding-top: 4px;
+}
+
+/* Small top gaps */
+.st-bgloader-gap-top {
+    margin-top: 4px;
+}
+
+.st-bgloader-gap-top-md {
+    margin-top: 4px;
+}
+
+/* Full-width button */
+.st-bgloader-btn-full {
+    width: 100%;
+}
+
+/* Label-left / value-right row (cache usage) */
+.st-bgloader-row-between {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+/* Multi-line status text (storage / Authority panel) */
+.st-bgloader-status-text {
+    font-size: 0.9em;
+    line-height: 1.6;
+}
+
+/* Status colours are semantic and must read identically on every theme, so they
+   are fixed values declared once (00-tokens) rather than following the theme. */
+.st-bgloader-status-ok {
+    color: var(--st-bg-status-ok);
+}
+
+.st-bgloader-status-warn {
+    color: var(--st-bg-status-warn);
+}
+
+/* Centred empty-state placeholder (trigger list) */
+.st-bgloader-empty {
+    text-align: center;
+    opacity: 0.6;
+    padding: 8px;
+}
+
+/* Permanently hidden control (hidden file inputs). JS calls .click() on these,
+   it never toggles their display — unlike #st_trigger_form, whose display is
+   driven at runtime and therefore stays inline. */
+.st-bgloader-hidden {
+    display: none;
+}
+
+/* Dropzone glyph */
+.st-bgloader-dropzone > i {
+    margin-bottom: 6px;
+    opacity: 0.7;
+}
+
+.st-bgloader-btn-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.st-bgloader-btn-row button,
+.st-bgloader-btn-row label {
+    /* label 参与均衡拉伸：导入类按钮是 <label for=…>（内嵌隐藏 file input），
+       旧规则只给 button flex:1，导出/导入同行时一宽一窄。 */
+    flex: 1;
+    text-align: center;
+}
+
+.st-bgloader-dim-text {
+    opacity: 0.7;
+    font-size: 0.85em;
+}
+
+.st-bgloader-success-text {
+    color: var(--st-bg-status-ok);
+    font-size: 0.85em;
+}
+
+.st-bgloader-disabled {
+    opacity: 0.5;
+    pointer-events: none;
+}

@@ -1,0 +1,61 @@
+/* =========================================================================
+   06-native-decor — 原生网格装饰（徽标 / 当前标记 / 接管选中 / 隐藏）
+   这些元素活在宿主自己的 #bg_menu_content 网格里（.st-bgloader-panel 之外），
+   因此它们的根选择器已加入 00-tokens 语义清单——语义变量在元素自身解析。
+   ========================================================================= */
+
+/* Native Thumbnail Badges */
+.st-bg-native-badge {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    font-size: 0.65em;
+    font-weight: bold;
+    padding: 1px 4px;
+    border-radius: 3px;
+    z-index: var(--st-z-badge);
+    color: #fff;
+    background: rgba(0, 0, 0, 0.8);
+    pointer-events: none;
+}
+
+/* Per-type colours for the native badges, matching the media-library badges (finding D2: all
+   types used to look identical). Values are the semantic exception tokens declared in
+   00-tokens（spec §4：编码含义，不随主题；单一书写点）。 */
+.st-bg-native-badge.video { background: var(--st-bg-badge-video); }
+.st-bg-native-badge.audio { background: var(--st-bg-badge-audio); }
+.st-bg-native-badge.html { background: var(--st-bg-badge-html); }
+.st-bg-native-badge.svg { background: var(--st-bg-badge-svg); }
+
+/* Native picker takeover: marks the thumbnail whose file is the media this extension has
+   mounted. A class of our own is required — the host recomputes `.selected-background` from
+   `background_settings.url`, a value we deliberately never write, so borrowing its class would
+   be cleared on the next re-render (and would fight its own highlight).
+
+   Expressed with an outline plus a real child marker, never with `::before` / `::after`: the
+   host already uses both pseudo-elements on this element (checkmark for selected, padlock for
+   locked), and sharing one would let our content win or lose by specificity. The marker sits
+   bottom-left to stay clear of the host's badge (top-left), its padlock (bottom-right) and the
+   mobile menu toggle (top-right). No glow — borders and contrast only. */
+.st-bg-takeover-selected {
+    outline: 2px solid var(--st-bg-accent);
+    outline-offset: -1px;
+}
+
+.st-bg-native-current {
+    position: absolute;
+    bottom: 2px;
+    left: 2px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--st-bg-accent);
+    z-index: var(--st-z-badge);
+    pointer-events: none;
+}
+
+/* Hides native children of #Backgrounds when ST-BgLoader takeover is active.
+   增强式内嵌改造后本类仅用于总开关关闭时的瞬时还原路径，不再参与日常面板遮盖。 */
+.st-bg-native-hidden {
+    display: none !important;
+}

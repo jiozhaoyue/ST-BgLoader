@@ -1,0 +1,49 @@
+/* =========================================================================
+   00-tokens — 语义变量层（唯一 fallback 书写点）+ z-index 分档 + 触摸下限
+   -------------------------------------------------------------------------
+   主题跟随机制（纯 CSS，无 JS 监听）：宿主把主题色写成 documentElement 内联
+   CSS 变量（--SmartTheme*），切换主题时所有 var() 引用自动重算。本文件是全仓
+   唯一允许引用 --SmartTheme* 的地方；组件样式一律只引 --st-bg-*。
+   fallback 统一基准（问答定案 2026-11-19）：
+     BodyColor #e0e0e0 / BorderColor rgba(255,255,255,0.1) /
+     QuoteColor #4fa3d1 / BlurTintColor #1e1e24。
+   ⚠ 新增 UI 面时必须把它的根选择器加入下方清单，否则语义变量在该面不解析。
+   ========================================================================= */
+
+.st-bgloader-panel,
+.st-bgloader-topbar-panel,
+.st-bg-mini-player,
+.st-bg-native-badge,
+.st-bg-native-current,
+.st-bg-takeover-selected,
+#st_bgloader_container {
+    /* —— 派生层：由宿主主题变量派生，随主题切换自动生效 —— */
+    --st-bg-text: var(--SmartThemeBodyColor, #e0e0e0);
+    --st-bg-border: var(--SmartThemeBorderColor, rgba(255, 255, 255, 0.1));
+    --st-bg-accent: var(--SmartThemeQuoteColor, #4fa3d1);
+    --st-bg-surface: var(--SmartThemeBlurTintColor, #1e1e24);
+    /* —— 语义例外（spec §4：编码含义，不随主题漂移）—— */
+    --st-bg-warn: #ff5252;
+    --st-bg-badge-video: #e53935;
+    --st-bg-badge-audio: #8e24aa;
+    --st-bg-badge-html: #fb8c00;
+    --st-bg-badge-svg: #43a047;
+    --st-bg-badge-image: #1e88e5;
+    --st-bg-status-ok: #4fae6b;
+    --st-bg-status-warn: #c9a34f;
+    /* —— z-index 分档（唯一书写点；9999 硬编码收敛为 --st-z-float）—— */
+    --st-z-badge: 2;
+    --st-z-header: 10;
+    --st-z-float: 9990;
+    /* —— 触摸目标下限（问答定案 ≥36px）—— */
+    --st-touch-min: 36px;
+}
+
+.st-bgloader-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 6px;
+    color: var(--st-bg-text);
+    font-size: 0.9em;
+}
