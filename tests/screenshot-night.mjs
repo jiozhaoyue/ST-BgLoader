@@ -49,6 +49,8 @@ try {
         const btn = document.querySelector('.st-bgloader-tab-btn[data-tab="settings"]');
         btn?.click();
     });
+    // 设置已重构为五组折叠；展开全部组，避免滚动到已折叠区无可视变化
+    await page.evaluate(() => { document.querySelectorAll('#st_tab_settings .st-bgloader-group-head').forEach((h) => h.click()); });
     await settle(page, 500);
     await shot(page, '03-settings-top');
 

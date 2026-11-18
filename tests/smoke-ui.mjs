@@ -92,11 +92,9 @@ try {
             // 库非空但网格空：多半是持久化的类型过滤筛空了当前库，经 UI 复位一次
             if (i === 2) {
                 await page.evaluate(() => {
-                    const t = document.querySelector('#st_topbar_type_filter');
-                    if (t && t.value !== 'all') {
-                        t.value = 'all';
-                        t.dispatchEvent(new Event('change', { bubbles: true }));
-                    }
+                    // 重构后类型过滤是分段胶囊（.st-bgloader-seg-btn），不再是 select
+                    const inactive = document.querySelector('#st_topbar_type_seg .st-bgloader-seg-btn[data-seg-value="all"]:not(.active)');
+                    if (inactive) inactive.click();
                     const s2 = document.querySelector('#st_topbar_search');
                     if (s2 && s2.value) {
                         s2.value = '';
@@ -142,23 +140,27 @@ try {
             });
         });
         if (target) {
-            await page.evaluate((t) => {
-                const el = document.querySelector('#st_topbar_type_filter');
-                el.value = t;
-                el.dispatchEvent(new Event('change', { bubbles: true }));
-            }, target.type);
+            // 分段胶囊语义：html/svg 同属「文档」段，期望值按段语义重算
+            const seg = (target.type === 'svg' || target.type === 'html') ? 'doc' : target.type;
+            const expected = await page.evaluate((segName) =>
+                window.STBgLoader.getAPI().getMediaList().then((items) =>
+                    items.filter((i) => segName === 'doc'
+                        ? (i.type === 'html' || i.type === 'svg')
+                        : i.type === segName).length), seg);
+            await page.evaluate((sv) => {
+                document.querySelector(`#st_topbar_type_seg .st-bgloader-seg-btn[data-seg-value="${sv}"]`)?.click();
+            }, seg);
             await settle(1200);
             const filtered = await page.evaluate(() =>
                 document.querySelectorAll('#st_bgloader_grid .st-bgloader-media-card').length);
-            step('S3 类型过滤生效', filtered === target.count, `${target.type}: ${filtered}/${target.count}`);
+            step('S3 类型过滤生效', filtered === expected, `${seg}: ${filtered}/${expected}`);
             await shot('03-type-filter');
         } else {
             step('S3 类型过滤生效', true, 'SKIP（所有条目同类型，过滤无区分度）');
         }
         await page.evaluate((tf) => {
-            const t = document.querySelector('#st_topbar_type_filter');
-            t.value = tf || 'all';
-            t.dispatchEvent(new Event('change', { bubbles: true }));
+            const segVal = (tf === 'svg' || tf === 'html') ? 'doc' : (tf || 'all');
+            document.querySelector(`#st_topbar_type_seg .st-bgloader-seg-btn[data-seg-value="${segVal}"]`)?.click();
         }, initial.libraryView?.typeFilter || 'all');
         await settle(600);
     } else {

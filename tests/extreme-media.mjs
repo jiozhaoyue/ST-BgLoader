@@ -436,7 +436,15 @@ try {
         return { focusMoved, enterApplied: window.__kbApplied === true };
     });
     await shot('c11-library-grid');
-    // 视频卡片首帧缩略图断言（B5）：等待惰性生成后，video 卡的预览层应有背景图
+    // 懒挂载契约：预览仅对进入视口 200px 前瞻带的卡片 hydrate，故统计前须把卡片逐个滚入视口
+    await page.evaluate(async () => {
+        const cards = [...document.querySelectorAll('#st_bgloader_grid .st-bgloader-media-card')];
+        for (const card of cards) {
+            card.scrollIntoView({ block: 'center' });
+            await new Promise(r => setTimeout(r, 300));
+        }
+    });
+    // 视频卡片首帧缩略图断言（B5）：等待惰性抽帧生成后，video 卡的预览层应有背景图
     await new Promise(r => setTimeout(r, 12000));
     const thumbs = await page.evaluate(() => {
         const cards = [...document.querySelectorAll('#st_bgloader_grid .st-bgloader-media-card')];
@@ -473,9 +481,8 @@ try {
     // ---------- c14 视图状态持久化（跨整页刷新）----------
     {
         await page.evaluate(() => {
-            const t = document.querySelector('#st_topbar_type_filter');
-            t.value = 'video';
-            t.dispatchEvent(new Event('change', { bubbles: true }));
+            // 重构后类型过滤是分段胶囊：点击「视频」段；排序仍是 select
+            document.querySelector('#st_topbar_type_seg .st-bgloader-seg-btn[data-seg-value="video"]')?.click();
             const s = document.querySelector('#st_topbar_sort');
             s.value = 'time';
             s.dispatchEvent(new Event('change', { bubbles: true }));
@@ -491,7 +498,7 @@ try {
         await page2.evaluate(() => window.STBgLoader.getTopbarDrawer()?.mount());
         await settle(2000);
         const restored = await page2.evaluate(() => ({
-            typeFilter: document.querySelector('#st_topbar_type_filter')?.value,
+            typeFilter: document.querySelector('#st_topbar_type_seg .st-bgloader-seg-btn.active')?.dataset.segValue,
             sort: document.querySelector('#st_topbar_sort')?.value,
             view: window.STBgLoader.getSettings().libraryView,
         }));
@@ -499,9 +506,7 @@ try {
         // 复原视图状态，不给实例留测试痕迹。服务端文档写有 800ms 去抖——过早关页会让
         // localStorage 的复原被服务端旧文档覆盖回残留（实测事故），必须等写落盘并回读验证。
         await page2.evaluate(() => {
-            const t = document.querySelector('#st_topbar_type_filter');
-            t.value = 'all';
-            t.dispatchEvent(new Event('change', { bubbles: true }));
+            document.querySelector('#st_topbar_type_seg .st-bgloader-seg-btn[data-seg-value="all"]')?.click();
             const s = document.querySelector('#st_topbar_sort');
             s.value = 'name';
             s.dispatchEvent(new Event('change', { bubbles: true }));
