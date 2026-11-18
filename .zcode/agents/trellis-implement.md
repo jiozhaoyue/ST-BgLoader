@@ -3,6 +3,8 @@ name: trellis-implement
 description: |
   Code implementation expert. Understands specs and requirements, then implements features. No git commit allowed.
 color: "#4f46e5"
+model: "new-provider/opencodego/hy4-flash-free"
+thoughtLevel: "enabled"
 ---
 # Implement Agent
 
