@@ -57,10 +57,12 @@ const NATIVE_HIDDEN_CLASS = 'st-bg-native-hidden';
 
 /**
  * TopbarBackgroundDrawer:
- * Takes over the host's native `#Backgrounds` drawer across 4 taverns (SillyTavern, Luker, PureTavern, TauriTavern).
+ * Mounts the enhancement panel inside the host's native `#Backgrounds` drawer
+ * across 4 taverns (SillyTavern, Luker, PureTavern, TauriTavern).
  *
- * When enabled, hides native drawer contents and presents the unified Rich Media Library
- * and Detailed Settings tabs inside the native top bar drawer.
+ * Native drawer contents stay visible and usable; takeover-style hiding was
+ * retired 2026-11-19. The panel presents the unified Rich Media Library and
+ * Detailed Settings tabs alongside the native content.
  */
 export class TopbarBackgroundDrawer {
     private panel: HTMLElement | null = null;
@@ -76,12 +78,21 @@ export class TopbarBackgroundDrawer {
     /** Pending DOM-wait observer between mount() and the host drawer appearing. */
     private mountObserver: MutationObserver | null = null;
     private searchDebounceTimer: number | null = null;
+    /** 15s 挂载兜底定时（技术面复检 D：可清理，避免 unmount 后残留回掉） */
+    private mountGiveUpTimer: number | null = null;
     /** Monotonic token for in-flight grid refreshes: only the newest run may write the grid. */
     private refreshGeneration = 0;
     /** Video first-frame thumbnails (itemId → dataURL), generated lazily per grid render. */
     private thumbCache = new Map<string, string>();
     private static readonly THUMB_CACHE_CAP = 64;
     private thumbInflight = new Map<string, Promise<string | null>>();
+    /** 多选批量模式（会话内视图态）：批量删/顺换/随机换 */
+    private multiSelectMode = false;
+    private selectedIds = new Set<string>();
+    /** 网格懒挂载观察器：卡片进入视口 200px 前瞻带才 hydrate 预览 */
+    private gridObserver: IntersectionObserver | null = null;
+    /** 最近一次网格构建的可见列表（懒抽帧按 id 回查 item 用） */
+    private lastGridItems: MediaItem[] | null = null;
 
     constructor(
         settings: BgLoaderSettings,
@@ -96,13 +107,16 @@ export class TopbarBackgroundDrawer {
         // View state persists in settings (libraryView); defensive fallbacks for callers that
         // hand us an unmerged object (older builds, tests).
         this.sortOrder = this.settings.libraryView?.sortOrder ?? 'name';
-        this.typeFilter = this.settings.libraryView?.typeFilter ?? 'all';
+        // 旧值 'html' 归一为 'doc'（分段胶囊把 html/svg 合并为「文档」段）
+        const storedType = this.settings.libraryView?.typeFilter ?? 'all';
+        this.typeFilter = storedType === 'html' ? 'doc' : storedType;
     }
 
     public applyRemoteSettings(next: BgLoaderSettings): void {
         this.settings = next;
         this.sortOrder = next.libraryView?.sortOrder ?? this.sortOrder;
-        this.typeFilter = next.libraryView?.typeFilter ?? this.typeFilter;
+        const remoteType = next.libraryView?.typeFilter ?? this.typeFilter;
+        this.typeFilter = remoteType === 'html' ? 'doc' : remoteType;
         if (this.panel) {
             this.syncFormControls();
         }
@@ -137,16 +151,15 @@ export class TopbarBackgroundDrawer {
             });
             this.mountObserver = observer;
             observer.observe(document.body, { childList: true, subtree: true });
-            setTimeout(() => this.dropMountObserver(), 15000);
+            // 技术面复检 D：兜底定时存字段，dropMountObserver/unmount 时可撤销
+            this.mountGiveUpTimer = window.setTimeout(() => this.dropMountObserver(), 15000);
             return;
         }
 
-        // Hide native children of #Backgrounds
-        Array.from(this.hostDrawer.children).forEach((child) => {
-            if (child.id !== 'st_bgloader_topbar_panel') {
-                child.classList.add(NATIVE_HIDDEN_CLASS);
-            }
-        });
+        // 增强式内嵌（问答定案 2026-11-19）：原生抽屉内容完全保留可见可用
+        // （原生上传/文件夹/多选/锁定全部保留），本面板挂载其后作为增强层。
+        // 替换式接管（display:none 全灭原生）废止；NATIVE_HIDDEN_CLASS 仅保留给
+        // unmount 的对称清理路径（升级瞬间摘除旧类，避免残留隐藏态）。
 
         // Remove existing panel if any
         const existing = this.hostDrawer.querySelector('#st_bgloader_topbar_panel');
@@ -170,6 +183,16 @@ export class TopbarBackgroundDrawer {
         // Also cancel the pending DOM-wait: after a master disable, a later observer tick
         // would otherwise re-run mount() and bring the panel back from the dead.
         this.dropMountObserver();
+        // 技术面复检 D：撤销未决搜索防抖，避免卸载后刷新已移除的面板
+        if (this.searchDebounceTimer !== null) {
+            window.clearTimeout(this.searchDebounceTimer);
+            this.searchDebounceTimer = null;
+        }
+        this.gridObserver?.disconnect();
+        this.gridObserver = null;
+        this.lastGridItems = null;
+        this.multiSelectMode = false;
+        this.selectedIds.clear();
         if (this.panel) {
             this.panel.remove();
             this.panel = null;
@@ -182,6 +205,11 @@ export class TopbarBackgroundDrawer {
     }
 
     private dropMountObserver(): void {
+        // 技术面复检 D：同时撤销 15s 兜底，避免卸载后残留定时回掉
+        if (this.mountGiveUpTimer !== null) {
+            window.clearTimeout(this.mountGiveUpTimer);
+            this.mountGiveUpTimer = null;
+        }
         this.mountObserver?.disconnect();
         this.mountObserver = null;
     }
@@ -207,6 +235,7 @@ export class TopbarBackgroundDrawer {
                     </button>
                 </div>
                 <div class="st-bgloader-topbar-actions">
+                    <select id="st_topbar_scene_quick" class="st-bgloader-scene-quick" title="场景快切"></select>
                     <button type="button" id="st_topbar_bg_vis_btn" class="menu_button menu_button_icon" title="${backgroundVisible ? '隐藏' : '显示'}">
                         <i class="fa-solid ${backgroundVisible ? 'fa-eye' : 'fa-eye-slash'}"></i>
                     </button>
@@ -226,33 +255,65 @@ export class TopbarBackgroundDrawer {
                         <div class="st-bgloader-search-wrap">
                             <input type="search" id="st_topbar_search" class="text_pole" placeholder="搜索..." value="${escapeHtml(this.searchQuery)}" />
                         </div>
-                        <select id="st_topbar_type_filter" class="text_pole">
-                            <option value="all" ${this.typeFilter === 'all' ? 'selected' : ''}>全部</option>
-                            <option value="image" ${this.typeFilter === 'image' ? 'selected' : ''}>图片</option>
-                            <option value="video" ${this.typeFilter === 'video' ? 'selected' : ''}>视频</option>
-                            <option value="audio" ${this.typeFilter === 'audio' ? 'selected' : ''}>音频</option>
-                            <option value="html" ${this.typeFilter === 'html' ? 'selected' : ''}>网页</option>
-                        </select>
-                        <select id="st_topbar_sort" class="text_pole">
-                            <option value="name" ${this.sortOrder === 'name' ? 'selected' : ''}>名称</option>
-                            <option value="time" ${this.sortOrder === 'time' ? 'selected' : ''}>时间</option>
-                            <option value="size" ${this.sortOrder === 'size' ? 'selected' : ''}>大小</option>
-                        </select>
-                        <button type="button" id="st_topbar_upload_toggle_btn" class="menu_button" title="导入">
-                            <i class="fa-solid fa-cloud-arrow-up"></i> 导入
-                        </button>
+                        ${UIComponents.renderSegmented({
+                            id: 'st_topbar_type_seg',
+                            options: [
+                                { value: 'all', label: '全部', icon: 'fa-border-all', selected: this.typeFilter === 'all' },
+                                { value: 'image', label: '图', icon: 'fa-image', selected: this.typeFilter === 'image' },
+                                { value: 'video', label: '视频', icon: 'fa-film', selected: this.typeFilter === 'video' },
+                                { value: 'audio', label: '音频', icon: 'fa-music', selected: this.typeFilter === 'audio' },
+                                { value: 'doc', label: '文档', icon: 'fa-file-code', selected: this.typeFilter === 'doc' },
+                            ],
+                        })}
+                        ${UIComponents.renderSelect({
+                            id: 'st_topbar_sort',
+                            label: '',
+                            compact: true,
+                            title: '排序',
+                            options: [
+                                { value: 'name', label: '名称', selected: this.sortOrder === 'name' },
+                                { value: 'time', label: '时间', selected: this.sortOrder === 'time' },
+                                { value: 'size', label: '大小', selected: this.sortOrder === 'size' },
+                            ],
+                        })}
+                        ${UIComponents.renderButton({ id: 'st_topbar_upload_toggle_btn', icon: 'fa-cloud-arrow-up', label: '导入', title: '导入' })}
+                        ${UIComponents.renderButton({ id: 'st_topbar_multiselect_btn', className: 'menu_button_icon', icon: 'fa-list-check', title: '多选' })}
                     </div>
 
                     <!-- Collapsible Upload Box -->
                     <div id="st_topbar_upload_box" class="st-bgloader-upload-box" style="display: none;">
-                        <div class="st-bgloader-dropzone" id="st_bgloader_dropzone">
+                        <div class="st-bgloader-dropzone" id="st_bgloader_dropzone" tabindex="0" role="button" aria-label="导入文件">
                             <i class="fa-solid fa-file-video fa-2x"></i>
                             <div>点击或拖拽文件导入</div>
                             <input type="file" id="st_bgloader_file_input" class="st-bgloader-hidden" accept="video/*,audio/*,image/*,.html,.htm,.svg" />
                         </div>
                         <div class="st-bgloader-url-import">
                             <input type="text" id="st_bgloader_url_input" class="text_pole" placeholder="媒体 URL..." />
-                            <button type="button" id="st_bgloader_url_btn" class="menu_button">导入</button>
+                            ${UIComponents.renderButton({ id: 'st_bgloader_url_btn', label: '导入' })}
+                        </div>
+                    </div>
+
+                    <!-- 多选操作条（进入多选态才显示） -->
+                    <div id="st_bgloader_multiselect_bar" class="st-bgloader-multiselect-bar" hidden>
+                        <span id="st_multiselect_count" class="st-bgloader-dim-text">已选 0</span>
+                        ${UIComponents.renderButton({ id: 'st_multiselect_delete_btn', variant: 'danger', icon: 'fa-trash', label: '批量删' })}
+                        ${UIComponents.renderButton({ id: 'st_multiselect_first_btn', icon: 'fa-play', label: '顺换', title: '应用首个选中' })}
+                        ${UIComponents.renderButton({ id: 'st_multiselect_random_btn', icon: 'fa-shuffle', label: '随机换', title: '随机应用一张' })}
+                        ${UIComponents.renderButton({ id: 'st_multiselect_exit_btn', label: '退出' })}
+                    </div>
+
+                    <!-- 场景条：场景入媒体 Tab（顶栏为快切，此处为管理） -->
+                    <div class="st-bgloader-toolbar-row">
+                        <div class="st-bgloader-scene-bar">
+                            <select id="st_scene_select" class="text_pole" title="场景"></select>
+                            ${UIComponents.renderButton({ id: 'st_scene_apply_btn', className: 'menu_button_icon', icon: 'fa-play', title: '应用' })}
+                            ${UIComponents.renderButton({ id: 'st_scene_save_btn', className: 'menu_button_icon', icon: 'fa-floppy-disk', title: '保存' })}
+                            ${UIComponents.renderButton({ id: 'st_scene_del_btn', variant: 'danger', className: 'menu_button_icon', icon: 'fa-trash', title: '删除' })}
+                            ${UIComponents.renderButton({ id: 'st_scene_export_btn', className: 'menu_button_icon', icon: 'fa-file-arrow-down', title: '导出' })}
+                            <label for="st_scene_import_file" class="menu_button menu_button_icon" title="导入">
+                                <i class="fa-solid fa-file-arrow-up"></i>
+                                <input type="file" id="st_scene_import_file" class="st-bgloader-hidden" accept=".json" />
+                            </label>
                         </div>
                     </div>
 
@@ -262,40 +323,20 @@ export class TopbarBackgroundDrawer {
                     </div>
                 </div>
 
-                <!-- Tab 2: Settings -->
+                <!-- Tab 2: Settings —— 五组折叠（画面/氛围/声音/自动化/系统），开闭状态记忆 -->
                 <div id="st_tab_settings" class="st-bgloader-tab-content ${this.activeTab === 'settings' ? 'active' : ''}">
-                    <!-- Scene -->
-                    ${UIComponents.renderSection({
-                        title: '场景',
-                        icon: 'fa-earth-americas',
+                    ${UIComponents.renderGroup({
+                        id: 'st_group_visual',
+                        title: '画面',
+                        icon: 'fa-image',
+                        open: true,
                         contentHtml: `
-                            <div class="st-bgloader-preset-row">
-                                <label class="st-bgloader-label-sm">场景:</label>
-                                <select id="st_scene_select" class="text_pole"></select>
-                                <button type="button" id="st_scene_apply_btn" class="menu_button" title="应用"><i class="fa-solid fa-play"></i> 应用</button>
-                                <button type="button" id="st_scene_save_btn" class="menu_button" title="保存"><i class="fa-solid fa-floppy-disk"></i></button>
-                                <button type="button" id="st_scene_del_btn" class="menu_button" title="删除"><i class="fa-solid fa-trash"></i></button>
-                            </div>
-                            <div class="st-bgloader-btn-row">
-                                <button type="button" id="st_scene_export_btn" class="menu_button" title="导出全部用户场景为可分享 JSON"><i class="fa-solid fa-file-arrow-down"></i> 导出场景</button>
-                                <label for="st_scene_import_file" class="menu_button" title="导入场景（同 id 覆盖，其余不动）">
-                                    <i class="fa-solid fa-file-arrow-up"></i> 导入场景
-                                    <input type="file" id="st_scene_import_file" class="st-bgloader-hidden" accept=".json" />
-                                </label>
-                            </div>
-                        `,
-                    })}
-
-                    <!-- Filters -->
-                    ${UIComponents.renderSection({
-                        title: '滤镜',
-                        icon: 'fa-sliders',
-                        contentHtml: `
+                            <div class="st-bgloader-group-subtitle"><i class="fa-solid fa-sliders"></i>滤镜</div>
                             <div class="st-bgloader-preset-row">
                                 <label class="st-bgloader-label-sm">预设:</label>
                                 <select id="st_preset_select" class="text_pole"></select>
-                                <button type="button" id="st_preset_save_btn" class="menu_button" title="保存"><i class="fa-solid fa-floppy-disk"></i></button>
-                                <button type="button" id="st_preset_del_btn" class="menu_button" title="删除"><i class="fa-solid fa-trash"></i></button>
+                                ${UIComponents.renderButton({ id: 'st_preset_save_btn', className: 'menu_button_icon', icon: 'fa-floppy-disk', title: '保存' })}
+                                ${UIComponents.renderButton({ id: 'st_preset_del_btn', variant: 'danger', className: 'menu_button_icon', icon: 'fa-trash', title: '删除' })}
                             </div>
                             ${UIComponents.renderSlider({ id: 'st_filter_blur', valId: 'st_filter_blur_val', label: '模糊', min: 0, max: 20, step: 1, value: this.settings.filters.blur, unit: 'px' })}
                             ${UIComponents.renderSlider({ id: 'st_filter_brightness', valId: 'st_filter_brightness_val', label: '亮度', min: 0, max: 200, step: 5, value: this.settings.filters.brightness, unit: '%' })}
@@ -304,150 +345,132 @@ export class TopbarBackgroundDrawer {
                             <div class="st-bgloader-check-stack">
                                 ${UIComponents.renderCheckbox({ id: 'st_bg_interactive', label: '背景交互', checked: this.settings.interactiveBackground })}
                             </div>
+                            <div class="st-bgloader-group-subtitle"><i class="fa-solid fa-eye"></i>毛玻璃</div>
+                            <div class="st-bgloader-check-stack">
+                                ${UIComponents.renderCheckbox({ id: 'st_frosted_enabled', label: '启用', checked: this.settings.frostedChat.enabled })}
+                            </div>
+                            ${UIComponents.renderSlider({ id: 'st_frosted_blur', valId: 'st_frosted_blur_val', label: '模糊', min: 0, max: 25, step: 1, value: this.settings.frostedChat.blur, unit: 'px' })}
+                            ${UIComponents.renderSlider({ id: 'st_frosted_opacity', valId: 'st_frosted_opacity_val', label: '不透明', min: 20, max: 100, step: 5, value: this.settings.frostedChat.opacity, unit: '%' })}
+                            <div class="st-bgloader-group-subtitle"><i class="fa-solid fa-wand-magic-sparkles"></i>转场</div>
+                            ${UIComponents.renderSelect({
+                                id: 'st_transition_effect',
+                                label: '效果',
+                                options: [
+                                    { value: 'fade', label: '淡入', selected: this.settings.transitionEffect === 'fade' },
+                                    { value: 'zoom_fade', label: '缩放', selected: this.settings.transitionEffect === 'zoom_fade' },
+                                    { value: 'blur_fade', label: '柔焦', selected: this.settings.transitionEffect === 'blur_fade' },
+                                    { value: 'slide_left', label: '左移', selected: this.settings.transitionEffect === 'slide_left' },
+                                    { value: 'slide_right', label: '右移', selected: this.settings.transitionEffect === 'slide_right' },
+                                ],
+                            })}
+                            ${UIComponents.renderSlider({ id: 'st_transition_dur', valId: 'st_transition_dur_val', label: '时长', min: 200, max: 1500, step: 50, value: this.settings.transitionDurationMs, unit: 'ms' })}
                         `,
                     })}
 
-                    <!-- Weather -->
-                    ${UIComponents.renderSection({
-                        title: '天气',
+                    ${UIComponents.renderGroup({
+                        id: 'st_group_atmosphere',
+                        title: '氛围',
                         icon: 'fa-cloud-sun-rain',
                         contentHtml: `
-                            <div class="st-bgloader-preset-row">
-                                <label class="st-bgloader-label-md">天气:</label>
-                                <select id="st_weather_type" class="text_pole">
-                                    ${WEATHER_TYPES.map((t) => `<option value="${t}" ${this.settings.weather.type === t ? 'selected' : ''}>${WEATHER_LABELS[t]}</option>`).join('')}
-                                </select>
-                            </div>
-                            <div class="st-bgloader-preset-row">
-                                <label class="st-bgloader-label-md">密度:</label>
-                                <select id="st_weather_density" class="text_pole">
-                                    <option value="low" ${this.settings.weather.density === 'low' ? 'selected' : ''}>稀疏</option>
-                                    <option value="medium" ${this.settings.weather.density === 'medium' ? 'selected' : ''}>适中</option>
-                                    <option value="high" ${this.settings.weather.density === 'high' ? 'selected' : ''}>密集</option>
-                                </select>
-                            </div>
+                            <div class="st-bgloader-group-subtitle"><i class="fa-solid fa-cloud-sun-rain"></i>天气</div>
+                            ${UIComponents.renderSelect({
+                                id: 'st_weather_type',
+                                label: '天气',
+                                options: WEATHER_TYPES.map((t) => ({ value: t, label: WEATHER_LABELS[t], selected: this.settings.weather.type === t })),
+                            })}
+                            ${UIComponents.renderSelect({
+                                id: 'st_weather_density',
+                                label: '密度',
+                                options: [
+                                    { value: 'low', label: '稀疏', selected: this.settings.weather.density === 'low' },
+                                    { value: 'medium', label: '适中', selected: this.settings.weather.density === 'medium' },
+                                    { value: 'high', label: '密集', selected: this.settings.weather.density === 'high' },
+                                ],
+                            })}
                             ${UIComponents.renderSlider({ id: 'st_weather_speed', valId: 'st_weather_speed_val', label: '速度', min: 5, max: 25, step: 1, value: Math.round(this.settings.weather.speed * 10), unit: 'x' })}
                             ${UIComponents.renderSlider({ id: 'st_weather_opacity', valId: 'st_weather_opacity_val', label: '不透明', min: 10, max: 100, step: 5, value: Math.round(this.settings.weather.opacity * 100), unit: '%' })}
-                        `,
-                    })}
-
-                    <!-- Motion -->
-                    ${UIComponents.renderSection({
-                        title: '动效',
-                        icon: 'fa-chart-simple',
-                        contentHtml: `
-                            <div class="st-bgloader-preset-row">
-                                <label>律动:</label>
-                                <select id="st_visualizer_mode" class="text_pole">
-                                    <option value="off" ${this.settings.visualizer.mode === 'off' ? 'selected' : ''}>关闭</option>
-                                    <option value="pulse" ${this.settings.visualizer.mode === 'pulse' ? 'selected' : ''}>呼吸</option>
-                                    <option value="spectrum" ${this.settings.visualizer.mode === 'spectrum' ? 'selected' : ''}>频谱</option>
-                                </select>
-                            </div>
+                            <div class="st-bgloader-group-subtitle"><i class="fa-solid fa-chart-simple"></i>动效</div>
+                            ${UIComponents.renderSelect({
+                                id: 'st_visualizer_mode',
+                                label: '律动',
+                                options: [
+                                    { value: 'off', label: '关闭', selected: this.settings.visualizer.mode === 'off' },
+                                    { value: 'pulse', label: '呼吸', selected: this.settings.visualizer.mode === 'pulse' },
+                                    { value: 'spectrum', label: '频谱', selected: this.settings.visualizer.mode === 'spectrum' },
+                                ],
+                            })}
                             ${UIComponents.renderSlider({ id: 'st_visualizer_sens', valId: 'st_visualizer_sens_val', label: '灵敏度', min: 5, max: 25, step: 1, value: Math.round(this.settings.visualizer.sensitivity * 10), unit: 'x' })}
                             <div class="st-bgloader-check-stack">
                                 ${UIComponents.renderCheckbox({ id: 'st_parallax_enabled', label: '景深视差', checked: this.settings.parallax.enabled })}
                             </div>
                             ${UIComponents.renderSlider({ id: 'st_parallax_intensity', valId: 'st_parallax_intensity_val', label: '深度', min: 1, max: 10, step: 1, value: Math.round(this.settings.parallax.intensity * 10), unit: '' })}
-                        `,
-                    })}
-
-                    <!-- Ambient Sound -->
-                    ${UIComponents.renderSection({
-                        title: '音效',
-                        icon: 'fa-fire',
-                        contentHtml: `
-                            <div class="st-bgloader-preset-row">
-                                <label>音效:</label>
-                                <select id="st_ambient_type" class="text_pole">
-                                    <option value="off" ${this.settings.ambientSound.type === 'off' ? 'selected' : ''}>关闭</option>
-                                    <option value="rain" ${this.settings.ambientSound.type === 'rain' ? 'selected' : ''}>雨声</option>
-                                    <option value="fire" ${this.settings.ambientSound.type === 'fire' ? 'selected' : ''}>壁炉</option>
-                                    <option value="wind" ${this.settings.ambientSound.type === 'wind' ? 'selected' : ''}>风声</option>
-                                </select>
-                            </div>
+                            <div class="st-bgloader-group-subtitle"><i class="fa-solid fa-fire"></i>音效</div>
+                            ${UIComponents.renderSelect({
+                                id: 'st_ambient_type',
+                                label: '音效',
+                                options: [
+                                    { value: 'off', label: '关闭', selected: this.settings.ambientSound.type === 'off' },
+                                    { value: 'rain', label: '雨声', selected: this.settings.ambientSound.type === 'rain' },
+                                    { value: 'fire', label: '壁炉', selected: this.settings.ambientSound.type === 'fire' },
+                                    { value: 'wind', label: '风声', selected: this.settings.ambientSound.type === 'wind' },
+                                ],
+                            })}
                             ${UIComponents.renderSlider({ id: 'st_ambient_vol', valId: 'st_ambient_vol_val', label: '音量', min: 0, max: 100, step: 5, value: Math.round(this.settings.ambientSound.volume * 100), unit: '%' })}
                         `,
                     })}
 
-                    <!-- Frosted Chat -->
-                    ${UIComponents.renderSection({
-                        title: '毛玻璃',
-                        icon: 'fa-eye',
-                        contentHtml: `
-                            <div class="st-bgloader-check-stack">
-                                ${UIComponents.renderCheckbox({ id: 'st_frosted_enabled', label: '毛玻璃穿透', checked: this.settings.frostedChat.enabled })}
-                            </div>
-                            ${UIComponents.renderSlider({ id: 'st_frosted_blur', valId: 'st_frosted_blur_val', label: '模糊', min: 0, max: 25, step: 1, value: this.settings.frostedChat.blur, unit: 'px' })}
-                            ${UIComponents.renderSlider({ id: 'st_frosted_opacity', valId: 'st_frosted_opacity_val', label: '不透明', min: 20, max: 100, step: 5, value: this.settings.frostedChat.opacity, unit: '%' })}
-                        `,
-                    })}
-
-                    <!-- Transition -->
-                    ${UIComponents.renderSection({
-                        title: '转场',
-                        icon: 'fa-wand-magic-sparkles',
-                        contentHtml: `
-                            <div class="st-bgloader-preset-row">
-                                <label>效果:</label>
-                                <select id="st_transition_effect" class="text_pole">
-                                    <option value="fade" ${this.settings.transitionEffect === 'fade' ? 'selected' : ''}>淡入</option>
-                                    <option value="zoom_fade" ${this.settings.transitionEffect === 'zoom_fade' ? 'selected' : ''}>缩放</option>
-                                    <option value="blur_fade" ${this.settings.transitionEffect === 'blur_fade' ? 'selected' : ''}>柔焦</option>
-                                    <option value="slide_left" ${this.settings.transitionEffect === 'slide_left' ? 'selected' : ''}>左移</option>
-                                    <option value="slide_right" ${this.settings.transitionEffect === 'slide_right' ? 'selected' : ''}>右移</option>
-                                </select>
-                            </div>
-                            ${UIComponents.renderSlider({ id: 'st_transition_dur', valId: 'st_transition_dur_val', label: '时长', min: 200, max: 1500, step: 50, value: this.settings.transitionDurationMs, unit: 'ms' })}
-                        `,
-                    })}
-
-                    <!-- Audio Engine -->
-                    ${UIComponents.renderSection({
-                        title: '音乐',
+                    ${UIComponents.renderGroup({
+                        id: 'st_group_audio',
+                        title: '声音',
                         icon: 'fa-volume-high',
                         contentHtml: `
+                            <div class="st-bgloader-group-subtitle"><i class="fa-solid fa-volume-high"></i>音乐</div>
                             ${UIComponents.renderSlider({ id: 'st_audio_volume', valId: 'st_audio_volume_val', label: '音量', min: 0, max: 100, step: 1, value: Math.round(this.settings.volume * 100), unit: '%' })}
-                            <div class="st-bgloader-preset-row">
-                                <label>模式:</label>
-                                <select id="st_playback_mode" class="text_pole">
-                                    <option value="loop" ${this.settings.playbackMode === 'loop' ? 'selected' : ''}>列表循环</option>
-                                    <option value="single" ${this.settings.playbackMode === 'single' ? 'selected' : ''}>单曲循环</option>
-                                    <option value="shuffle" ${this.settings.playbackMode === 'shuffle' ? 'selected' : ''}>随机播放</option>
-                                </select>
-                            </div>
+                            ${UIComponents.renderSelect({
+                                id: 'st_playback_mode',
+                                label: '模式',
+                                options: [
+                                    { value: 'loop', label: '列表循环', selected: this.settings.playbackMode === 'loop' },
+                                    { value: 'single', label: '单曲循环', selected: this.settings.playbackMode === 'single' },
+                                    { value: 'shuffle', label: '随机播放', selected: this.settings.playbackMode === 'shuffle' },
+                                ],
+                            })}
                             <div class="st-bgloader-check-stack">
                                 ${UIComponents.renderCheckbox({ id: 'st_audio_mute', label: '静音', checked: this.settings.muted })}
                                 ${UIComponents.renderCheckbox({ id: 'st_audio_muffle', label: '沉浸低通', checked: this.settings.muffleBGM })}
                                 ${UIComponents.renderCheckbox({ id: 'st_audio_blur', label: '后台暂停', checked: this.settings.pauseOnBlur })}
-                                ${UIComponents.renderCheckbox({ id: 'st_bgm_auto_advance', label: '自动轮播', checked: this.settings.bgmAutoAdvance.enabled })}
                                 ${UIComponents.renderCheckbox({ id: 'st_mini_player_toggle', label: '悬浮胶囊', checked: this.settings.showMiniPlayer })}
                                 ${UIComponents.renderCheckbox({ id: 'st_capsule_on_play', label: '播放时显示', checked: this.settings.capsuleOnPlayOnly, sub: true })}
+                            </div>
+                            <div class="st-bgloader-group-subtitle"><i class="fa-solid fa-rotate"></i>轮播</div>
+                            <div class="st-bgloader-check-stack">
+                                ${UIComponents.renderCheckbox({ id: 'st_bgm_auto_advance', label: '自动轮播', checked: this.settings.bgmAutoAdvance.enabled })}
                             </div>
                             <div class="st-bgloader-preset-row" id="st_bgm_auto_advance_row" ${this.settings.bgmAutoAdvance.enabled ? '' : 'style="display:none;"'}>
                                 <label for="st_bgm_auto_advance_min">轮播间隔:</label>
                                 <input type="number" id="st_bgm_auto_advance_min" class="text_pole" min="1" max="60" step="1" value="${Math.max(1, Math.round(this.settings.bgmAutoAdvance.intervalSec / 60))}" />
                                 <label>分</label>
                             </div>
-                            ${UIComponents.renderSlider({ id: 'st_bgm_auto_advance_fade', valId: 'st_bgm_auto_advance_fade_val', label: '轮播淡入淡出', min: 0, max: 2000, step: 100, value: this.settings.bgmAutoAdvance.fadeMs, unit: ' ms' })}
+                            ${UIComponents.renderSlider({ id: 'st_bgm_auto_advance_fade', valId: 'st_bgm_auto_advance_fade_val', label: '淡入淡出', min: 0, max: 2000, step: 100, value: this.settings.bgmAutoAdvance.fadeMs, unit: ' ms' })}
                         `,
                     })}
 
-                    <!-- Triggers -->
-                    ${UIComponents.renderSection({
-                        title: '触发器',
+                    ${UIComponents.renderGroup({
+                        id: 'st_group_auto',
+                        title: '自动化',
                         icon: 'fa-bolt',
                         contentHtml: `
                             <div class="st-bgloader-trigger-list" id="st_trigger_list"></div>
                             <div class="st-bgloader-trigger-form" id="st_trigger_form" style="display: none;">
-                                <div class="st-bgloader-preset-row">
-                                    <label>类型:</label>
-                                    <select id="st_trigger_type" class="text_pole">
-                                        <option value="character">角色</option>
-                                        <option value="chat">聊天</option>
-                                        <option value="regex">正则</option>
-                                    </select>
-                                </div>
+                                ${UIComponents.renderSelect({
+                                    id: 'st_trigger_type',
+                                    label: '类型',
+                                    options: [
+                                        { value: 'character', label: '角色' },
+                                        { value: 'chat', label: '聊天' },
+                                        { value: 'regex', label: '正则' },
+                                    ],
+                                })}
                                 <div class="st-bgloader-preset-row">
                                     <label>规则:</label>
                                     <input type="text" id="st_trigger_name" class="text_pole" placeholder="名称" />
@@ -457,45 +480,37 @@ export class TopbarBackgroundDrawer {
                                     <input type="text" id="st_trigger_pattern" class="text_pole" placeholder="匹配文本" />
                                 </div>
                                 <div class="st-bgloader-btn-row">
-                                    <button type="button" id="st_trigger_confirm_btn" class="menu_button"><i class="fa-solid fa-check"></i> 添加</button>
-                                    <button type="button" id="st_trigger_cancel_btn" class="menu_button">取消</button>
+                                    ${UIComponents.renderButton({ id: 'st_trigger_confirm_btn', icon: 'fa-check', label: '添加' })}
+                                    ${UIComponents.renderButton({ id: 'st_trigger_cancel_btn', label: '取消' })}
                                 </div>
                             </div>
-                            <button type="button" id="st_trigger_add_btn" class="menu_button st-bgloader-btn-full">
-                                <i class="fa-solid fa-plus"></i> 添加
-                            </button>
+                            ${UIComponents.renderButton({ id: 'st_trigger_add_btn', variant: 'full', icon: 'fa-plus', label: '添加' })}
                         `,
                     })}
 
-                    <!-- Storage -->
-                    ${UIComponents.renderSection({
-                        title: '存储',
-                        icon: 'fa-file-export',
+                    ${UIComponents.renderGroup({
+                        id: 'st_group_system',
+                        title: '系统',
+                        icon: 'fa-gear',
                         contentHtml: `
+                            <div class="st-bgloader-group-subtitle"><i class="fa-solid fa-file-export"></i>存储</div>
                             <div class="st-bgloader-row-between">
                                 <div>已用: <strong id="st_cache_used">0 MB</strong> <span id="st_cache_count">0</span>项</div>
-                                <button type="button" id="st_cache_clear_btn" class="menu_button menu_button_danger">清空</button>
+                                ${UIComponents.renderButton({ id: 'st_cache_clear_btn', variant: 'danger', label: '清空' })}
                             </div>
                             ${UIComponents.renderSlider({ id: 'st_cache_quota', valId: 'st_cache_quota_val', label: '配额', min: 128, max: 8192, step: 128, value: this.settings.cacheQuotaMB, unit: ' MB' })}
                             <div class="st-bgloader-check-stack">
                                 ${UIComponents.renderCheckbox({ id: 'st_cache_autoclean', label: '自动清理', checked: this.settings.lruAutoClean })}
                             </div>
                             <div class="st-bgloader-btn-row">
-                                <button type="button" id="st_backup_export_btn" class="menu_button"><i class="fa-solid fa-download"></i> 导出</button>
+                                ${UIComponents.renderButton({ id: 'st_backup_export_btn', icon: 'fa-download', label: '导出' })}
                                 <label for="st_backup_import_file" class="menu_button">
                                     <i class="fa-solid fa-upload"></i> 导入
                                     <input type="file" id="st_backup_import_file" class="st-bgloader-hidden" accept=".json" />
                                 </label>
                             </div>
-                        `,
-                    })}
-
-                    <!-- Cloud -->
-                    ${UIComponents.renderSection({
-                        id: 'st_authority_section',
-                        title: '云端',
-                        icon: 'fa-cloud',
-                        contentHtml: `
+                            <div class="st-bgloader-group-subtitle"><i class="fa-solid fa-cloud"></i>云端</div>
+                            <div id="st_authority_section" class="st-bgloader-cloud-note"></div>
                             <div id="st_cloud_status_text" class="st-bgloader-cloud-note"></div>
                             <div class="st-bgloader-check-stack">
                                 ${UIComponents.renderCheckbox({ id: 'st_agent_tools_enable', label: 'Agent导演', checked: this.settings.agentToolsEnabled })}
@@ -559,14 +574,37 @@ export class TopbarBackgroundDrawer {
             }, 250);
         });
 
-        const typeFilter = this.panel.querySelector('#st_topbar_type_filter') as HTMLSelectElement | null;
-        typeFilter?.addEventListener('change', () => {
-            this.typeFilter = typeFilter.value;
+        // 分段类型过滤（定案：分段胶囊）——html/svg 合并为「文档」段
+        UIComponents.bindSegmented(this.panel, (value) => {
+            this.typeFilter = value || 'all';
             // Persisted view state: the library opens with the same filter next session.
             if (!this.settings.libraryView) this.settings.libraryView = { sortOrder: this.sortOrder, typeFilter: 'all' };
             this.settings.libraryView.typeFilter = this.typeFilter;
             this.save();
             void this.refreshMediaGrid();
+        });
+
+        // 五组折叠 + 开闭状态记忆（视图态 localStorage，不进 settings）
+        UIComponents.bindGroups(this.panel, {
+            st_group_visual: true,
+            st_group_atmosphere: false,
+            st_group_audio: false,
+            st_group_auto: false,
+            st_group_system: false,
+        });
+
+        // 多选批量模式
+        const multiBtn = this.panel.querySelector('#st_topbar_multiselect_btn') as HTMLButtonElement | null;
+        multiBtn?.addEventListener('click', () => this.setMultiSelectMode(!this.multiSelectMode));
+        this.panel.querySelector('#st_multiselect_delete_btn')?.addEventListener('click', () => { void this.bulkDeleteSelected(); });
+        this.panel.querySelector('#st_multiselect_first_btn')?.addEventListener('click', () => { void this.applyFirstSelected(); });
+        this.panel.querySelector('#st_multiselect_random_btn')?.addEventListener('click', () => { void this.applyRandomSelected(); });
+        this.panel.querySelector('#st_multiselect_exit_btn')?.addEventListener('click', () => this.setMultiSelectMode(false));
+
+        // 顶栏场景快切：选中即应用
+        const quickScene = this.panel.querySelector('#st_topbar_scene_quick') as HTMLSelectElement | null;
+        quickScene?.addEventListener('change', () => {
+            if (quickScene.value) this.callbacks.onSceneApplied?.(quickScene.value);
         });
 
         const sortSelect = this.panel.querySelector('#st_topbar_sort') as HTMLSelectElement | null;
@@ -593,6 +631,14 @@ export class TopbarBackgroundDrawer {
         const fileInput = this.panel.querySelector('#st_bgloader_file_input') as HTMLInputElement | null;
 
         dropzone?.addEventListener('click', () => fileInput?.click());
+        // 键盘可达（a11y 定案）：dropzone 可聚焦，Enter/Space 触发文件选择
+        dropzone?.addEventListener('keydown', (e) => {
+            const key = (e as KeyboardEvent).key;
+            if (key === 'Enter' || key === ' ') {
+                e.preventDefault();
+                fileInput?.click();
+            }
+        });
         dropzone?.addEventListener('dragover', (e) => {
             e.preventDefault();
             dropzone.classList.add('dragover');
@@ -867,7 +913,7 @@ export class TopbarBackgroundDrawer {
                     this.save();
                     this.syncFormControls();
                 } catch (err) {
-                    alert('导入失败：不是有效的 JSON 配置文件');
+                    void HostBridge.getInstance().alertDialog('导入失败：不是有效的 JSON 配置文件');
                 }
             };
             reader.readAsText(file);
@@ -969,9 +1015,10 @@ export class TopbarBackgroundDrawer {
         setChecked('st_cache_autoclean', this.settings.lruAutoClean);
         setChecked('st_agent_tools_enable', this.settings.agentToolsEnabled);
 
-        // Library view state (remote convergence must repaint the two toolbar selects too).
-        const typeEl = this.panel?.querySelector('#st_topbar_type_filter') as HTMLSelectElement | null;
-        if (typeEl) typeEl.value = this.typeFilter;
+        // Library view state（远程收敛回填）：分段胶囊选中态 + 排序下拉。
+        for (const b of Array.from(this.panel.querySelectorAll<HTMLButtonElement>('#st_topbar_type_seg .st-bgloader-seg-btn'))) {
+            b.classList.toggle('active', b.dataset.segValue === this.typeFilter);
+        }
         const sortEl = this.panel?.querySelector('#st_topbar_sort') as HTMLSelectElement | null;
         if (sortEl) sortEl.value = this.sortOrder;
     }
@@ -1004,9 +1051,11 @@ export class TopbarBackgroundDrawer {
         let items = await this.cacheManager.listMedia();
         if (generation !== this.refreshGeneration) return;
 
-        // Filter by type
+        // Filter by type（'doc' = html + svg 合并段）
         if (this.typeFilter !== 'all') {
-            items = items.filter((i) => i.type === this.typeFilter);
+            items = items.filter((i) => this.typeFilter === 'doc'
+                ? (i.type === 'html' || i.type === 'svg')
+                : i.type === this.typeFilter);
         }
 
         // Filter by search
@@ -1022,6 +1071,7 @@ export class TopbarBackgroundDrawer {
         } else {
             items.sort((a, b) => a.name.localeCompare(b.name));
         }
+        this.lastGridItems = items;
 
         if (items.length === 0) {
             grid.innerHTML = `
@@ -1047,10 +1097,11 @@ export class TopbarBackgroundDrawer {
             if (item.type === 'audio') iconClass = 'fa-file-audio';
             if (item.type === 'html' || item.type === 'svg') iconClass = 'fa-file-code';
 
+            // 懒挂载：图片/视频预览不在构建期写入（data-lazy-*），进入视口 200px 前瞻带才 hydrate
             const previewContent = item.type === 'image'
-                ? `<div class="st-bgloader-card-img" style="background-image: url('${escapeHtml(item.url)}')"></div>`
+                ? `<div class="st-bgloader-card-img" data-lazy-image="${escapeHtml(item.url)}"></div>`
                 : item.type === 'video'
-                    ? `<div class="st-bgloader-card-img st-bgloader-card-img-pending"></div>`
+                    ? `<div class="st-bgloader-card-img st-bgloader-card-img-pending" data-lazy-thumb="${escapeHtml(item.id)}"></div>`
                     : `<div class="st-bgloader-card-icon"><i class="fa-solid ${iconClass} fa-2x"></i></div>`;
 
             const displayName = item.name.replace(/[\(\（][^\)\）]*[\)\）]/g, '').trim() || item.name;
@@ -1064,20 +1115,12 @@ export class TopbarBackgroundDrawer {
                         ${isActive ? '<span class="st-bgloader-active-tag"><i class="fa-solid fa-check"></i> 当前</span>' : ''}
                     </div>
                 </div>
-                <div class="st-bgloader-card-actions">
-                    <button type="button" class="menu_button menu_button_icon st-card-apply" title="应用"><i class="fa-solid fa-play"></i></button>
-                    <button type="button" class="menu_button menu_button_icon menu_button_danger st-card-delete" title="删除"><i class="fa-solid fa-trash"></i></button>
-                </div>
+                <button type="button" class="st-bgloader-media-delete st-card-delete" title="删除" aria-label="删除 ${escapeHtml(item.name)}"><i class="fa-solid fa-trash"></i></button>
             `;
-
-            card.querySelector('.st-card-apply')?.addEventListener('click', (e) => {
-                e.stopPropagation();
-                this.reportMediaAction(this.callbacks.onMediaSelected(item), '应用媒体失败');
-            });
 
             card.querySelector('.st-card-delete')?.addEventListener('click', async (e) => {
                 e.stopPropagation();
-                if (confirm('确认删除？')) {
+                if (await HostBridge.getInstance().confirmDialog('确认删除？')) {
                     try {
                         await this.cacheManager.deleteMedia(item.id);
                         // 缩略图缓存同步失效：否则重建网格会命中旧缓存（或滞留已删条目）
@@ -1092,6 +1135,15 @@ export class TopbarBackgroundDrawer {
             });
 
             card.addEventListener('click', () => {
+                if (this.multiSelectMode) {
+                    const id = card.dataset.itemId;
+                    if (!id) return;
+                    if (this.selectedIds.has(id)) this.selectedIds.delete(id);
+                    else this.selectedIds.add(id);
+                    this.syncCardSelection(card);
+                    this.syncMultiSelectCount();
+                    return;
+                }
                 this.reportMediaAction(this.callbacks.onMediaSelected(item), '应用媒体失败');
             });
 
@@ -1123,35 +1175,142 @@ export class TopbarBackgroundDrawer {
             fragment.appendChild(card);
         });
         grid.appendChild(fragment);
-        void this.populateVideoThumbnails(items, generation);
+        this.observeGridLazyLoad(grid);
+
+        // 多选态下重建网格后回写选中视觉与计数（技术面复检 A：否则 selectedIds 与 DOM 失步）
+        if (this.multiSelectMode) {
+            for (const card of Array.from(grid.querySelectorAll<HTMLElement>('.st-bgloader-media-card'))) {
+                this.syncCardSelection(card);
+            }
+            this.syncMultiSelectCount();
+        }
     }
 
     /**
-     * Fills video cards with first-frame thumbnails after the grid renders. Lazily generated
-     * (2 at a time, seek ~1/3 into the stream), cached per item for the session; failures fall
-     * back to the empty placeholder tile silently. Generation-guarded so a newer grid refresh
-     * is never painted by a stale run.
+     * 懒挂载（定案：懒加载+窗口化）：卡片进入视口 200px 前瞻带才写预览背景或生成视频
+     * 抽帧；离屏渲染由 CSS content-visibility 跳过。老宿主无 IntersectionObserver 时
+     * 降级为构建后直接全量 hydrate（功能不变，只是放弃懒优化）。
      */
-    private async populateVideoThumbnails(items: MediaItem[], generation: number): Promise<void> {
-        const queue = items.filter(i => i.type === 'video');
-        const paint = (item: MediaItem, dataUrl: string) => {
-            if (generation !== this.refreshGeneration || !this.panel) return;
-            const img = this.panel.querySelector(
+    private observeGridLazyLoad(grid: Element): void {
+        this.gridObserver?.disconnect();
+        const cards = Array.from(grid.querySelectorAll<HTMLElement>('.st-bgloader-media-card'));
+        if (!('IntersectionObserver' in window)) {
+            for (const card of cards) this.hydrateCardPreview(card);
+            return;
+        }
+        this.gridObserver = new IntersectionObserver((entries) => {
+            for (const entry of entries) {
+                if (!entry.isIntersecting) continue;
+                const card = entry.target as HTMLElement;
+                this.gridObserver?.unobserve(card);
+                this.hydrateCardPreview(card);
+            }
+        }, { rootMargin: '200px 0px' });
+        for (const card of cards) this.gridObserver.observe(card);
+    }
+
+    /** 写入单卡预览：图片直接落背景，视频进入既有 LRU 抽帧管线（生成后按 id 回填）。 */
+    private hydrateCardPreview(card: HTMLElement): void {
+        const img = card.querySelector<HTMLElement>('.st-bgloader-card-img');
+        if (!img) return;
+        const lazyImage = img.dataset.lazyImage;
+        if (lazyImage) {
+            img.style.backgroundImage = `url('${lazyImage}')`;
+            delete img.dataset.lazyImage;
+            return;
+        }
+        const lazyThumb = img.dataset.lazyThumb;
+        if (!lazyThumb) return;
+        delete img.dataset.lazyThumb;
+        const item = this.lastGridItems?.find((i) => i.id === lazyThumb);
+        if (!item) return;
+        void this.getVideoThumbnail(item).then((dataUrl) => {
+            if (!dataUrl || !this.panel) return;
+            const target = this.panel?.querySelector(
                 `#st_bgloader_grid .st-bgloader-media-card[data-item-id="${CSS.escape(item.id)}"] .st-bgloader-card-img`,
             ) as HTMLElement | null;
-            if (img) {
-                img.style.backgroundImage = `url('${dataUrl}')`;
-                img.classList.remove('st-bgloader-card-img-pending');
+            if (target) {
+                target.style.backgroundImage = `url('${dataUrl}')`;
+                target.classList.remove('st-bgloader-card-img-pending');
             }
-        };
-        const worker = async () => {
-            while (queue.length > 0) {
-                const item = queue.shift()!;
-                const dataUrl = await this.getVideoThumbnail(item);
-                if (dataUrl) paint(item, dataUrl);
+        });
+    }
+
+    /** 多选批量模式切换（会话内视图态）：进出时同步操作条显隐与卡片角标。 */
+    private setMultiSelectMode(on: boolean): void {
+        this.multiSelectMode = on;
+        if (!on) this.selectedIds.clear();
+        const bar = this.panel?.querySelector('#st_bgloader_multiselect_bar') as HTMLElement | null;
+        if (bar) bar.hidden = !on;
+        const btn = this.panel?.querySelector('#st_topbar_multiselect_btn');
+        if (btn) btn.classList.toggle('active', on);
+        for (const card of Array.from(this.panel?.querySelectorAll<HTMLElement>('.st-bgloader-media-card') ?? [])) {
+            this.syncCardSelection(card);
+        }
+        this.syncMultiSelectCount();
+    }
+
+    private syncCardSelection(card: HTMLElement): void {
+        const id = card.dataset.itemId;
+        const selected = this.multiSelectMode && !!id && this.selectedIds.has(id);
+        card.classList.toggle('selected', selected);
+        const mark = card.querySelector('.st-bgloader-select-mark');
+        if (selected && !mark) {
+            const el = document.createElement('div');
+            el.className = 'st-bgloader-select-mark';
+            el.innerHTML = '<i class="fa-solid fa-check"></i>';
+            card.appendChild(el);
+        } else if (!selected && mark) {
+            mark.remove();
+        }
+    }
+
+    private syncMultiSelectCount(): void {
+        const el = this.panel?.querySelector('#st_multiselect_count');
+        if (el) el.textContent = `已选 ${this.selectedIds.size}`;
+    }
+
+    private async findItemById(id: string): Promise<MediaItem | undefined> {
+        return (await this.cacheManager.listMedia()).find((i) => i.id === id);
+    }
+
+    private async applyFirstSelected(): Promise<void> {
+        const id = Array.from(this.selectedIds)[0];
+        if (!id) return;
+        const item = await this.findItemById(id);
+        if (item) this.reportMediaAction(this.callbacks.onMediaSelected(item), '应用媒体失败');
+    }
+
+    private async applyRandomSelected(): Promise<void> {
+        const ids = Array.from(this.selectedIds);
+        if (ids.length === 0) return;
+        const pick = ids[Math.floor(Math.random() * ids.length)];
+        const item = await this.findItemById(pick);
+        if (item) this.reportMediaAction(this.callbacks.onMediaSelected(item), '应用媒体失败');
+    }
+
+    private async bulkDeleteSelected(): Promise<void> {
+        const ids = Array.from(this.selectedIds);
+        if (ids.length === 0) return;
+        const ok = await HostBridge.getInstance().confirmDialog(`删除 ${ids.length} 个媒体？`);
+        if (!ok) return;
+        let failed = 0;
+        for (const id of ids) {
+            try {
+                await this.cacheManager.deleteMedia(id);
+                this.thumbCache.delete(id);
+                await this.callbacks.onMediaDeleted(id);
+                this.selectedIds.delete(id);
+            } catch (err) {
+                failed++;
+                console.error('[ST-BgLoader] 批量删除失败:', id, err);
             }
-        };
-        await Promise.all(Array.from({ length: Math.min(2, queue.length) }, worker));
+        }
+        if (failed > 0) {
+            void HostBridge.getInstance().alertDialog(`批量删除完成，失败 ${failed} 个`);
+        }
+        void this.refreshMediaGrid();
+        void this.updateCacheStats();
     }
 
     private async getVideoThumbnail(item: MediaItem): Promise<string | null> {
@@ -1251,7 +1410,7 @@ export class TopbarBackgroundDrawer {
             void this.updateCacheStats();
         } catch (err) {
             console.error('[ST-BgLoader] Upload failed:', err);
-            alert(`上传失败: ${(err as Error).message}`);
+            void HostBridge.getInstance().alertDialog(`上传失败: ${(err as Error).message}`);
         }
     }
 
@@ -1271,7 +1430,7 @@ export class TopbarBackgroundDrawer {
             void this.updateCacheStats();
         } catch (err) {
             console.error('[ST-BgLoader] URL Import failed:', err);
-            alert(`URL 导入失败: ${(err as Error).message}`);
+            void HostBridge.getInstance().alertDialog(`URL 导入失败: ${(err as Error).message}`);
         }
     }
 
@@ -1310,8 +1469,8 @@ export class TopbarBackgroundDrawer {
 
         const saveBtn = this.panel?.querySelector<HTMLButtonElement>('#st_preset_save_btn');
         if (saveBtn) {
-            saveBtn.onclick = () => {
-                const name = prompt('预设名称:');
+            saveBtn.onclick = async () => {
+                const name = await HostBridge.getInstance().promptDialog('预设名称');
                 if (name) {
                     if (!this.settings.userPresets) this.settings.userPresets = {};
                     this.settings.userPresets[name] = { ...this.settings.filters };
@@ -1327,7 +1486,7 @@ export class TopbarBackgroundDrawer {
             delBtn.onclick = () => {
                 const cur = select.value;
                 if (BUILTIN_PRESETS[cur]) {
-                    alert('无法删除内置预设');
+                    void HostBridge.getInstance().alertDialog('无法删除内置预设');
                     return;
                 }
                 if (this.settings.userPresets?.[cur]) {
@@ -1344,37 +1503,46 @@ export class TopbarBackgroundDrawer {
 
     private updateSceneSelect(): void {
         const select = this.panel?.querySelector('#st_scene_select') as HTMLSelectElement | null;
-        if (!select) return;
-        select.innerHTML = '';
-
-        Object.values(BUILTIN_SCENES).forEach((s) => {
-            const opt = document.createElement('option');
-            opt.value = s.id;
-            opt.textContent = s.name;
-            opt.selected = this.settings.activeSceneId === s.id;
-            select.appendChild(opt);
-        });
-
-        Object.entries(this.settings.scenes || {}).forEach(([id, s]) => {
-            const opt = document.createElement('option');
-            opt.value = id;
-            opt.textContent = `⭐ ${s.name}`;
-            opt.selected = this.settings.activeSceneId === id;
-            select.appendChild(opt);
-        });
+        const quick = this.panel?.querySelector('#st_topbar_scene_quick') as HTMLSelectElement | null;
+        const populate = (target: HTMLSelectElement | null, placeholder?: string) => {
+            if (!target) return;
+            target.innerHTML = '';
+            if (placeholder !== undefined) {
+                const ph = document.createElement('option');
+                ph.value = '';
+                ph.textContent = placeholder;
+                target.appendChild(ph);
+            }
+            Object.values(BUILTIN_SCENES).forEach((s) => {
+                const opt = document.createElement('option');
+                opt.value = s.id;
+                opt.textContent = s.name;
+                opt.selected = this.settings.activeSceneId === s.id;
+                target.appendChild(opt);
+            });
+            Object.entries(this.settings.scenes || {}).forEach(([id, s]) => {
+                const opt = document.createElement('option');
+                opt.value = id;
+                opt.textContent = `⭐ ${s.name}`;
+                opt.selected = this.settings.activeSceneId === id;
+                target.appendChild(opt);
+            });
+        };
+        populate(select);
+        populate(quick, '场景');
 
         const applyBtn = this.panel?.querySelector<HTMLButtonElement>('#st_scene_apply_btn');
         if (applyBtn) {
             applyBtn.onclick = () => {
-                const val = select.value;
+                const val = (this.panel?.querySelector('#st_scene_select') as HTMLSelectElement | null)?.value ?? '';
                 this.callbacks.onSceneApplied?.(val);
             };
         }
 
         const saveBtn = this.panel?.querySelector<HTMLButtonElement>('#st_scene_save_btn');
         if (saveBtn) {
-            saveBtn.onclick = () => {
-                const name = prompt('场景名称:');
+            saveBtn.onclick = async () => {
+                const name = await HostBridge.getInstance().promptDialog('场景名称');
                 if (!name) return;
                 const id = 'scene_' + Date.now();
                 if (!this.settings.scenes) this.settings.scenes = {};
@@ -1398,9 +1566,9 @@ export class TopbarBackgroundDrawer {
         const delBtn = this.panel?.querySelector<HTMLButtonElement>('#st_scene_del_btn');
         if (delBtn) {
             delBtn.onclick = () => {
-                const cur = select.value;
+                const cur = (this.panel?.querySelector('#st_scene_select') as HTMLSelectElement | null)?.value ?? '';
                 if (BUILTIN_SCENES[cur]) {
-                    alert('无法删除内置场景');
+                    void HostBridge.getInstance().alertDialog('无法删除内置场景');
                     return;
                 }
                 if (this.settings.scenes?.[cur]) {
@@ -1441,17 +1609,17 @@ export class TopbarBackgroundDrawer {
                     try {
                         parsed = JSON.parse(event.target?.result as string);
                     } catch {
-                        alert('导入失败：不是有效的 JSON 文件');
+                        void HostBridge.getInstance().alertDialog('导入失败：不是有效的 JSON 文件');
                         return;
                     }
                     const result = this.callbacks.onScenesImport?.(parsed);
                     if (!result) {
-                        alert('导入失败：不是本插件导出的场景文件（format/version 不符）');
+                        void HostBridge.getInstance().alertDialog('导入失败：场景文件格式不符');
                         return;
                     }
                     this.updateSceneSelect();
-                    const summary = `场景导入完成：新增 ${result.added} / 更新 ${result.updated}` +
-                        (result.skipped ? ` / 跳过 ${result.skipped}` : '');
+                    const summary = `场景导入：新增 ${result.added} 更新 ${result.updated}` +
+                        (result.skipped ? ` 跳过 ${result.skipped}` : '');
                     try {
                         (window as unknown as { toastr?: { success(msg: string): void } }).toastr?.success(summary);
                     } catch { /* toastr 不在时静默——选择器已刷新，结果可从场景列表核对 */ }
@@ -1519,7 +1687,7 @@ export class TopbarBackgroundDrawer {
                 const name = (this.panel?.querySelector('#st_trigger_name') as HTMLInputElement)?.value.trim();
                 const pattern = (this.panel?.querySelector('#st_trigger_pattern') as HTMLInputElement)?.value.trim();
                 if (!name || !pattern) {
-                    alert('请填写规则名称和匹配文本');
+                    void HostBridge.getInstance().alertDialog('名称、匹配文本必填');
                     return;
                 }
                 const newRule: TriggerRule = {

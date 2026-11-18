@@ -109,7 +109,7 @@ export class SettingsDrawer {
                         <div class="st-bgloader-master-row">
                             <label class="st-bgloader-check st-bgloader-master-label">
                                 <input type="checkbox" id="st_bgloader_master_enable" ${isEnabled ? 'checked' : ''} />
-                                <span><strong>启用背景增强</strong></span>
+                                <span><strong>启用增强</strong></span>
                             </label>
                         </div>
                         <div class="st-bgloader-master-status">

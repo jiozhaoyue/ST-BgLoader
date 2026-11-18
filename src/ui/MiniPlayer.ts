@@ -38,17 +38,17 @@ export class MiniPlayer {
 
         el.innerHTML = `
             <div class="st-bg-mini-capsule">
-                <button class="st-bg-mini-btn" id="st_mini_prev" title="上一曲">
+                <button class="st-bg-mini-btn" id="st_mini_prev" title="上一曲" aria-label="上一曲">
                     <i class="fa-solid fa-backward-step"></i>
                 </button>
-                <button class="st-bg-mini-btn st-bg-mini-play" id="st_mini_play" title="${isPlaying ? '暂停' : '播放'}">
+                <button class="st-bg-mini-btn st-bg-mini-play" id="st_mini_play" title="${isPlaying ? '暂停' : '播放'}" aria-label="${isPlaying ? '暂停' : '播放'}">
                     <i class="fa-solid ${isPlaying ? 'fa-pause' : 'fa-play'}"></i>
                 </button>
-                <button class="st-bg-mini-btn" id="st_mini_next" title="下一曲">
+                <button class="st-bg-mini-btn" id="st_mini_next" title="下一曲" aria-label="下一曲">
                     <i class="fa-solid fa-forward-step"></i>
                 </button>
                 <div class="st-bg-mini-track" id="st_mini_title" title="${escapeHtml(trackTitle)}">${escapeHtml(trackTitle)}</div>
-                <button class="st-bg-mini-btn st-bg-mini-mode" id="st_mini_mode" title="模式">
+                <button class="st-bg-mini-btn st-bg-mini-mode" id="st_mini_mode" title="模式" aria-label="播放模式">
                     <i class="fa-solid ${this.getModeIcon(mode)}"></i>
                 </button>
             </div>

@@ -162,4 +162,46 @@ export class HostBridge {
             return null;
         }
     }
+
+    // ------------------------------------------------------------------
+    // 官方 Popup 适配器（D-06）：统一弹窗入口，业务层禁止直接调 alert/confirm/prompt。
+    // 优先宿主 context 的 callGenericPopup（官方扩展 API，POPUP_TYPE：
+    // TEXT=0 / CONFIRM=1 / INPUT=2，CONFIRM 返回 AFFIRMATIVE=1 / NEGATIVE=0），
+    // 不可用或异常时逐级降级（D-03 链），永不抛错。降级终点是原生弹窗——
+    // 本文件在 src/bridge/，不属于 src/ui 弹窗门禁扫描面。
+    // ------------------------------------------------------------------
+
+    public async alertDialog(message: string): Promise<void> {
+        const popup = this.getContext()?.callGenericPopup;
+        if (typeof popup === 'function') {
+            try {
+                await popup(message, 0);
+                return;
+            } catch { /* 降级到原生 */ }
+        }
+        window.alert(message);
+    }
+
+    public async confirmDialog(message: string): Promise<boolean> {
+        const popup = this.getContext()?.callGenericPopup;
+        if (typeof popup === 'function') {
+            try {
+                const result = await popup(message, 1);
+                // 严格白名单：非 1/true 一律视为未确认（技术面复检 B）
+                return result === true || result === 1;
+            } catch { /* 降级到原生 */ }
+        }
+        return window.confirm(message);
+    }
+
+    public async promptDialog(message: string): Promise<string | null> {
+        const popup = this.getContext()?.callGenericPopup;
+        if (typeof popup === 'function') {
+            try {
+                const result = await popup(message, 2);
+                return typeof result === 'string' ? result : null;
+            } catch { /* 降级到原生 */ }
+        }
+        return window.prompt(message);
+    }
 }
