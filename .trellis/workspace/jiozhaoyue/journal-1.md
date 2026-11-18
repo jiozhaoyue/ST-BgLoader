@@ -745,3 +745,28 @@ Added procedural WebAudio ambient soundscape synthesizer, frosted glass transpar
 ### Status
 
 [OK] **Completed**
+
+
+## Session 27: 全仓蜂群审计：敏感信息/规范/注入/逻辑/UI/后端/竞品（两波交叉验证）
+<!-- trellis-session: v=2 fp=6b160ff9184f22af -->
+
+**Date**: 2026-11-19
+**Task**: 全仓蜂群审计：敏感信息/规范/注入/逻辑/UI/后端/竞品（两波交叉验证）
+**Branch**: `master`
+
+### Summary
+
+两波蜂群只读审计（8 路探查+3 路交叉找茬，11 任务 13 实例，12 个 hy4-flash-free 免费档）；报告落盘 .trellis/research/st-bgloader-full-audit-2026-11.md。关键结论：①高危——blob 8d2be5e0 残留泄露 sk- 密钥（22.8MB settings 备份，.gitignore 注释自述曾推公开仓库），需轮换+本地 gc；②接管为替换式（display:none 全灭原生抽屉），与『只接管原生背景设置』目标差距所在，移动端零 @media；③『DJ 台硬耦合』论断被交叉验证推翻（组合根 DI，9 项演出类全有 API 路径，7 项模块可降级 addon，场景/触发器为编排器拆不干净）；④无自研后端，主路径 100% 复用原生 /api/backgrounds/*，Authority 可选且 blob/sql/jobs/events 四接口零调用属超前声明；⑤『全生态唯一零转码』被推翻（LenAnderson 扩展存在），定位改为『唯一工程化零转码方案+Canvas 特效引擎』，酒馆助手脚本生态可复刻特效大半是最大威胁；⑥规范硬约束落实度高，漂移在文档自身（AGENTS.md:86 入口失效、spec 数字 5 处过时、G-18/D-06 两条规则冲突待裁决）；⑦index.ts 847 行上帝对象，5 大确认风险+2 新竞态。实施类决策（面板重构方向/演出类处置/后端定位/下一步优先级）问答面板未获回应，挂起待裁定。scout.md 代理配置已对齐 hy4-flash-free+enabled。
+Topics: [.trellis/research/st-bgloader-full-audit-2026-11.md](../../research/st-bgloader-full-audit-2026-11.md)
+
+### Git Commits
+
+(No commits - planning session)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- P0=用户轮换泄露密钥并授权 git 历史清理与 .gitignore 补规则；然后按用户裁定进入 UI 重构设计或 P1 修复批
