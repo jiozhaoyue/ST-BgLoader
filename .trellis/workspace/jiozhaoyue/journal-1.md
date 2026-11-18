@@ -770,3 +770,24 @@ Topics: [.trellis/research/st-bgloader-full-audit-2026-11.md](../../research/st-
 ### Next Steps
 
 - P0=用户轮换泄露密钥并授权 git 历史清理与 .gitignore 补规则；然后按用户裁定进入 UI 重构设计或 P1 修复批
+
+
+## Session 28: Session 28: 面板 UI 四面重构——增强式内嵌与蜂群接力终验
+<!-- trellis-session: v=2 fp=cda6ce1d24cb9809 -->
+
+**Date**: 2026-11-19
+**Task**: Session 28: 面板 UI 四面重构——增强式内嵌与蜂群接力终验
+**Branch**: `master`
+
+### Summary
+
+从上个 jsonl（Session 27 审计）续接。流程：git pull→Dev Luker :8003 启动+junction 身份核验→5 路 hy4-flash-free 蜂群调研（信息架构/酒馆生态样板/现代设计系统/图库样板/主题+移动端）→10×4 交互问答 40 项定案→任务工件（PRD/design/implement/task.jsonl，验收非 TBD）→主实施 S1-S4→用户纠偏后改蜂群接力完成全部落地与验证（trellis-implement 首孵读新定义打通 hy4-free 写通道；并发限制实测为用户级）。定案要点：四面全重做/渐进披露/增强式内嵌（废止替换式接管，原生网格保留可见）/维持边框方案（G-18 项目豁免入 AGENTS 项目覆盖）；双 Tab+五组折叠（画面开四合，localStorage 记忆）/分段胶囊（html+svg 归并 doc 段）/场景双下拉/多选批量（删/顺换/随机换）/懒挂载（IO 200px+content-visibility）/HostBridge 弹窗适配器（callGenericPopup 优先+严格白名单 ===1||true+降级原生）/语义令牌层（00-tokens 唯一 fallback 点）/z-index 分档/移动端 1000/450 断点+触摸 36px。两波交叉验证实效：F2 规范面抓 P0 令牌失解析（.st-bgloader-topbar-panel 漏清单→补入，探针关闭 ACCENT=#4fa3d1/border1px/minHeight36px）、F3 红队 3P1（组头键盘可达 aria+keydown/header wrap/450px 占位 54px）、F1 技术面 A 多选视图失步/B confirm 白名单/D 定时器清理（全修）。测试适配：smoke/extreme 分段语义+c11 懒挂载断言+截图脚本分组展开（04-07 md5 分离）+e2e E2E_NAV_TIMEOUT_MS（Luker 第三方扩展 CDN 抖动治本）；T-E 修 Dev Luker 陈旧拷贝→junction（旧拷贝归档 _stale-extensions-backup）。验证矩阵：type-check/check:css/build 全绿；dev-harness 14/14+api-harness 38/38；真机 Dev ST :8001 e2e 26/26+smoke 11/11+extreme 14/14 清理零残留；Dev Luker :8003 e2e 26/26（Test 26 十断言含 tokensResolve/touchMin）；8001 停回离线、8003 保持。P0 整改（用户授权）：gitignore 四条/.bak 出索引/wiki 去 file:///、git 历史清理 blob 8d2be5e0 已不可达（松散对象 1113→0）；密钥轮换仍待用户。提交 7 连发 9bc2497→cd4363c 显式 pathspec 逐个推送；commit 1 因 T-D 预暂存的 .bak 删除被一并带入，分组略掺杂已如实记录。
+Topics: [.trellis/research/panel-ui-refactor-research-2026-11.md](../../research/panel-ui-refactor-research-2026-11.md)
+
+### Git Commits
+
+(No commits - planning session)
+
+### Status
+
+[OK] **Completed**
