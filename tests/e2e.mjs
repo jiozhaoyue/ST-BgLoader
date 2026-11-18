@@ -10,6 +10,8 @@ const TARGET_URL = process.env.TEST_TARGET_URL
     || process.env.TARGET_URL
     || 'https://localhost:8003';
 
+const NAV_TIMEOUT_MS = Number(process.env.E2E_NAV_TIMEOUT_MS) || 35000;
+
 async function runE2ETests() {
     console.log('🚀 Starting Automated E2E Test on', TARGET_URL);
 
@@ -37,13 +39,14 @@ async function runE2ETests() {
 
     try {
         console.log('⏳ Navigating to SillyTavern...');
-        await page.goto(TARGET_URL, { waitUntil: 'networkidle2', timeout: 35000 });
+        // Luker 页面存在第三方扩展周期性外部请求，networkidle2 需更长窗口
+        await page.goto(TARGET_URL, { waitUntil: 'networkidle2', timeout: NAV_TIMEOUT_MS });
 
         // Ensure loader clears
         await page.waitForFunction(() => {
             const loader = document.querySelector('#loader, #loading');
             return !loader || loader.style.display === 'none' || window.getComputedStyle(loader).display === 'none';
-        }, { timeout: 35000 });
+        }, { timeout: 90000 });
 
         // Enable extension in context if not yet active
         await page.evaluate(async () => {
@@ -64,6 +67,10 @@ async function runE2ETests() {
         await page.waitForFunction(() => {
             return window.STBgLoader && window.STBgLoader.isInitialized;
         }, { timeout: 35000 });
+
+        // 面板按重构定案为懒挂载：持久化 enabled=false 时不会自动挂载。
+        // 与 smoke-ui/extreme-media 保持一致，测试开始时显式挂载一次。
+        await page.evaluate(() => window.STBgLoader.getTopbarDrawer?.()?.mount?.());
 
         // 1. Check window.STBgLoader
         console.log('🧪 Test 1: Verifying window.STBgLoader extension instance...');
@@ -879,8 +886,96 @@ async function runE2ETests() {
         }
         console.log('✅ Test 25 Passed: v2 endpoints (auto-advance + scene share) verified.');
 
+        // ---------- Test 26: Panel UI refactor acceptance ----------
+        // 覆盖 2026-11-19 重构定案：增强式内嵌、分段胶囊、五组折叠记忆、多选批量、
+        // content-visibility 窗口化、1000px 断点放开高度、同步骨架构建 <50ms。
+        console.log('🧪 Test 26: Panel UI refactor acceptance (enhanced-inline / segmented / groups / multiselect / windowing / breakpoint)...');
+        const uiResult = await page.evaluate(async () => {
+            const out = {};
+            const drawerApi = window.STBgLoader?.getTopbarDrawer?.();
+            drawerApi?.unmount?.();
+            // 同步骨架构建耗时（不含异步网格加载）：PRD 数字指标的可测口径
+            const t0 = performance.now();
+            drawerApi?.mount?.();
+            out.panelBuildMs = Math.round(performance.now() - t0);
+
+            const panel = document.querySelector('#st_bgloader_topbar_panel');
+            out.mounted = !!panel;
+            if (!panel) return out;
+
+            // 1. 增强式内嵌：原生抽屉直接子元素不再被打上隐藏类（替换式接管废止）
+            const hostBg = document.querySelector('#Backgrounds');
+            const hiddenNative = Array.from(hostBg?.children ?? [])
+                .filter((c) => c.id !== 'st_bgloader_topbar_panel' && c.classList.contains('st-bg-native-hidden')).length;
+            out.enhancedInline = hiddenNative === 0;
+
+            // 2. 分段胶囊：段按钮存在且含全部五段
+            const segBtns = Array.from(panel.querySelectorAll('#st_topbar_type_seg .st-bgloader-seg-btn'));
+            out.segmented = segBtns.length === 5
+                && ['all', 'image', 'video', 'audio', 'doc'].every((v) => segBtns.some((b) => b.dataset.segValue === v));
+
+            // 3. 五组折叠 + 开闭状态记忆（localStorage 视图态）
+            const autoGroup = panel.querySelector('#st_group_auto');
+            const head = autoGroup?.querySelector('.st-bgloader-group-head');
+            head?.click();
+            const bodyAfterOpen = autoGroup?.querySelector(':scope > .st-bgloader-group-body');
+            const opened = autoGroup?.dataset.open === 'true' && bodyAfterOpen && !bodyAfterOpen.hidden;
+            const stored = JSON.parse(localStorage.getItem('st_bgloader_group_state') || '{}');
+            out.groupMemory = opened && stored['st_group_auto'] === true;
+            head?.click(); // 还原折叠态，不给实例留视图痕迹
+
+            // 等异步网格就绪（卡片或空态，最多 ~3s）再做多选断言
+            for (let i = 0; i < 30; i++) {
+                if (panel.querySelector('#st_bgloader_grid .st-bgloader-media-card')
+                    || panel.querySelector('#st_bgloader_grid .st-bgloader-empty-state')) break;
+                await new Promise((r) => setTimeout(r, 100));
+            }
+
+            // 4. 多选批量：进入→选首卡→计数→退出
+            const cardCount = panel.querySelectorAll('#st_bgloader_grid .st-bgloader-media-card').length;
+            panel.querySelector('#st_topbar_multiselect_btn')?.click();
+            panel.querySelector('#st_bgloader_grid .st-bgloader-media-card')?.click();
+            const countText = panel.querySelector('#st_multiselect_count')?.textContent || '';
+            out.multiselect = cardCount > 0 && countText.includes('1')
+                && !!panel.querySelector('#st_bgloader_grid .st-bgloader-media-card.selected');
+            panel.querySelector('#st_multiselect_exit_btn')?.click();
+            out.multiselectExited = panel.querySelector('#st_bgloader_multiselect_bar')?.hidden === true;
+
+            // 5. 窗口化：卡片携带 content-visibility:auto（离屏渲染跳过）
+            const firstCard = panel.querySelector('#st_bgloader_grid .st-bgloader-media-card');
+            out.contentVisibility = firstCard ? getComputedStyle(firstCard).contentVisibility === 'auto' : false;
+
+            // 7. 语义令牌解析（00-tokens 提供者清单回归守卫：新面必须入清单）
+            out.tokensResolve = getComputedStyle(panel).getPropertyValue('--st-bg-accent').trim() !== '';
+            // 8. 触摸下限生效（≥36px 定案回归守卫）
+            const tabBtn = panel.querySelector('.st-bgloader-tab-btn');
+            out.touchMin = tabBtn ? getComputedStyle(tabBtn).minHeight === '36px' : false;
+
+            return out;
+        });
+        // 6. 移动断点（1000px）：切窄视口断言面板放开 max-height、网格不再 280px，测后还原
+        await page.setViewport({ width: 390, height: 844 });
+        await new Promise((resolve) => setTimeout(resolve, 400));
+        const mobileCheck = await page.evaluate(() => {
+            const p = document.querySelector('#st_bgloader_topbar_panel');
+            if (!p) return { none: false, grid: false };
+            const grid = p.querySelector('#st_bgloader_grid');
+            return { none: getComputedStyle(p).maxHeight === 'none', grid: grid ? getComputedStyle(grid).maxHeight !== '280px' : false };
+        });
+        uiResult.mobileBreakpoint = mobileCheck.none && mobileCheck.grid;
+        await page.setViewport({ width: 1280, height: 800 });
+        console.log('   UI refactor result:', JSON.stringify(uiResult));
+        if (!uiResult.mounted || !uiResult.enhancedInline || !uiResult.segmented || !uiResult.groupMemory
+            || !uiResult.multiselect || !uiResult.multiselectExited || !uiResult.contentVisibility
+            || !uiResult.mobileBreakpoint || !(uiResult.panelBuildMs >= 0 && uiResult.panelBuildMs < 50)
+            || !uiResult.tokensResolve || !uiResult.touchMin) {
+            console.error('❌ Test 26 Failed: Panel UI refactor acceptance failed!', JSON.stringify(uiResult));
+            process.exit(1);
+        }
+        console.log('✅ Test 26 Passed: Panel UI refactor acceptance verified (build ' + uiResult.panelBuildMs + 'ms).');
+
         console.log('\n==========================================');
-        console.log('🎉 ALL 25 AUTOMATED E2E TESTS PASSED! 🎉');
+        console.log('🎉 ALL 26 AUTOMATED E2E TESTS PASSED! 🎉');
         console.log('==========================================\n');
 
     } catch (err) {
