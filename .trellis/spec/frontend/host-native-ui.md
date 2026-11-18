@@ -85,7 +85,7 @@ a `box-shadow` glow is not part of the host's visual language, and geometric hov
 (`transform: scale()`) make the grid jitter in a way the host never does.
 
 **Rule: no `box-shadow` anywhere in the extension's stylesheet.** Elevation is expressed with a
-border. `grep -c 'box-shadow:' src/ui/style.css` must be 0.
+border. `grep -rc 'box-shadow:' src/ui/styles/` 必须全为 0（style.css 现为 @import 聚合入口，守卫逐文件扫描 styles/*.css）。
 
 (The pattern includes the colon on purpose: a bare `grep -c box-shadow` also matches the
 comments that explain *why* there is no shadow, and a false red gate is worse than none.)
@@ -287,12 +287,10 @@ a pass-through assertion succeed for the wrong reason.
    - 扩展设置挂载点：`#extensions_settings`
 3. **安全 CSRF 处理**：统一由 `HostBridge.getCSRFHeaders()` 提取安全 CSRF 校验头，屏蔽宿主上下文内部变量差异。
 
-### 9.2 `#Backgrounds` 原位夺舍与无损还原 (`TopbarBackgroundDrawer`)
+### 9.2 `#Backgrounds` 原位增强挂载与无损还原 (`TopbarBackgroundDrawer`)
 
-1. **原位接管**：点击顶栏背景按钮时，展开的是酒馆原生抽屉 `#Backgrounds`，但在其内部挂载由插件接管的视听双选项卡容器：
-   - **Tab 1「媒体」**：同源 `/api/backgrounds/` 后端文件存储管理、搜索筛选、文件上传、URL 导入与卡片激活管理；
-   - **Tab 2「设置」**：滤镜调色、环境天气、音频频谱、视差、BGM与环境音、视听预设、转场、毛玻璃与缓存管理等。
-2. **原生子节点隐藏**：通过向原生抽屉的原生子元素追加 `.st-bg-native-hidden` 类名（CSS 中显式 `display: none !important;`）进行视觉隐藏。严禁直接 `remove()` 原生 DOM，确保关闭总开关时能瞬间、零损耗还原酒馆原生背景网格。
+1. **原位增强（2026-11-19 定案，废止替换式接管）**：点击顶栏背景按钮展开酒馆原生抽屉，原生内容（背景网格/上传/文件夹/多选/锁定）**完全保留可见可用**；插件面板（媒体+设置双 Tab、设置五组折叠）挂载在原生抽屉内容之后作为增强层。面板底色透明融入宿主，分区靠边框与轻表面层。禁止再用 `.st-bg-native-hidden` 全灭原生子元素。
+2. **无损还原**：总开关关闭时 `unmount()` 摘除面板、断开懒挂载观察器，并清理可能残留的 `.st-bg-native-hidden` 类（该类仅保留给历史残留清理路径），确保零损耗还原原生网格。
 3. **抽屉动画与滑动契约**：遵循 §1 与 §2 铁律，严禁在抽屉外层或 `.inline-drawer-toggle` 拦截滑动事件或写入内联 `display` 样式，完全借用酒馆原生抽屉的折叠滑动与手势支持。
 
 ### 9.3 扩展设置面板单总开关设计 (`SettingsDrawer`)
@@ -337,5 +335,27 @@ a pass-through assertion succeed for the wrong reason.
 - **背景隐藏状态联动**：当用户点击眼睛图标隐藏背景（`backgroundVisible === false`）或禁用扩展（`enabled === false`）时，粒子天气与音频动效画布即刻隐藏并停止循环；
 - **动效静音休眠**：音频静音或无音频信号输出时，`AudioVisualizer` 自动进入静默休眠，跳过渐变重绘；
 - **扫描线离屏着色**：扫描线静态条纹使用 1x4 离屏离散 Pattern 单次填充，取代每帧 300 次 `fillRect` 密集循环。
+
+---
+
+## 11. 语义令牌与重构组件（2026-11-19 面板四面重构）
+
+### 11.1 语义令牌层（styles/00-tokens.css）
+- 全仓唯一允许引用 `--SmartTheme*` 的文件；组件 CSS 一律引用 `--st-bg-*` 派生层（text/border/accent/surface/warn + badge/status 语义例外）。
+- fallback 统一基准：BodyColor #e0e0e0 / BorderColor rgba(255,255,255,.1) / QuoteColor #4fa3d1 / BlurTintColor #1e1e24。
+- **新增 UI 面必须把它的根选择器加入 00-tokens 的清单**，否则语义变量在该面不解析。
+- z-index 分档：--st-z-badge/-header/-float（MiniPlayer 9999 硬编码已收敛）。
+- 样式按组件拆分 styles/00~07（Vite 内联合并，产物仍单文件）；tests/css-gate.mjs 逐文件扫描 style.css + styles/*.css。
+
+### 11.2 组件工厂与交互
+- UIComponents：renderRow（行式：标题左控件右）/ renderGroup（折叠组：hidden 属性切换内容层，开闭态存 localStorage `st_bgloader_group_state`，组头 actions 区点击不折叠）/ renderSegmented（分段胶囊）/ renderSelect(compact) / renderButton。
+- 绑定器统一返回解绑函数（bindRafSlider/bindGroups/bindSegmented），取消挂起 rAF；监听器随面板元素销毁。
+- 弹窗统一走 HostBridge：alertDialog/confirmDialog/promptDialog——优先宿主 callGenericPopup（POPUP_TYPE TEXT=0/CONFIRM=1/INPUT=2），异常降级原生；业务层零 alert/confirm/prompt（grep 门禁=0）。
+
+### 11.3 媒体网格与移动端
+- 懒挂载：卡片构建不写预览（data-lazy-image/data-lazy-thumb），IntersectionObserver rootMargin 200px 进入前瞻带才 hydrate；视频抽帧复用 LRU 管线按需生成。
+- content-visibility:auto + contain-intrinsic-size（离屏渲染跳过，web.dev 实测 7x）。
+- 多选批量：setMultiSelectMode + 批量删（确认走适配器）/顺换/随机换；选中卡 accent 边框+对勾角标。
+- 移动端断点与宿主官方一致：1000px（面板放开 max-height、网格 40vh）、450px（网格 96px 列、工具条折行）；触摸目标 ≥36px（--st-touch-min）；overscroll-behavior:contain；prefers-reduced-motion 降级。
 
 

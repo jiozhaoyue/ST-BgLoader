@@ -91,7 +91,10 @@ Managed by mini-trellis. Edits outside this block are preserved.
 - 禁止 pack：card, infra
 
 ## 项目覆盖
-（本仓自有内容，同步器保留；无则留空。）
+- G-18 豁免：本项目以边框表达层级，全样式零 box-shadow（2026-09-26 裁定，2026-11-19 问答重申维持）。
+- 接管形态为增强式内嵌：原生抽屉内容保留可见可用，插件面板挂载其后（2026-11-19 问答定案）。
+- 样式单一书写点：组件 CSS 只引 --st-bg-* 语义变量，--SmartTheme* 仅限 src/ui/styles/00-tokens.css。
+- 面板弹窗统一走 HostBridge 弹窗适配器，业务层禁用原生 alert/confirm/prompt。
 
 <!-- TAVERN-RULES:END -->
 
