@@ -9,6 +9,18 @@
     "dev:ui": "vite --config vite.config.dev.ts",
     "type-check": "tsc --noEmit",
     "check:css": "node tests/css-gate.mjs",
+    "harness:dev": "node scripts/guards/harness-runner.mjs tests/dev-harness.mjs",
+    "harness:api": "node scripts/guards/harness-runner.mjs tests/api-harness.mjs",
+    "harness:all": "npm run harness:dev && npm run harness:api",
+    "dev-harness": "npm run harness:dev",
+    "api-harness": "npm run harness:api",
+    "test": "npm run type-check && npm run check:css && npm run qa:static",
+    "qa:static": "node scripts/guards/qa-static.mjs",
+    "guard:ui-tokens": "node scripts/guards/check-ui-tokens.mjs",
+    "guard:dom-injection": "node scripts/guards/dom-injection.mjs",
+    "guard:template-source": "node scripts/guards/template-source.mjs",
+    "guard:control-consumer": "node scripts/guards/control-consumer.mjs",
+    "guard:copy-audit": "node scripts/guards/copy-audit.mjs",
     "test:e2e": "node tests/e2e.mjs",
     "test:stress": "node tests/stress.mjs"
   },
@@ -33,5 +45,8 @@
     "puppeteer-core": "^25.10.0",
     "typescript": "^5.4.0",
     "vite": "^5.2.0"
+  },
+  "dependencies": {
+    "preact": "^11.2.0"
   }
 }
