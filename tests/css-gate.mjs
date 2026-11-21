@@ -3,8 +3,11 @@
 //   1) 严禁全局选择器泄漏：* / html / body / :root 开头的选择器一律违规；
 //   2) 每条选择器必须携带本扩展专属前缀：类 .st-bg-*（含 .st-bgloader-*）或 id #st_bg*；
 //   3) 零溢光：box-shadow 一律禁止（用户裁定 2026-09-26，边界由边框+色调表达）。
-// 扫描范围：src/ui/style.css（聚合入口）+ src/ui/styles/*.css（拆分件）。
+// 扫描范围：src/ui/style.css（聚合入口）+ src/ui/styles/*.css（拆分件）+ dev/styles/harness.css。
 // 样式拆分后若只扫聚合入口，全部规则会逃出守卫——盲区教训，2026-11-19 随拆分同步补齐。
+// dev harness 样式此前是第二个盲区：harness.css 存量两处 box-shadow 逃过门禁
+// （红队发现 2026-11-21），故一并纳入；但它模拟真宿主 DOM（#bg_menu_content/.bg_example），
+// 前缀纪律不适用，扫描时豁免规则 2，仅套用全局泄漏与 box-shadow 两条（规则语义不变）。
 // 用法：npm run check:css（退出码非 0 即违规，逐条列出 file:line 证据）。
 
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
@@ -14,19 +17,22 @@ import { dirname, join } from 'node:path';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 const collectCssFiles = () => {
-    const files = [join(root, 'src', 'ui', 'style.css')];
+    // { path, enforcePrefix }：src 件强制扩展前缀；dev harness 模拟宿主 DOM，豁免前缀纪律。
+    const files = [{ path: join(root, 'src', 'ui', 'style.css'), enforcePrefix: true }];
     const stylesDir = join(root, 'src', 'ui', 'styles');
     if (existsSync(stylesDir)) {
         for (const name of readdirSync(stylesDir).filter(n => n.endsWith('.css')).sort()) {
-            files.push(join(stylesDir, name));
+            files.push({ path: join(stylesDir, name), enforcePrefix: true });
         }
     }
+    // dev harness 样式纳入 box-shadow 与全局泄漏门禁（红队盲区修复）。
+    files.push({ path: join(root, 'dev', 'styles', 'harness.css'), enforcePrefix: false });
     return files;
 };
 
 const violations = [];
 
-const scanCssFile = (filePath) => {
+const scanCssFile = ({ path: filePath, enforcePrefix }) => {
     const rel = filePath.slice(root.length + 1);
     const text = readFileSync(filePath, 'utf8');
     const local = [];
@@ -54,10 +60,12 @@ const scanCssFile = (filePath) => {
                 local.push(`L${startLine} 全局选择器泄漏: \`${s}\``);
                 continue;
             }
-            // 规则 2：前缀纪律（类 .st-bg* / id #st_bg* 至少其一）
-            const hasPrefix = /\.st-bg[A-Za-z0-9_-]*/.test(s) || /#st_bg[A-Za-z0-9_-]*/.test(s);
-            if (!hasPrefix) {
-                local.push(`L${startLine} 缺少扩展前缀（需 .st-bg-* / #st_bg*）: \`${s}\``);
+            // 规则 2：前缀纪律（类 .st-bg* / id #st_bg* 至少其一）。dev harness 豁免。
+            if (enforcePrefix) {
+                const hasPrefix = /\.st-bg[A-Za-z0-9_-]*/.test(s) || /#st_bg[A-Za-z0-9_-]*/.test(s);
+                if (!hasPrefix) {
+                    local.push(`L${startLine} 缺少扩展前缀（需 .st-bg-* / #st_bg*）: \`${s}\``);
+                }
             }
         }
     };
@@ -149,4 +157,4 @@ if (violations.length > 0) {
     for (const v of violations) console.error(`  - ${v}`);
     process.exit(1);
 }
-console.log('CSS 门禁通过：0 全局泄漏 / 0 缺前缀 / 0 box-shadow（style.css 聚合入口 + styles/*.css 拆分件 + src/**/*.ts 注入面）');
+console.log('CSS 门禁通过：0 全局泄漏 / 0 缺前缀 / 0 box-shadow（style.css 聚合入口 + styles/*.css 拆分件 + dev/styles/harness.css + src/**/*.ts 注入面；harness 豁免前缀）');

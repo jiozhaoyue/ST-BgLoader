@@ -54,6 +54,10 @@ window.addEventListener('unhandledrejection', e => setStatus(`未处理拒绝：
 
 window.setTimeout(() => {
     const api = (window as any).STBgLoader?.getAPI?.();
-    if (api) setStatus('扩展已启动（API 就绪）', true);
-    else setStatus('扩展未启动：查看控制台', false);
+    const tutorial = (window as any).__devHarness?.isTutorial === true;
+    // 措辞与实际行为一致：教程态由服务端内存数据集 + 浏览器 localStorage/CacheStorage/
+    // IndexedDB 全部内存替换共同保证「零持久化」，故统一标注「全部内存·不写真实数据」。
+    const suffix = tutorial ? ' · 教程（全部内存，不写真实数据）' : '';
+    if (api) setStatus(`扩展已启动（API 就绪）${suffix}`, true);
+    else setStatus(`扩展未启动：查看控制台${suffix}`, false);
 }, 1200);

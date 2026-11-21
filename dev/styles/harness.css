@@ -140,8 +140,8 @@
     width: 460px;
     max-width: 92vw;
     background: var(--st-bgloader-dev-panel);
-    border-left: 1px solid var(--st-bgloader-dev-border);
-    box-shadow: -8px 0 24px rgba(0, 0, 0, 0.35);
+    /* 零溢光：抽屉边界由加深的左边框表达，不用 box-shadow（用户裁定） */
+    border-left: 1px solid #0a0c10;
     transform: translateX(102%);
     transition: transform 0.18s ease;
     overflow-y: auto;
@@ -150,6 +150,48 @@
 
 .st-bgloader-dev-drawer.st-bgloader-dev-open {
     transform: translateX(0);
+}
+
+/* 宿主 #bg1 背景容器：真机铺满视口，扩展把媒体层挂在其内。工作台给固定低层级，
+   使 MediaMount / 原生接管装饰可见可用（与真机同构，而非另造 UI）。 */
+.st-bgloader-dev-bg1 {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+    pointer-events: none;
+    border: 1px solid var(--st-bgloader-dev-border);
+}
+
+/* 原生背景瓦片：NativeBackgroundController 给 .bg_example 打徽标/选中标记，
+   工作台渲染两组样例（图片/音频）以便复现接管拦截，禁止隐藏。 */
+.st-bgloader-dev-bg1 #bg_menu_content,
+#bg_menu_content {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 8px;
+}
+
+.bg_example {
+    min-width: 64px;
+    min-height: 48px;
+    padding: 6px;
+    border: 1px solid var(--st-bgloader-dev-border);
+    border-radius: 6px;
+    color: var(--st-bgloader-dev-text);
+    font-size: 11px;
+    cursor: pointer;
+    background: #262c37;
+}
+
+/* 渲染+灰化范式：宿主 API 不可用的控件保留渲染、仅灰化禁用，禁止隐藏/不渲染。
+   与 src/ui/styles/01-base.css 的 .st-bgloader-disabled 同语义，供 dev 作用域控件复用。 */
+.st-bgloader-dev-btn.st-bgloader-dev-unavailable,
+.st-bgloader-dev-unavailable {
+    opacity: 0.5;
+    pointer-events: none;
+    cursor: not-allowed;
 }
 
 .st-bgloader-dev-toast {
@@ -161,10 +203,10 @@
     border-radius: 8px;
     background: #262c37;
     border: 1px solid var(--st-bgloader-dev-border);
+    /* 零溢光：浮层边界由边框与底色色差表达，不用 box-shadow（用户裁定） */
     color: var(--st-bgloader-dev-text);
     font-size: 13px;
     z-index: 60;
-    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
 }
 
 .st-bgloader-dev-toast.st-bgloader-dev-toast-error {

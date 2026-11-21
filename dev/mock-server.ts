@@ -75,6 +75,32 @@ function makeWav(seconds = 3, freq = 220, sampleRate = 8000): Buffer {
     return Buffer.concat([header, data]);
 }
 
+/**
+ * 教程模式开关（单一权威）：dry-run + 内存演示数据，不写 dev/.data（不写真实数据）。
+ * mock-server 运行在 Node（Vite 插件），读不到浏览器 URL 参数，故以环境变量 DEV_TUTORIAL
+ * 为唯一权威开关；浏览器侧不再支持 ?tutorial=1 双轨。启动方式：DEV_TUTORIAL=1 npm run dev:ui。
+ * 该权威值经 transformIndexHtml 注入 window.__DEV_TUTORIAL__，由 host-stub 消费，
+ * 保证 UI 标识（isTutorial）与实际持久化拦截行为同源、永不漂移。
+ */
+const TUTORIAL = process.env.DEV_TUTORIAL === '1';
+
+/**
+ * 教程演示数据集：纯内存，复用现有 SVG/WAV 生成器，零磁盘写入。
+ * 值类型含字节与 MIME，供 GET 静态路由直接回吐；键为文件名，供 /all 列举。
+ */
+type DemoFile = { data: Buffer; mime: string };
+const demoFiles = new Map<string, DemoFile>();
+
+function seedDemoFiles(): void {
+    if (demoFiles.size) return;
+    demoFiles.set('tutorial-landscape.svg', { data: Buffer.from(SAMPLE_SVG, 'utf8'), mime: 'image/svg+xml' });
+    demoFiles.set('tutorial-ambient.wav', { data: makeWav(), mime: 'audio/wav' });
+    demoFiles.set('tutorial-night.svg', {
+        data: Buffer.from(SAMPLE_SVG.replace(/#2b3a55/g, '#0b1020').replace(/#c98a7a/g, '#3a4a7a'), 'utf8'),
+        mime: 'image/svg+xml',
+    });
+}
+
 function readBody(req: Connect.IncomingMessage): Promise<Buffer> {
     return new Promise((resolve, reject) => {
         const chunks: Buffer[] = [];
@@ -124,6 +150,11 @@ export function devMockServer(): Plugin {
     const bgDir = path.resolve(process.cwd(), 'dev', '.data', 'backgrounds');
 
     function seed(): void {
+        // 教程模式：不 seeding 磁盘、不写 dev/.data，演示数据全部驻留内存。
+        if (TUTORIAL) {
+            seedDemoFiles();
+            return;
+        }
         fs.mkdirSync(bgDir, { recursive: true });
         const svg = path.join(bgDir, 'sample-landscape.svg');
         if (!fs.existsSync(svg)) fs.writeFileSync(svg, SAMPLE_SVG, 'utf8');
@@ -143,13 +174,16 @@ export function devMockServer(): Plugin {
         const pathname = decodeURIComponent(rawUrl.split('?')[0]);
 
         // 自愈：configureServer 时 seed 过的目录可能在中途被清（清理脚本/手动删除），
-        // 任何请求到达时补种，避免 readdir ENOENT 500。
-        if (!fs.existsSync(bgDir)) seed();
+        // 任何请求到达时补种，避免 readdir ENOENT 500。教程模式跳过磁盘自愈（只读内存）。
+        if (!TUTORIAL && !fs.existsSync(bgDir)) seed();
 
         try {
             if (pathname === '/api/backgrounds/all' && req.method === 'POST') {
                 await readBody(req);
-                send(res, 200, JSON.stringify({ images: mediaOnly(bgDir) }), 'application/json');
+                const images = TUTORIAL
+                    ? [...demoFiles.keys()].map(filename => ({ filename }))
+                    : mediaOnly(bgDir);
+                send(res, 200, JSON.stringify({ images }), 'application/json');
                 return;
             }
 
@@ -169,6 +203,14 @@ export function devMockServer(): Plugin {
                 const name = safeName(part.filename);
                 if (!name) {
                     send(res, 400, 'unsafe filename', 'text/plain');
+                    return;
+                }
+                // 教程模式：拦截一切持久化写入——上传只落内存演示集，绝不碰 dev/.data。
+                // 复用真实上传路径返回的文件名协议（plain text），业务层无感知、控件照常渲染。
+                if (TUTORIAL) {
+                    const ext = name.split('.').pop()?.toLowerCase() ?? '';
+                    demoFiles.set(name, { data: part.data, mime: MIME[ext] ?? 'application/octet-stream' });
+                    send(res, 200, name, 'text/plain');
                     return;
                 }
                 // JSON documents are state, not media: the extension rewrites them in place.
@@ -200,6 +242,12 @@ export function devMockServer(): Plugin {
                     send(res, 400, 'unsafe filename', 'text/plain');
                     return;
                 }
+                // 教程模式：删除只作用于内存演示集，幂等且零磁盘副作用。
+                if (TUTORIAL) {
+                    demoFiles.delete(name);
+                    send(res, 200, JSON.stringify({ ok: true }), 'application/json');
+                    return;
+                }
                 // Idempotent: the extension treats "already gone" as success.
                 try { fs.rmSync(path.join(bgDir, name)); } catch { /* absent */ }
                 send(res, 200, JSON.stringify({ ok: true }), 'application/json');
@@ -210,6 +258,16 @@ export function devMockServer(): Plugin {
                 const name = safeName(pathname.slice('/backgrounds/'.length));
                 if (!name) {
                     send(res, 400, 'unsafe path', 'text/plain');
+                    return;
+                }
+                // 教程模式：静态资源从内存演示集回吐，供媒体层正常解码渲染。
+                if (TUTORIAL) {
+                    const demo = demoFiles.get(name);
+                    if (!demo) {
+                        send(res, 404, 'not found', 'text/plain');
+                        return;
+                    }
+                    send(res, 200, demo.data, demo.mime);
                     return;
                 }
                 const file = path.join(bgDir, name);
@@ -233,10 +291,28 @@ export function devMockServer(): Plugin {
     return {
         name: 'st-bgloader-dev-mock',
         apply: 'serve',
+        // 把 Node 侧唯一权威教程开关注入浏览器，供 host-stub 在 module 求值前读取。
+        // 以 inline script 置于 head 最前，早于 boot.ts 的 module import 链执行；
+        // %s 布尔字面量由 JS 强制生成，无字符串拼接注入风险。
+        transformIndexHtml(html: string) {
+            return {
+                html,
+                tags: [{
+                    tag: 'script',
+                    attrs: { type: 'text/javascript' },
+                    children: `window.__DEV_TUTORIAL__ = ${TUTORIAL ? 'true' : 'false'};`,
+                    injectTo: 'head-prepend',
+                }],
+            };
+        },
         configureServer(server) {
             seed();
             server.middlewares.use(middleware);
-            server.config.logger.info('[dev-mock] 挂载 /api/backgrounds/* 与 /backgrounds/* 于 dev/.data/');
+            server.config.logger.info(
+                TUTORIAL
+                    ? '[dev-mock] 教程模式（dry-run）：演示数据在内存，/api/backgrounds/* 与 /backgrounds/* 全部零磁盘写入'
+                    : '[dev-mock] 挂载 /api/backgrounds/* 与 /backgrounds/* 于 dev/.data/'
+            );
         },
     };
 }
