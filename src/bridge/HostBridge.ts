@@ -6,6 +6,39 @@ export interface HostBridgeInfo {
 }
 
 /**
+ * 宿主能力键：业务层只认能力，禁止按宿主名分支（D-01）。
+ * 每项均为运行时特性检测结果，而非从 hostType 字符串推导。
+ */
+export type HostCapability =
+    | 'contextApi'
+    | 'requestHeaders'
+    | 'genericPopup'
+    | 'nativeBackgroundDrawer'
+    | 'extensionsSettings';
+
+/** 能力探测结果（detect 后缓存，只读）。 */
+export type HostCapabilities = Readonly<Record<HostCapability, boolean>>;
+
+/** 能力显式声明清单：新增能力必须同时在此登记并补探测函数。 */
+export const HOST_CAPABILITIES: readonly HostCapability[] = [
+    'contextApi',
+    'requestHeaders',
+    'genericPopup',
+    'nativeBackgroundDrawer',
+    'extensionsSettings',
+];
+
+/** 能力探测函数表：集中在宿主桥内做特性检测，业务层不可见。 */
+type CapabilityProbe = (self: HostBridge) => boolean;
+const CAPABILITY_PROBES: Readonly<Record<HostCapability, CapabilityProbe>> = {
+    contextApi: () => typeof (window as any)?.SillyTavern?.getContext === 'function',
+    requestHeaders: () => typeof (window as any)?.SillyTavern?.getContext?.()?.getRequestHeaders === 'function',
+    genericPopup: (self) => typeof self.getContext()?.callGenericPopup === 'function',
+    nativeBackgroundDrawer: () => !!document.querySelector('#Backgrounds'),
+    extensionsSettings: () => !!document.querySelector('#extensions_settings'),
+};
+
+/**
  * HostBridge centralizes all platform and host-specific detection and DOM seams
  * for SillyTavern, Luker, PureTavern, and TauriTavern.
  *
@@ -15,9 +48,11 @@ export interface HostBridgeInfo {
 export class HostBridge {
     private static instance: HostBridge | null = null;
     private readonly hostType: HostType;
+    private readonly capabilities: HostCapabilities;
 
     constructor() {
         this.hostType = this.detectHostType();
+        this.capabilities = this.detectCapabilities();
     }
 
     public static getInstance(): HostBridge {
@@ -64,6 +99,39 @@ export class HostBridge {
         }
 
         return 'generic';
+    }
+
+    /**
+     * 逐项运行能力探测并缓存结果（构造期一次性）。
+     * 仅做特性检测，不按 hostType 推导，业务层据此查询即可（D-01）。
+     */
+    private detectCapabilities(): HostCapabilities {
+        const result = {} as Record<HostCapability, boolean>;
+        for (const key of HOST_CAPABILITIES) {
+            let hit = false;
+            try {
+                hit = CAPABILITY_PROBES[key](this) === true;
+            } catch {
+                hit = false;
+            }
+            result[key] = hit;
+        }
+        return result as HostCapabilities;
+    }
+
+    /** 返回全部宿主能力探测结果（只读快照）。 */
+    public getCapabilities(): HostCapabilities {
+        return { ...this.capabilities };
+    }
+
+    /** 查询单项宿主能力是否可用；未登记的能力返回 false。 */
+    public hasCapability(key: HostCapability): boolean {
+        return this.capabilities[key] === true;
+    }
+
+    /** 宿主是否具备官方弹窗能力（业务层据此选择弹窗适配路径）。 */
+    public canUseGenericPopup(): boolean {
+        return this.hasCapability('genericPopup');
     }
 
     public getHostType(): HostType {

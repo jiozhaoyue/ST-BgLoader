@@ -1,4 +1,6 @@
 import { escapeHtml } from '../core/sanitize';
+import { renderToHtml } from './framework/bridge';
+import { segmentedVNode } from './framework/components';
 
 export interface SliderOptions {
     id: string;
@@ -258,13 +260,11 @@ export class UIComponents {
      * Renders a single-select segmented pill control.
      */
     public static renderSegmented(opts: SegmentedOptions): string {
-        const idAttr = opts.id ? ` id="${opts.id}"` : '';
-        const btns = opts.options.map(o => {
-            const active = o.selected ? ' active' : '';
-            const icon = o.icon ? `<i class="fa-solid ${o.icon}"></i>` : '';
-            return `<button type="button" class="st-bgloader-seg-btn${active}" data-seg-value="${escapeHtml(o.value)}">${icon}<span>${escapeHtml(o.label)}</span></button>`;
-        }).join('');
-        return `<div class="st-bgloader-seg"${idAttr}>${btns}</div>`;
+        // Preact 示范迁移（框架基建兵首波次）：改用 Preact h() 构造胶囊 DOM，
+        // 经桥接层序列化回字符串嵌入既有模板。class 前缀与 data-seg-value
+        // 逐字段保持旧版一致，bindSegmented 事件委托与 E2E 选择器零改动。
+        // 纯展示、无状态、无自带事件，故走静态渲染通道；交互仍由原委托负责。
+        return renderToHtml(segmentedVNode(opts));
     }
 
     private static readonly GROUP_STATE_KEY = 'st_bgloader_group_state';

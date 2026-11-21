@@ -8,6 +8,7 @@
      BodyColor #e0e0e0 / BorderColor rgba(255,255,255,0.1) /
      QuoteColor #4fa3d1 / BlurTintColor #1e1e24。
    ⚠ 新增 UI 面时必须把它的根选择器加入下方清单，否则语义变量在该面不解析。
+   FrostedGlass 作用于宿主聊天区，故把 body 上的 .st-bgloader-frosted-active 一并纳入。
    ========================================================================= */
 
 .st-bgloader-panel,
@@ -16,12 +17,16 @@
 .st-bg-native-badge,
 .st-bg-native-current,
 .st-bg-takeover-selected,
-#st_bgloader_container {
+#st_bgloader_container,
+.st-bgloader-frosted-active {
     /* —— 派生层：由宿主主题变量派生，随主题切换自动生效 —— */
     --st-bg-text: var(--SmartThemeBodyColor, #e0e0e0);
     --st-bg-border: var(--SmartThemeBorderColor, rgba(255, 255, 255, 0.1));
     --st-bg-accent: var(--SmartThemeQuoteColor, #4fa3d1);
     --st-bg-surface: var(--SmartThemeBlurTintColor, #1e1e24);
+    /* —— 毛玻璃派生层（供 FrostedGlassController 运行时 CSS 引用，避免绕过本真源）—— */
+    --st-bg-frosted-tint: var(--SmartThemeBlurTintColor, #121218);
+    --st-bg-frosted-border: var(--SmartThemeBorderColor, rgba(255, 255, 255, 0.12));
     /* —— 语义例外（spec §4：编码含义，不随主题漂移）—— */
     --st-bg-warn: #ff5252;
     --st-bg-badge-video: #e53935;
