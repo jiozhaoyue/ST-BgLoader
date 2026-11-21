@@ -3,9 +3,16 @@
 > 目标：**不启动酒馆**也能看到并操作 ST-BgLoader 的完整 UI，用于快速迭代与截图验证。
 
 ```bash
-npm run dev:ui        # 打开 http://localhost:5173/
-node tests/dev-harness.mjs   # 自检（需先启动上面这条）
+npm run dev:ui        # 手动打开 http://localhost:5173/（仅交互调试用）
+
+# 一键自检：自动探测 :5173，无服务则拉起 dev:ui，跑完回收服务进程
+npm run harness:dev   # dev-harness（14 项断言）
+npm run harness:api   # api-harness（38 项断言）
+npm run harness:all   # 两套串跑（门禁免实例入口）
 ```
+
+> 直接 `node tests/dev-harness.mjs` / `node tests/api-harness.mjs` 要求 `:5173` 已在运行；
+> 否则报 `net::ERR_CONNECTION_REFUSED`。门禁与 CI 请走上面的 `harness:*` npm 入口。
 
 ## 为什么不是「把酒馆拆开」
 

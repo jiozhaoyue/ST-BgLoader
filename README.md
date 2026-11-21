@@ -15,19 +15,26 @@
 
 项目包含全套生产级技术文档与创作者集成指南，欢迎查阅：
 
-* 📖 **[Wiki 首页 (Home)](wiki/Home.md)**
-* ⚙️ **[全量设置项对照表 (Settings Reference)](wiki/Settings-Reference.md)**
-* 💾 **[存储模型与 Authority 增强集成 (Storage & Authority)](wiki/Storage-and-Authority-Integration.md)**
-* 🏛️ **[顶栏原生抽屉夺舍与跨宿主集成 (Native Background Integration)](wiki/Native-Background-Integration.md)**
-* 🖼️ **[UI 组件、视听转场与毛玻璃 (UI Components & Transitions)](wiki/UI-Components-and-Transitions.md)**
-* 📐 **[系统架构与解耦设计 (Architecture & Design)](wiki/Architecture-and-Design.md)**
-* 🔌 **[开发者公共 API 参考 (Public API Reference)](wiki/Public-API-Reference.md)**
-* 🌧️ **[微粒天气系统 (Atmospheric Weather Engine)](wiki/Atmospheric-Weather-Engine.md)**
-* 🎵 **[音频引擎与律动频谱 (Audio Engine & Visualizer)](wiki/Audio-Engine-and-Visualizer.md)**
-* ⚡ **[智能场景触发器 (Smart Triggers & Scenes)](wiki/Smart-Triggers-and-Scene-Automation.md)**
-* 🎭 **[角色卡集成与创作者指南 (Character Card Integration)](wiki/Character-Card-Integration.md)**
-* 🚀 **[性能优化与缓存体系 (Performance & Caching)](wiki/Performance-and-Caching-Guide.md)**
-* ❓ **[常见问题与排查 (FAQ & Troubleshooting)](wiki/FAQ-and-Troubleshooting.md)**
+* 📖 **[Wiki 首页 (Home)](docs/Home.md)**
+* ⚙️ **[全量设置项对照表 (Settings Reference)](docs/Settings-Reference.md)**
+* 💾 **[存储模型与 Authority 增强集成 (Storage & Authority)](docs/Storage-and-Authority-Integration.md)**
+* 🏛️ **[顶栏原生抽屉夺舍与跨宿主集成 (Native Background Integration)](docs/Native-Background-Integration.md)**
+* 🖼️ **[UI 组件、视听转场与毛玻璃 (UI Components & Transitions)](docs/UI-Components-and-Transitions.md)**
+* 📐 **[系统架构与解耦设计 (Architecture & Design)](docs/Architecture-and-Design.md)**
+* 🔌 **[开发者公共 API 参考 (Public API Reference)](docs/Public-API-Reference.md)**
+* 🌧️ **[微粒天气系统 (Atmospheric Weather Engine)](docs/Atmospheric-Weather-Engine.md)**
+* 🎵 **[音频引擎与律动频谱 (Audio Engine & Visualizer)](docs/Audio-Engine-and-Visualizer.md)**
+* ⚡ **[智能场景触发器 (Smart Triggers & Scenes)](docs/Smart-Triggers-and-Scene-Automation.md)**
+* 🎭 **[角色卡集成与创作者指南 (Character Card Integration)](docs/Character-Card-Integration.md)**
+* 🚀 **[性能优化与缓存体系 (Performance & Caching)](docs/Performance-and-Caching-Guide.md)**
+* ❓ **[常见问题与排查 (FAQ & Troubleshooting)](docs/FAQ-and-Troubleshooting.md)**
+* 📖 **[用户使用指南 (User Guide)](docs/User-Guide.md)**
+* 🛠️ **[逐项故障排查 (Troubleshooting)](docs/Troubleshooting.md)**
+* 📐 **[全形态 × 分辨率断点差异矩阵 (Form-Factor Matrix)](docs/Form-Factor-Matrix.md)**
+* 🧪 **[免酒馆独立 UI 预览台 (Development Harness)](docs/Development-Harness.md)**
+* 🛡️ **[静态守卫清单 (Guards)](docs/Guards.md)**
+* 🧑‍💻 **[开发者指南 (Dev Guide)](docs/Dev-Guide.md)**
+* 🎬 **[教程模式 (Tutorial Mode)](docs/Tutorial-Mode.md)**
 
 
 ---
@@ -127,8 +134,9 @@ npm run dev:ui     # 打开 http://localhost:5173/
 ### 自动化测试套件
 项目配备了完整的自动化质量门禁套件：
 - `npm run check:css`：CSS 作用域静态门禁（无需实例，随时可跑）；
-- `node tests/dev-harness.mjs`：预览台自检（免实例，需先 `npm run dev:ui`，14 项断言）；
-- `node tests/api-harness.mjs`：对外端点面自检（免实例，需先 `npm run dev:ui`，38 项断言：发现接口 / postMessage 桥往返与错误帧 / 事件三通道一致性 / 媒体库-设置-缓存-播放列表端点往返 / 登记表零漂移 / 网格合帧 / BGM 自动轮播端点 / 场景导出导入与白名单清洗）；
+- `npm run harness:dev`：预览台自检（免实例，自启/复用 `:5173` 服务并自动回收，14 项断言）；
+- `npm run harness:api`：对外端点面自检（免实例，自启/复用 `:5173` 服务并自动回收，38 项断言：发现接口 / postMessage 桥往返与错误帧 / 事件三通道一致性 / 媒体库-设置-缓存-播放列表端点往返 / 登记表零漂移 / 网格合帧 / BGM 自动轮播端点 / 场景导出导入与白名单清洗）；
+- `npm run harness:all`：一次串跑上面两套（门禁免实例入口，均不依赖外部先启服务）；
 - `node tests/e2e.mjs`：端到端功能回归测试（25 项断言，含 v2 端点真机往返）；
 - `node tests/stress.mjs`：极限并发切换、大文件流、异常容错与显存泄漏压力测试；
 - `node tests/authority.mjs`：服务端存储与 Authority 扩展交互能力测试；
@@ -173,7 +181,7 @@ window.stBgLoader.setParallax(true, 0.4);
 await window.stBgLoader.preloadMedia(['https://assets.example.com/scene.mp4']);
 ```
 
-完整接口参数与角色卡实战，请参阅 [Public API Reference](wiki/Public-API-Reference.md) 与 [Character Card Integration Guide](wiki/Character-Card-Integration.md)。
+完整接口参数与角色卡实战，请参阅 [Public API Reference](docs/Public-API-Reference.md) 与 [Character Card Integration Guide](docs/Character-Card-Integration.md)。
 
 ---
 
