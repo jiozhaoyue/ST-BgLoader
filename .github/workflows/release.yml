@@ -1,0 +1,75 @@
+# 发版发布工作流
+#
+# 头部注释：大产物不入库走 Release asset。
+#   dist/index.js / dist/style.css 是构建产物，体积较大，不提交进 Git 库；
+#   发版时以 Release asset 上传，配合 gh release upload --clobber 实现幂等重传。
+#   仓库保持轻量，用户从 Release 页取产物即可。
+#
+# Test gate 门槛：package.json 已登记 test 聚合入口（type-check → check:css → qa:static），
+#   任一守卫非零即整个 test 非零退出，发版前统一拦截质量问题。
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Test gate
+        run: npm run test
+
+      - name: Build
+        run: npm run build
+
+      - name: Verify artifact
+        run: |
+          test -f dist/index.js
+          SIZE=$(wc -c < dist/index.js)
+          if [ "$SIZE" -le 10240 ]; then
+            echo "产物过小：dist/index.js 仅 ${SIZE} 字节，低于阈值 10240" >&2
+            exit 1
+          fi
+          echo "产物校验通过：dist/index.js ${SIZE} 字节"
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release create "${GITHUB_REF_NAME}" --generate-notes || true
+
+      - name: Upload assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${GITHUB_REF_NAME}" dist/index.js dist/style.css --clobber
+
+      - name: Summary
+        run: |
+          SIZE=$(wc -c < dist/index.js)
+          {
+            echo "## 发布摘要"
+            echo "- Tag：${GITHUB_REF_NAME}"
+            echo "- dist/index.js：${SIZE} 字节"
+            echo "- 产物以 Release asset 形式上传，未入库"
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,43 @@
+# host-direct 构建门禁工作流
+#
+# 踩坑注释（务必保留）：本门禁专门拦截「只在打包器里成立、宿主直载时整图失败」的写法。
+# 真实教训：源码曾用 JSON 静态导入（import data from './x.json'），Vite 打包阶段一路绿灯，
+#           但宿主以 ESM 直载 dist 产物时无法解析该静态导入，导致整张背景图加载失败。
+#           故把 type-check / build / CSS 守卫串成硬门槛，让只在 bundler 内部自洽的写法
+#           在 CI 阶段就暴露，而不是流到宿主运行时才炸。
+name: host-direct checks
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npm run type-check
+
+      - name: Build
+        run: npm run build
+
+      - name: CSS gate
+        run: npm run check:css
+
+      - name: Static guards
+        run: npm run qa:static
